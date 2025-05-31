@@ -1,0 +1,1039 @@
+{% extends "base.html" %}
+
+{% block title %}Options Calculator - AI Trading Analysis{% endblock %}
+
+{% block head %}
+<style>
+/* Custom styles for options chain tables */
+.calls-table th, .calls-table td {
+    background-color: #e3f6fc !important;
+}
+.calls-table tr.calls-row:nth-child(odd) td {
+    background-color: #bde6f7 !important;
+}
+
+.puts-table th, .puts-table td {
+    background-color: #f4f4f4 !important;
+}
+.puts-table tr.puts-row:nth-child(odd) td {
+    background-color: #e0e0e0 !important;
+}
+.options-table th.calls-header {
+    background-color: #17a2b8 !important;
+    color: #fff !important;
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+.options-table th.puts-header {
+    background-color: #495057 !important;
+    color: #fff !important;
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+.btn-pnl-call {
+    background-color: #17a2b8;
+    color: #fff;
+    border: none;
+}
+.btn-pnl-call:hover {
+    background-color: #138496;
+    color: #fff;
+}
+.btn-pnl-put {
+    background-color: #495057;
+    color: #fff;
+    border: none;
+}
+.btn-pnl-put:hover {
+    background-color: #343a40;
+    color: #fff;
+}
+.autocomplete-dropdown {
+    position: fixed !important;
+    z-index: 99999 !important;
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    max-height: 200px;
+    overflow-y: auto;
+}
+.autocomplete-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.autocomplete-item.active, .autocomplete-item:hover {
+    background: #e3f6fc;
+}
+.autocomplete-symbol {
+    font-weight: bold;
+    color: #179ad6;
+    margin-right: 8px;
+}
+.autocomplete-name {
+    color: #555;
+    font-size: 0.95em;
+    flex: 1;
+    text-align: right;
+}
+
+/* Ensure autocomplete dropdown appears over everything */
+.symbol-input-container {
+    position: relative !important;
+    z-index: 99999 !important;
+}
+
+.card-body {
+    overflow: visible !important;
+}
+
+.input-group {
+    overflow: visible !important;
+}
+
+/* Ensure tables don't clip the dropdown */
+.table-responsive {
+    overflow: visible !important;
+}
+
+.card {
+    overflow: visible !important;
+}
+
+body {
+    overflow-x: visible !important;
+}
+
+/* Fix for current price display */
+.alert.alert-info {
+    display: block !important;
+    visibility: visible !important;
+    position: relative !important;
+    z-index: 1 !important;
+    margin-bottom: 1.5rem !important;
+}
+
+.itm-call-row td {
+    background-color: #cbeaf7 !important;
+}
+.itm-put-row td {
+    background-color: #f8d2d2 !important;
+}
+.otm-row td {
+    background-color: #f4f4f4 !important;
+}
+.itm-call-cell {
+    background-color: #cbeaf7 !important;
+}
+.itm-put-cell {
+    background-color: #f8d2d2 !important;
+}
+.otm-cell {
+    background-color: #f4f4f4 !important;
+}
+.alt-row .itm-call-cell {
+    background-color: #b3d8ec !important;
+}
+.alt-row .itm-put-cell {
+    background-color: #f3bcbc !important;
+}
+.alt-row .otm-cell {
+    background-color: #e0e0e0 !important;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-chart-line text-primary me-2"></i>
+        Options Profit Calculator
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        {% if current_user.is_authenticated %}
+        <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-home me-1"></i>
+            Dashboard
+        </a>
+        {% else %}
+        <a href="{{ url_for('login') }}" class="btn btn-outline-primary me-2">
+            <i class="fas fa-sign-in-alt me-1"></i>
+            Login
+        </a>
+        <a href="{{ url_for('register') }}" class="btn btn-primary">
+            <i class="fas fa-user-plus me-1"></i>
+            Register
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+{% if not current_user.is_authenticated %}
+<div class="alert alert-info mb-4">
+    <i class="fas fa-info-circle me-2"></i>
+    You can use the options calculator without logging in. Create an account to save your analysis and track your trades.
+</div>
+{% endif %}
+
+<!-- Symbol Input Form -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="fas fa-search me-2"></i>
+            Stock Symbol & Expiration
+        </h5>
+    </div>
+    <div class="card-body">
+        <form method="POST" class="row g-3">
+            <div class="col-md-6">
+                <label for="symbol" class="form-label">Stock Symbol</label>
+                <div class="input-group symbol-input-container">
+                    <input type="text" class="form-control" id="symbol-input" name="symbol" 
+                           value="{{ context.symbol if context.symbol else '' }}" 
+                           placeholder="Enter stock symbol (e.g., AAPL)" required autocomplete="off">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search me-1"></i>
+                        Get Options Chain
+                    </button>
+                </div>
+            </div>
+            {% if context.expiration_dates %}
+            <div class="col-md-6">
+                <label for="expiration_date" class="form-label">Expiration Date</label>
+                <select class="form-select" id="expiration_date" name="expiration_date">
+                    {% for date in context.expiration_dates %}
+                    <option value="{{ date }}" {% if date == context.selected_date %}selected{% endif %}>
+                        {{ date }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+        </form>
+    </div>
+</div>
+
+{% if context.symbol and context.current_price %}
+<!-- Stock Info Bar - Updated via JavaScript -->
+<div id="stockInfoBar" class="alert alert-info mb-4">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <span id="stockDisplay">
+            <strong>{{ context.symbol }}</strong>
+                {% if context.stock_name and context.stock_name != context.symbol %}
+                <span class="text-muted">— {{ context.stock_name }}</span>
+                {% endif %}
+            <span class="ms-2">Current Price: ${{ "%.2f"|format(context.current_price) }}</span>
+            </span>
+        </div>
+        {% if current_user.is_authenticated %}
+        <button class="btn btn-sm btn-outline-primary" onclick="addToTrades()">
+            <i class="fas fa-plus me-1"></i>
+            Add to Trades
+        </button>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+{% if context.calls and context.puts %}
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="fas fa-table me-2"></i>
+            Options Chain
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table options-table mb-0">
+                <thead>
+                    <tr>
+                        <th colspan="6" class="text-center calls-header">Calls</th>
+                        <th colspan="6" class="text-center puts-header">Puts</th>
+                    </tr>
+                    <tr>
+                        <th>Strike</th>
+                        <th>Last</th>
+                        <th>Bid</th>
+                        <th>Ask</th>
+                        <th>Volume</th>
+                        <th>Analysis</th>
+                        <th>Strike</th>
+                        <th>Last</th>
+                        <th>Bid</th>
+                        <th>Ask</th>
+                        <th>Volume</th>
+                        <th>Analysis</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for i in range(context.calls|length) %}
+                        {% set call = context.calls[i] %}
+                        {% set put = context.puts[i] %}
+                        {% set call_itm = call['strike'] < context.current_price %}
+                        {% set put_itm = put['strike'] > context.current_price %}
+                        <tr class="{% if i % 2 == 1 %}alt-row{% endif %}">
+                            <td class="{% if call_itm %}itm-call-cell{% else %}otm-cell{% endif %}"><strong>${{ "%.2f"|format(call['strike']) }}</strong></td>
+                            <td class="{% if call_itm %}itm-call-cell{% else %}otm-cell{% endif %}">${{ "%.2f"|format(call['last']) if call['last'] else 'N/A' }}</td>
+                            <td class="{% if call_itm %}itm-call-cell{% else %}otm-cell{% endif %}">${{ "%.2f"|format(call['bid']) if call['bid'] else 'N/A' }}</td>
+                            <td class="{% if call_itm %}itm-call-cell{% else %}otm-cell{% endif %}">${{ "%.2f"|format(call['ask']) if call['ask'] else 'N/A' }}</td>
+                            <td class="{% if call_itm %}itm-call-cell{% else %}otm-cell{% endif %}">{{ call['volume'] if call['volume'] else '0' }}</td>
+                            <td class="{% if call_itm %}itm-call-cell{% else %}otm-cell{% endif %}">
+                                <button class="btn btn-sm btn-pnl-call" onclick="analyzeOption('call', {{ call['strike'] }}, {{ context.current_price }}, '{{ context.selected_date }}', {{ call['last']|default(0) }})">View P&amp;L</button>
+                            </td>
+                            <td class="{% if put_itm %}itm-put-cell{% else %}otm-cell{% endif %}"><strong>${{ "%.2f"|format(put['strike']) }}</strong></td>
+                            <td class="{% if put_itm %}itm-put-cell{% else %}otm-cell{% endif %}">${{ "%.2f"|format(put['last']) if put['last'] else 'N/A' }}</td>
+                            <td class="{% if put_itm %}itm-put-cell{% else %}otm-cell{% endif %}">${{ "%.2f"|format(put['bid']) if put['bid'] else 'N/A' }}</td>
+                            <td class="{% if put_itm %}itm-put-cell{% else %}otm-cell{% endif %}">${{ "%.2f"|format(put['ask']) if put['ask'] else 'N/A' }}</td>
+                            <td class="{% if put_itm %}itm-put-cell{% else %}otm-cell{% endif %}">{{ put['volume'] if put['volume'] else '0' }}</td>
+                            <td class="{% if put_itm %}itm-put-cell{% else %}otm-cell{% endif %}">
+                                <button class="btn btn-sm btn-pnl-put" onclick="analyzeOption('put', {{ put['strike'] }}, {{ context.current_price }}, '{{ context.selected_date }}', {{ put['last']|default(0) }})">View P&amp;L</button>
+                            </td>
+                        </tr>
+                        {% if call['strike'] < context.current_price and (loop.index == loop.length or context.calls[loop.index]['strike'] >= context.current_price) %}
+                        <tr class="current-price-row">
+                            <td colspan="12" class="text-center text-dark p-2 fw-bold" style="background-color:#f8f9fa; font-size:14px;">
+                                &larr; Current Stock Price: ${{ "%.2f"|format(context.current_price) }} &rarr;
+                            </td>
+                        </tr>
+                        {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="alert alert-warning">
+    <i class="fas fa-exclamation-triangle me-2"></i>
+    No options data available for {{ context.symbol }}. Please check the symbol and try again.
+</div>
+{% endif %}
+
+<!-- P&L Analysis Modal -->
+<div class="modal fade" id="pnlModal" tabindex="-1" aria-labelledby="pnlModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="pnlModalLabel">Options P&L Analysis</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="pnlAnalysisContent">
+                    <!-- Content will be loaded dynamically -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Login Required Modal -->
+<div class="modal fade" id="loginRequiredModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Login Required</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Please log in to save your trade analysis.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <a href="{{ url_for('login') }}" class="btn btn-primary">Login</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Comprehensive list of 500+ popular stocks with options
+const POPULAR_STOCKS = [
+    {symbol: 'AAPL', name: 'Apple Inc'},
+    {symbol: 'MSFT', name: 'Microsoft Corporation'},
+    {symbol: 'GOOGL', name: 'Alphabet Inc Class A'},
+    {symbol: 'AMZN', name: 'Amazon.com Inc'},
+    {symbol: 'TSLA', name: 'Tesla Inc'},
+    {symbol: 'NVDA', name: 'NVIDIA Corporation'},
+    {symbol: 'META', name: 'Meta Platforms Inc'},
+    {symbol: 'BRK.B', name: 'Berkshire Hathaway Inc Class B'},
+    {symbol: 'LLY', name: 'Eli Lilly and Company'},
+    {symbol: 'V', name: 'Visa Inc'},
+    {symbol: 'UNH', name: 'UnitedHealth Group Inc'},
+    {symbol: 'JPM', name: 'JPMorgan Chase & Co'},
+    {symbol: 'XOM', name: 'Exxon Mobil Corporation'},
+    {symbol: 'MA', name: 'Mastercard Inc'},
+    {symbol: 'PG', name: 'Procter & Gamble Company'},
+    {symbol: 'JNJ', name: 'Johnson & Johnson'},
+    {symbol: 'HD', name: 'Home Depot Inc'},
+    {symbol: 'CVX', name: 'Chevron Corporation'},
+    {symbol: 'MRK', name: 'Merck & Co Inc'},
+    {symbol: 'ABBV', name: 'AbbVie Inc'},
+    {symbol: 'BAC', name: 'Bank of America Corp'},
+    {symbol: 'KO', name: 'Coca-Cola Company'},
+    {symbol: 'AVGO', name: 'Broadcom Inc'},
+    {symbol: 'WMT', name: 'Walmart Inc'},
+    {symbol: 'ORCL', name: 'Oracle Corporation'},
+    {symbol: 'COST', name: 'Costco Wholesale Corp'},
+    {symbol: 'PEP', name: 'PepsiCo Inc'},
+    {symbol: 'ADBE', name: 'Adobe Inc'},
+    {symbol: 'TMO', name: 'Thermo Fisher Scientific'},
+    {symbol: 'MCD', name: 'McDonald\'s Corporation'},
+    {symbol: 'ACN', name: 'Accenture plc'},
+    {symbol: 'CSCO', name: 'Cisco Systems Inc'},
+    {symbol: 'ABT', name: 'Abbott Laboratories'},
+    {symbol: 'CRM', name: 'Salesforce Inc'},
+    {symbol: 'NFLX', name: 'Netflix Inc'},
+    {symbol: 'WFC', name: 'Wells Fargo & Company'},
+    {symbol: 'DHR', name: 'Danaher Corporation'},
+    {symbol: 'INTU', name: 'Intuit Inc'},
+    {symbol: 'VZ', name: 'Verizon Communications'},
+    {symbol: 'PM', name: 'Philip Morris International'},
+    {symbol: 'TXN', name: 'Texas Instruments Inc'},
+    {symbol: 'RTX', name: 'Raytheon Technologies'},
+    {symbol: 'SPGI', name: 'S&P Global Inc'},
+    {symbol: 'NOW', name: 'ServiceNow Inc'},
+    {symbol: 'NEE', name: 'NextEra Energy Inc'},
+    {symbol: 'LOW', name: 'Lowe\'s Companies Inc'},
+    {symbol: 'QCOM', name: 'QUALCOMM Inc'},
+    {symbol: 'UNP', name: 'Union Pacific Corporation'},
+    {symbol: 'CAT', name: 'Caterpillar Inc'},
+    {symbol: 'AMGN', name: 'Amgen Inc'},
+    {symbol: 'HON', name: 'Honeywell International'},
+    {symbol: 'AMD', name: 'Advanced Micro Devices'},
+    {symbol: 'SCHW', name: 'Charles Schwab Corporation'},
+    {symbol: 'PFE', name: 'Pfizer Inc'},
+    {symbol: 'AXP', name: 'American Express Company'},
+    {symbol: 'SYK', name: 'Stryker Corporation'},
+    {symbol: 'GE', name: 'General Electric Company'},
+    {symbol: 'BSX', name: 'Boston Scientific Corporation'},
+    {symbol: 'DE', name: 'Deere & Company'},
+    {symbol: 'BLK', name: 'BlackRock Inc'},
+    {symbol: 'MDT', name: 'Medtronic plc'},
+    {symbol: 'GILD', name: 'Gilead Sciences Inc'},
+    {symbol: 'C', name: 'Citigroup Inc'},
+    {symbol: 'VRTX', name: 'Vertex Pharmaceuticals'},
+    {symbol: 'MMC', name: 'Marsh & McLennan Companies'},
+    {symbol: 'AON', name: 'Aon plc'},
+    {symbol: 'LRCX', name: 'Lam Research Corporation'},
+    {symbol: 'ADI', name: 'Analog Devices Inc'},
+    {symbol: 'ADP', name: 'Automatic Data Processing'},
+    {symbol: 'MDLZ', name: 'Mondelez International'},
+    {symbol: 'KLAC', name: 'KLA Corporation'},
+    {symbol: 'CI', name: 'Cigna Corporation'},
+    {symbol: 'SHW', name: 'Sherwin-Williams Company'},
+    {symbol: 'ZTS', name: 'Zoetis Inc'},
+    {symbol: 'CB', name: 'Chubb Limited'},
+    {symbol: 'REGN', name: 'Regeneron Pharmaceuticals'},
+    {symbol: 'PYPL', name: 'PayPal Holdings Inc'},
+    {symbol: 'SO', name: 'Southern Company'},
+    {symbol: 'DUK', name: 'Duke Energy Corporation'},
+    {symbol: 'CMG', name: 'Chipotle Mexican Grill'},
+    {symbol: 'PGR', name: 'Progressive Corporation'},
+    {symbol: 'ITW', name: 'Illinois Tool Works'},
+    {symbol: 'TGT', name: 'Target Corporation'},
+    {symbol: 'USB', name: 'U.S. Bancorp'},
+    {symbol: 'MMM', name: '3M Company'},
+    {symbol: 'MU', name: 'Micron Technology Inc'},
+    {symbol: 'APH', name: 'Amphenol Corporation'},
+    {symbol: 'TJX', name: 'TJX Companies Inc'},
+    {symbol: 'BDX', name: 'Becton Dickinson and Company'},
+    {symbol: 'MO', name: 'Altria Group Inc'},
+    {symbol: 'NSC', name: 'Norfolk Southern Corporation'},
+    {symbol: 'ISRG', name: 'Intuitive Surgical Inc'},
+    {symbol: 'HCA', name: 'HCA Healthcare Inc'},
+    {symbol: 'NKE', name: 'NIKE Inc'},
+    {symbol: 'CVS', name: 'CVS Health Corporation'},
+    {symbol: 'FI', name: 'Fiserv Inc'},
+    {symbol: 'COP', name: 'ConocoPhillips'},
+    {symbol: 'ETN', name: 'Eaton Corporation plc'},
+    {symbol: 'PLD', name: 'Prologis Inc'},
+    {symbol: 'APD', name: 'Air Products and Chemicals'},
+    {symbol: 'CL', name: 'Colgate-Palmolive Company'},
+    {symbol: 'AMAT', name: 'Applied Materials Inc'},
+    {symbol: 'GS', name: 'Goldman Sachs Group Inc'},
+    {symbol: 'FCX', name: 'Freeport-McMoRan Inc'},
+    {symbol: 'SLB', name: 'Schlumberger Limited'},
+    {symbol: 'EQIX', name: 'Equinix Inc'},
+    {symbol: 'CSX', name: 'CSX Corporation'},
+    {symbol: 'MPC', name: 'Marathon Petroleum Corporation'},
+    {symbol: 'NOC', name: 'Northrop Grumman Corporation'},
+    {symbol: 'EMR', name: 'Emerson Electric Co'},
+    {symbol: 'SNPS', name: 'Synopsys Inc'},
+    {symbol: 'TT', name: 'Trane Technologies plc'},
+    {symbol: 'F', name: 'Ford Motor Company'},
+    {symbol: 'HUM', name: 'Humana Inc'},
+    {symbol: 'CDNS', name: 'Cadence Design Systems'},
+    {symbol: 'SPY', name: 'SPDR S&P 500 ETF Trust'},
+    {symbol: 'QQQ', name: 'Invesco QQQ Trust'},
+    {symbol: 'IWM', name: 'iShares Russell 2000 ETF'},
+    {symbol: 'EFA', name: 'iShares MSCI EAFE ETF'},
+    {symbol: 'VTI', name: 'Vanguard Total Stock Market ETF'},
+    {symbol: 'VOO', name: 'Vanguard S&P 500 ETF'},
+    {symbol: 'GLD', name: 'SPDR Gold Shares'},
+    {symbol: 'SLV', name: 'iShares Silver Trust'},
+    {symbol: 'TLT', name: '20+ Year Treasury Bond ETF'},
+    {symbol: 'HYG', name: 'iShares iBoxx High Yield Corporate Bond ETF'},
+    {symbol: 'XLF', name: 'Financial Select Sector SPDR Fund'},
+    {symbol: 'XLE', name: 'Energy Select Sector SPDR Fund'},
+    {symbol: 'XLK', name: 'Technology Select Sector SPDR Fund'},
+    {symbol: 'XLV', name: 'Health Care Select Sector SPDR Fund'},
+    {symbol: 'XLI', name: 'Industrial Select Sector SPDR Fund'},
+    {symbol: 'XLY', name: 'Consumer Discretionary Select Sector SPDR Fund'},
+    {symbol: 'XLP', name: 'Consumer Staples Select Sector SPDR Fund'},
+    {symbol: 'XLRE', name: 'Real Estate Select Sector SPDR Fund'},
+    {symbol: 'XLU', name: 'Utilities Select Sector SPDR Fund'},
+    {symbol: 'XLB', name: 'Materials Select Sector SPDR Fund'},
+    {symbol: 'BA', name: 'Boeing Company'},
+    {symbol: 'DIS', name: 'Walt Disney Company'},
+    {symbol: 'INTC', name: 'Intel Corporation'},
+    {symbol: 'IBM', name: 'International Business Machines'},
+    {symbol: 'T', name: 'AT&T Inc'},
+    {symbol: 'GME', name: 'GameStop Corp'},
+    {symbol: 'AMC', name: 'AMC Entertainment Holdings'},
+    {symbol: 'BB', name: 'BlackBerry Limited'},
+    {symbol: 'NOK', name: 'Nokia Corporation'},
+    {symbol: 'PLTR', name: 'Palantir Technologies Inc'},
+    {symbol: 'NIO', name: 'NIO Inc'},
+    {symbol: 'RIOT', name: 'Riot Platforms Inc'},
+    {symbol: 'MARA', name: 'Marathon Digital Holdings'},
+    {symbol: 'COIN', name: 'Coinbase Global Inc'},
+    {symbol: 'SQ', name: 'Block Inc'},
+    {symbol: 'HOOD', name: 'Robinhood Markets Inc'},
+    {symbol: 'SOFI', name: 'SoFi Technologies Inc'},
+    {symbol: 'UPST', name: 'Upstart Holdings Inc'},
+    {symbol: 'AFRM', name: 'Affirm Holdings Inc'},
+    {symbol: 'ROKU', name: 'Roku Inc'},
+    {symbol: 'SNAP', name: 'Snap Inc'},
+    {symbol: 'TWTR', name: 'Twitter Inc'},
+    {symbol: 'UBER', name: 'Uber Technologies Inc'},
+    {symbol: 'LYFT', name: 'Lyft Inc'},
+    {symbol: 'ABNB', name: 'Airbnb Inc'},
+    {symbol: 'DOCU', name: 'DocuSign Inc'},
+    {symbol: 'ZM', name: 'Zoom Video Communications'},
+    {symbol: 'CRM', name: 'Salesforce Inc'},
+    {symbol: 'SHOP', name: 'Shopify Inc'},
+    {symbol: 'SPOT', name: 'Spotify Technology SA'},
+    {symbol: 'SQ', name: 'Square Inc'},
+    {symbol: 'TWLO', name: 'Twilio Inc'},
+    {symbol: 'OKTA', name: 'Okta Inc'},
+    {symbol: 'DDOG', name: 'Datadog Inc'},
+    {symbol: 'SNOW', name: 'Snowflake Inc'},
+    {symbol: 'NET', name: 'Cloudflare Inc'},
+    {symbol: 'FSLY', name: 'Fastly Inc'},
+    {symbol: 'MDB', name: 'MongoDB Inc'},
+    {symbol: 'CRWD', name: 'CrowdStrike Holdings Inc'},
+    {symbol: 'ZS', name: 'Zscaler Inc'},
+    {symbol: 'PANW', name: 'Palo Alto Networks Inc'},
+    {symbol: 'FTNT', name: 'Fortinet Inc'},
+    {symbol: 'SPLK', name: 'Splunk Inc'},
+    {symbol: 'VEEV', name: 'Veeva Systems Inc'},
+    {symbol: 'WDAY', name: 'Workday Inc'},
+    {symbol: 'TEAM', name: 'Atlassian Corporation'},
+    {symbol: 'ZEN', name: 'Zendesk Inc'},
+    {symbol: 'PD', name: 'PagerDuty Inc'},
+    {symbol: 'ESTC', name: 'Elastic NV'},
+    {symbol: 'AI', name: 'C3.ai Inc'},
+    {symbol: 'PLTR', name: 'Palantir Technologies Inc'},
+    {symbol: 'NVTA', name: 'Invitae Corporation'},
+    {symbol: 'TDOC', name: 'Teladoc Health Inc'},
+    {symbol: 'PTON', name: 'Peloton Interactive Inc'},
+    {symbol: 'NKLA', name: 'Nikola Corporation'},
+    {symbol: 'LCID', name: 'Lucid Group Inc'},
+    {symbol: 'RIVN', name: 'Rivian Automotive Inc'},
+    {symbol: 'F', name: 'Ford Motor Company'},
+    {symbol: 'GM', name: 'General Motors Company'},
+    {symbol: 'STLA', name: 'Stellantis NV'},
+    {symbol: 'TM', name: 'Toyota Motor Corporation'},
+    {symbol: 'HMC', name: 'Honda Motor Co Ltd'},
+    {symbol: 'AAL', name: 'American Airlines Group'},
+    {symbol: 'DAL', name: 'Delta Air Lines Inc'},
+    {symbol: 'UAL', name: 'United Airlines Holdings'},
+    {symbol: 'LUV', name: 'Southwest Airlines Co'},
+    {symbol: 'CCL', name: 'Carnival Corporation'},
+    {symbol: 'RCL', name: 'Royal Caribbean Cruises'},
+    {symbol: 'NCLH', name: 'Norwegian Cruise Line Holdings'},
+    {symbol: 'MAR', name: 'Marriott International'},
+    {symbol: 'HLT', name: 'Hilton Worldwide Holdings'},
+    {symbol: 'IHG', name: 'InterContinental Hotels Group'},
+    {symbol: 'MGM', name: 'MGM Resorts International'},
+    {symbol: 'LVS', name: 'Las Vegas Sands Corp'},
+    {symbol: 'WYNN', name: 'Wynn Resorts Limited'},
+    {symbol: 'PENN', name: 'Penn Entertainment Inc'},
+    {symbol: 'DKNG', name: 'DraftKings Inc'},
+    {symbol: 'CZR', name: 'Caesars Entertainment Inc'},
+    {symbol: 'AA', name: 'Alcoa Corporation'},
+    {symbol: 'X', name: 'United States Steel Corporation'},
+    {symbol: 'NUE', name: 'Nucor Corporation'},
+    {symbol: 'STLD', name: 'Steel Dynamics Inc'},
+    {symbol: 'CLF', name: 'Cleveland-Cliffs Inc'},
+    {symbol: 'MT', name: 'ArcelorMittal'},
+    {symbol: 'VALE', name: 'Vale SA'},
+    {symbol: 'RIO', name: 'Rio Tinto Group'},
+    {symbol: 'BHP', name: 'BHP Group Limited'},
+    {symbol: 'NEM', name: 'Newmont Corporation'},
+    {symbol: 'GOLD', name: 'Barrick Gold Corporation'},
+    {symbol: 'AEM', name: 'Agnico Eagle Mines Limited'},
+    {symbol: 'WPM', name: 'Wheaton Precious Metals Corp'},
+    {symbol: 'SLB', name: 'Schlumberger Limited'},
+    {symbol: 'HAL', name: 'Halliburton Company'},
+    {symbol: 'BKR', name: 'Baker Hughes Company'},
+    {symbol: 'OXY', name: 'Occidental Petroleum Corporation'},
+    {symbol: 'EOG', name: 'EOG Resources Inc'},
+    {symbol: 'PXD', name: 'Pioneer Natural Resources'},
+    {symbol: 'DVN', name: 'Devon Energy Corporation'},
+    {symbol: 'MRO', name: 'Marathon Oil Corporation'},
+    {symbol: 'APA', name: 'APA Corporation'},
+    {symbol: 'HES', name: 'Hess Corporation'},
+    {symbol: 'KMI', name: 'Kinder Morgan Inc'},
+    {symbol: 'WMB', name: 'Williams Companies Inc'},
+    {symbol: 'OKE', name: 'ONEOK Inc'},
+    {symbol: 'EPD', name: 'Enterprise Products Partners'},
+    {symbol: 'MMP', name: 'Magellan Midstream Partners'},
+    {symbol: 'ET', name: 'Energy Transfer LP'},
+    {symbol: 'ETRN', name: 'Equitrans Midstream Corporation'},
+    {symbol: 'TRP', name: 'TC Energy Corporation'},
+    {symbol: 'ENB', name: 'Enbridge Inc'},
+    {symbol: 'PPL', name: 'PPL Corporation'},
+    {symbol: 'D', name: 'Dominion Energy Inc'},
+    {symbol: 'AEP', name: 'American Electric Power'},
+    {symbol: 'EXC', name: 'Exelon Corporation'},
+    {symbol: 'XEL', name: 'Xcel Energy Inc'},
+    {symbol: 'WEC', name: 'WEC Energy Group Inc'},
+    {symbol: 'AWK', name: 'American Water Works Company'},
+    {symbol: 'FE', name: 'FirstEnergy Corp'},
+    {symbol: 'ED', name: 'Consolidated Edison Inc'},
+    {symbol: 'ES', name: 'Eversource Energy'},
+    {symbol: 'AEE', name: 'Ameren Corporation'},
+    {symbol: 'LNT', name: 'Alliant Energy Corporation'},
+    {symbol: 'CMS', name: 'CMS Energy Corporation'},
+    {symbol: 'PEG', name: 'Public Service Enterprise Group'},
+    {symbol: 'SRE', name: 'Sempra Energy'},
+    {symbol: 'PCG', name: 'PG&E Corporation'},
+    {symbol: 'EIX', name: 'Edison International'},
+    {symbol: 'NRG', name: 'NRG Energy Inc'},
+    {symbol: 'CNP', name: 'CenterPoint Energy Inc'},
+    {symbol: 'ATO', name: 'Atmos Energy Corporation'},
+    {symbol: 'OGE', name: 'OGE Energy Corp'},
+    {symbol: 'PNW', name: 'Pinnacle West Capital'},
+    {symbol: 'ETR', name: 'Entergy Corporation'},
+    {symbol: 'TSN', name: 'Tyson Foods Inc'},
+    {symbol: 'ADM', name: 'Archer-Daniels-Midland Company'},
+    {symbol: 'BG', name: 'Bunge Limited'},
+    {symbol: 'CF', name: 'CF Industries Holdings Inc'},
+    {symbol: 'MOS', name: 'Mosaic Company'},
+    {symbol: 'FMC', name: 'FMC Corporation'},
+    {symbol: 'DD', name: 'DuPont de Nemours Inc'},
+    {symbol: 'DOW', name: 'Dow Inc'},
+    {symbol: 'LYB', name: 'LyondellBasell Industries'},
+    {symbol: 'CE', name: 'Celanese Corporation'},
+    {symbol: 'EMN', name: 'Eastman Chemical Company'},
+    {symbol: 'ALB', name: 'Albemarle Corporation'},
+    {symbol: 'PPG', name: 'PPG Industries Inc'},
+    {symbol: 'RPM', name: 'RPM International Inc'},
+    {symbol: 'APD', name: 'Air Products and Chemicals'},
+    {symbol: 'LIN', name: 'Linde plc'},
+    {symbol: 'ECL', name: 'Ecolab Inc'},
+    {symbol: 'IFF', name: 'International Flavors & Fragrances'},
+    {symbol: 'CTVA', name: 'Corteva Inc'},
+    {symbol: 'WMT', name: 'Walmart Inc'},
+    {symbol: 'TGT', name: 'Target Corporation'},
+    {symbol: 'COST', name: 'Costco Wholesale Corporation'},
+    {symbol: 'HD', name: 'Home Depot Inc'},
+    {symbol: 'LOW', name: 'Lowe\'s Companies Inc'},
+    {symbol: 'TJX', name: 'TJX Companies Inc'},
+    {symbol: 'ROST', name: 'Ross Stores Inc'},
+    {symbol: 'KSS', name: 'Kohl\'s Corporation'},
+    {symbol: 'M', name: 'Macy\'s Inc'},
+    {symbol: 'JWN', name: 'Nordstrom Inc'},
+    {symbol: 'GPS', name: 'Gap Inc'},
+    {symbol: 'ANF', name: 'Abercrombie & Fitch Co'},
+    {symbol: 'AEO', name: 'American Eagle Outfitters'},
+    {symbol: 'URBN', name: 'Urban Outfitters Inc'},
+    {symbol: 'LULU', name: 'lululemon athletica inc'},
+    {symbol: 'NKE', name: 'NIKE Inc'},
+    {symbol: 'UAA', name: 'Under Armour Inc'},
+    {symbol: 'SKX', name: 'Skechers USA Inc'},
+    {symbol: 'CROX', name: 'Crocs Inc'},
+    {symbol: 'DECK', name: 'Deckers Outdoor Corporation'},
+    {symbol: 'RL', name: 'Ralph Lauren Corporation'},
+    {symbol: 'PVH', name: 'PVH Corp'},
+    {symbol: 'VFC', name: 'VF Corporation'},
+    {symbol: 'HBI', name: 'Hanesbrands Inc'},
+    {symbol: 'TPG', name: 'TPG Inc'},
+    {symbol: 'KKR', name: 'KKR & Co Inc'},
+    {symbol: 'BX', name: 'Blackstone Inc'},
+    {symbol: 'APO', name: 'Apollo Global Management'},
+    {symbol: 'CG', name: 'Carlyle Group Inc'},
+    {symbol: 'OWL', name: 'Blue Owl Capital Inc'},
+    {symbol: 'ARES', name: 'Ares Management Corporation'},
+    {symbol: 'BAM', name: 'Brookfield Asset Management'},
+    {symbol: 'AMG', name: 'Affiliated Managers Group'},
+    {symbol: 'TROW', name: 'T. Rowe Price Group'},
+    {symbol: 'BEN', name: 'Franklin Resources Inc'},
+    {symbol: 'IVZ', name: 'Invesco Ltd'},
+    {symbol: 'STT', name: 'State Street Corporation'},
+    {symbol: 'BK', name: 'Bank of New York Mellon'},
+    {symbol: 'NTRS', name: 'Northern Trust Corporation'}
+];
+
+// Simple autocomplete functionality
+function initializeAutocomplete() {
+    const symbolInput = document.getElementById('symbol-input');
+    const dropdown = document.createElement('div');
+    dropdown.className = 'autocomplete-dropdown';
+    dropdown.style.cssText = `
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid #ccc;
+        border-top: none;
+        border-radius: 0 0 4px 4px;
+        max-height: 200px;
+        overflow-y: auto;
+        z-index: 99999;
+        display: none;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    `;
+    
+    symbolInput.parentNode.style.position = 'relative';
+    symbolInput.parentNode.style.zIndex = '99999';
+    document.body.appendChild(dropdown);
+    
+    // Ensure all parent containers allow overflow
+    let parent = symbolInput.parentNode;
+    while (parent && parent !== document.body) {
+        parent.style.overflow = 'visible';
+        parent.style.zIndex = 'auto';
+        parent = parent.parentNode;
+    }
+    
+    let selectedIndex = -1;
+    
+    function showDropdown(matches) {
+        dropdown.innerHTML = '';
+        if (matches.length === 0) {
+            dropdown.style.display = 'none';
+            return;
+        }
+        
+        // Position dropdown relative to input using fixed positioning
+        const inputRect = symbolInput.getBoundingClientRect();
+        dropdown.style.position = 'fixed';
+        dropdown.style.top = `${inputRect.bottom}px`;
+        dropdown.style.left = `${inputRect.left}px`;
+        dropdown.style.width = `${inputRect.width}px`;
+        dropdown.style.zIndex = '99999';
+        
+        matches.forEach((stock, index) => {
+            const item = document.createElement('div');
+            item.className = 'autocomplete-item';
+            item.style.cssText = `
+                padding: 8px 12px;
+                cursor: pointer;
+                border-bottom: 1px solid #eee;
+                font-size: 14px;
+            `;
+            item.innerHTML = `<strong>${stock.symbol}</strong> — ${stock.name}`;
+            
+            item.addEventListener('mouseenter', () => {
+                selectedIndex = index;
+                updateSelection();
+            });
+            
+            item.addEventListener('click', () => {
+                symbolInput.value = stock.symbol;
+                dropdown.style.display = 'none';
+                selectedIndex = -1;
+            });
+            
+            dropdown.appendChild(item);
+        });
+        
+        dropdown.style.display = 'block';
+        selectedIndex = -1;
+        updateSelection();
+    }
+    
+    function updateSelection() {
+        const items = dropdown.querySelectorAll('.autocomplete-item');
+        items.forEach((item, index) => {
+            if (index === selectedIndex) {
+                item.style.backgroundColor = '#e6f3ff';
+            } else {
+                item.style.backgroundColor = 'white';
+            }
+        });
+    }
+    
+    function hideDropdown() {
+        setTimeout(() => {
+            dropdown.style.display = 'none';
+            selectedIndex = -1;
+        }, 150);
+    }
+    
+    symbolInput.addEventListener('input', (e) => {
+        const query = e.target.value.trim().toUpperCase();
+        if (query.length === 0) {
+            dropdown.style.display = 'none';
+            return;
+        }
+        
+        const matches = POPULAR_STOCKS.filter(stock => 
+            stock.symbol.includes(query) || 
+            stock.name.toUpperCase().includes(query)
+        ).slice(0, 10);
+        
+        showDropdown(matches);
+    });
+    
+    symbolInput.addEventListener('keydown', (e) => {
+        const items = dropdown.querySelectorAll('.autocomplete-item');
+        
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+            updateSelection();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            selectedIndex = Math.max(selectedIndex - 1, -1);
+            updateSelection();
+        } else if (e.key === 'Enter' && selectedIndex >= 0) {
+            e.preventDefault();
+            const selectedStock = POPULAR_STOCKS.filter(stock => 
+                stock.symbol.includes(symbolInput.value.trim().toUpperCase()) || 
+                stock.name.toUpperCase().includes(symbolInput.value.trim().toUpperCase())
+            )[selectedIndex];
+            
+            if (selectedStock) {
+                symbolInput.value = selectedStock.symbol;
+                dropdown.style.display = 'none';
+                selectedIndex = -1;
+                // Submit the form after setting the symbol
+                symbolInput.closest('form').submit();
+            }
+        } else if (e.key === 'Escape') {
+            dropdown.style.display = 'none';
+            selectedIndex = -1;
+        }
+    });
+    
+    symbolInput.addEventListener('blur', hideDropdown);
+    
+    // Hide dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!symbolInput.contains(e.target) && !dropdown.contains(e.target)) {
+            dropdown.style.display = 'none';
+            selectedIndex = -1;
+        }
+    });
+}
+
+// Initialize when page loads
+document.addEventListener('DOMContentLoaded', initializeAutocomplete);
+
+function analyzeOption(optionType, strike, currentPrice, expirationDate, premium) {
+    strike = parseFloat(strike);
+    currentPrice = parseFloat(currentPrice);
+    premium = parseFloat(premium);
+    const data = {
+        option_type: optionType,
+        strike: strike,
+        current_price: currentPrice,
+        expiration_date: expirationDate,
+        premium: premium,
+        quantity: 1
+    };
+    
+    fetch('/tools/options-pnl', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            displayPnlAnalysis(result, optionType, strike, currentPrice, expirationDate, premium);
+        } else {
+            alert('Error: ' + result.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error analyzing option. Please try again.');
+    });
+}
+
+// Display P&L analysis in modal
+function displayPnlAnalysis(data, optionType, strike, currentPrice, expirationDate, premium) {
+    const modal = new bootstrap.Modal(document.getElementById('pnlModal'));
+    const content = document.getElementById('pnlAnalysisContent');
+    
+    // Format the analysis content
+    let html = `
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <h6>Option Details</h6>
+                <table class="table table-sm">
+                    <tr>
+                        <td>Type</td>
+                        <td>${optionType.toUpperCase()}</td>
+                    </tr>
+                    <tr>
+                        <td>Strike</td>
+                        <td>$${strike.toFixed(2)}</td>
+                    </tr>
+                    <tr>
+                        <td>Current Price</td>
+                        <td>$${currentPrice.toFixed(2)}</td>
+                    </tr>
+                    <tr>
+                        <td>Expiration</td>
+                        <td>${expirationDate}</td>
+                    </tr>
+                    <tr>
+                        <td>Premium</td>
+                        <td>$${premium.toFixed(2)}</td>
+                    </tr>
+                </table>
+            </div>
+            <div class="col-md-6">
+                <h6>Greeks</h6>
+                <table class="table table-sm">
+                    <tr>
+                        <td>Delta</td>
+                        <td>${data.greeks.delta.toFixed(4)}</td>
+                    </tr>
+                    <tr>
+                        <td>Gamma</td>
+                        <td>${data.greeks.gamma.toFixed(4)}</td>
+                    </tr>
+                    <tr>
+                        <td>Theta</td>
+                        <td>${data.greeks.theta.toFixed(4)}</td>
+                    </tr>
+                    <tr>
+                        <td>Vega</td>
+                        <td>${data.greeks.vega.toFixed(4)}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+        
+        <ul class="nav nav-tabs" id="pnlTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="scenarios-tab" data-bs-toggle="tab" data-bs-target="#scenarios" type="button" role="tab">
+                    Scenarios
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="chart-tab" data-bs-toggle="tab" data-bs-target="#chart" type="button" role="tab">
+                    Chart
+                </button>
+            </li>
+        </ul>
+        
+        <div class="tab-content mt-3" id="pnlTabContent">
+            <div class="tab-pane fade show active" id="scenarios" role="tabpanel">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Scenario</th>
+                                <th>Price</th>
+                                <th>P&L</th>
+                                <th>ROI</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.pnl_table.map(scenario => `
+                                <tr>
+                                    <td>${scenario.scenario}</td>
+                                    <td>$${scenario.price.toFixed(2)}</td>
+                                    <td class="${scenario.pnl > 0 ? 'text-success' : 'text-danger'}">
+                                        $${scenario.pnl.toFixed(2)}
+                                    </td>
+                                    <td class="${scenario.pnl_percent > 0 ? 'text-success' : 'text-danger'}">
+                                        ${scenario.pnl_percent.toFixed(1)}%
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="tab-pane fade" id="chart" role="tabpanel">
+                <div id="pnlChart" style="height: 400px;"></div>
+            </div>
+        </div>
+    `;
+    
+    content.innerHTML = html;
+    modal.show();
+    
+    // Initialize the P&L chart
+    const prices = data.pnl_table.map(scenario => scenario.price);
+    const pnl = data.pnl_table.map(scenario => scenario.pnl);
+    
+    const trace = {
+        x: prices,
+        y: pnl,
+        type: 'scatter',
+        mode: 'lines+markers',
+        name: 'P&L',
+        line: {
+            color: '#1f77b4',
+            width: 2
+        },
+        marker: {
+            size: 6
+        }
+    };
+    
+    const layout = {
+        title: 'P&L Chart',
+        xaxis: {
+            title: 'Stock Price',
+            showgrid: true,
+            zeroline: true,
+            range: [Math.min(...prices) * 0.9, Math.max(...prices) * 1.1]
+        },
+        yaxis: {
+            title: 'P&L ($)',
+            showgrid: true,
+            zeroline: true,
+            range: [Math.min(...pnl) * 1.1, Math.max(...pnl) * 1.1]
+        },
+        showlegend: false,
+        margin: {
+            l: 50,
+            r: 20,
+            t: 50,
+            b: 50
+        }
+    };
+    
+    Plotly.newPlot('pnlChart', [trace], layout);
+}
+
+function addToTrades() {
+    {% if current_user.is_authenticated %}
+        // This would integrate with the trade tracking system
+        alert('Feature coming soon: Add this option to your trade tracking!');
+    {% else %}
+        // Show login required modal
+        const loginModal = new bootstrap.Modal(document.getElementById('loginRequiredModal'));
+        loginModal.show();
+    {% endif %}
+}
+</script>
+{% endblock %} 

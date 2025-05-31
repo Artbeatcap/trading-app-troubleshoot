@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+
+{% block title %}AI Trading Analysis - Improve Your Trading{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <!-- Hero Section -->
+            <div class="text-center py-5">
+                <h1 class="display-4 fw-bold mb-4">
+                    <i class="fas fa-robot text-primary me-3"></i>
+                    AI Trading Analysis
+                </h1>
+                <p class="lead text-muted mb-4">
+                    Transform your trading with AI-powered analysis, comprehensive options calculators, and personalized feedback. 
+                    Track your trades, journal your progress, and get professional-grade tools to improve your trading performance.
+                </p>
+                <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                    {% if current_user.is_authenticated %}
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-primary btn-lg px-4 me-md-2">
+                            <i class="fas fa-tachometer-alt me-2"></i>Go to Dashboard
+                        </a>
+                        <a href="{{ url_for('options_calculator') }}" class="btn btn-outline-info btn-lg px-4">
+                            <i class="fas fa-calculator me-2"></i>Options Calculator
+                        </a>
+                    {% else %}
+                        <a href="{{ url_for('register') }}" class="btn btn-primary btn-lg px-4 me-md-2">
+                            <i class="fas fa-rocket me-2"></i>Get Started
+                        </a>
+                        <a href="{{ url_for('login') }}" class="btn btn-outline-secondary btn-lg px-4">
+                            <i class="fas fa-sign-in-alt me-2"></i>Login
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Features Section -->
+    <div class="row g-4 py-5">
+        <div class="col-md-4">
+            <div class="card h-100 text-center">
+                <div class="card-body">
+                    <div class="mb-3">
+                        <i class="fas fa-chart-line fa-3x text-primary"></i>
+                    </div>
+                    <h5 class="card-title">Trade Tracking</h5>
+                    <p class="card-text">
+                        Log your trades with detailed entry and exit information, 
+                        including setup types, market conditions, and your reasoning.
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card h-100 text-center">
+                <div class="card-body">
+                    <div class="mb-3">
+                        <i class="fas fa-calculator fa-3x text-info"></i>
+                    </div>
+                    <h5 class="card-title">Options Calculator</h5>
+                    <p class="card-text">
+                        Real-time options chains with P&L analysis, Greeks calculation, 
+                        and comprehensive profit/loss scenarios for any option strategy.
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card h-100 text-center">
+                <div class="card-body">
+                    <div class="mb-3">
+                        <i class="fas fa-robot fa-3x text-success"></i>
+                    </div>
+                    <h5 class="card-title">AI Analysis</h5>
+                    <p class="card-text">
+                        Get comprehensive AI-powered feedback on each trade, 
+                        including strengths, weaknesses, and actionable improvement drills.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Trading Tools Section -->
+    <div class="row g-4 py-4">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-search text-primary me-2"></i>
+                        Live Market Data
+                    </h5>
+                    <p class="card-text">
+                        Access real-time stock prices, options chains, and market data 
+                        for 200+ stocks with active options trading. Search by symbol 
+                        or company name with intelligent autocomplete.
+                    </p>
+                    <ul class="list-unstyled small">
+                        <li><i class="fas fa-check text-success me-2"></i>Live options chains from Yahoo Finance</li>
+                        <li><i class="fas fa-check text-success me-2"></i>ITM/OTM highlighting with current price markers</li>
+                        <li><i class="fas fa-check text-success me-2"></i>Comprehensive stock database with autocomplete</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-chart-area text-warning me-2"></i>
+                        P&L Analysis & Greeks
+                    </h5>
+                    <p class="card-text">
+                        Interactive profit/loss scenarios with complete Greeks analysis. 
+                        Visualize risk/reward profiles and understand how time decay, 
+                        volatility, and price movement affect your positions.
+                    </p>
+                    <ul class="list-unstyled small">
+                        <li><i class="fas fa-check text-success me-2"></i>Interactive P&L charts with Plotly</li>
+                        <li><i class="fas fa-check text-success me-2"></i>Delta, Gamma, Theta, Vega calculations</li>
+                        <li><i class="fas fa-check text-success me-2"></i>Breakeven points and risk metrics</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Additional Features -->
+    <div class="row g-4 py-4">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-book text-info me-2"></i>
+                        Trading Journal
+                    </h5>
+                    <p class="card-text">
+                        Maintain a daily trading journal with emotional state tracking 
+                        and AI-generated daily performance feedback to improve consistency.
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-chart-bar text-warning me-2"></i>
+                        Advanced Analytics
+                    </h5>
+                    <p class="card-text">
+                        View detailed analytics of your trading performance with 
+                        interactive charts showing P&L over time, win rates, 
+                        and setup type performance.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- How It Works -->
+    <div class="row justify-content-center py-5">
+        <div class="col-lg-10">
+            <h2 class="text-center mb-5">How It Works</h2>
+            <div class="row g-4">
+                <div class="col-md-3 text-center">
+                    <div class="mb-3">
+                        <div class="bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                            <span class="fw-bold">1</span>
+                        </div>
+                    </div>
+                    <h6>Analyze Options</h6>
+                    <small class="text-muted">
+                        Use our options calculator to analyze profit scenarios and Greeks for any stock with live market data.
+                    </small>
+                </div>
+                
+                <div class="col-md-3 text-center">
+                    <div class="mb-3">
+                        <div class="bg-success text-white rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                            <span class="fw-bold">2</span>
+                        </div>
+                    </div>
+                    <h6>Track Your Trades</h6>
+                    <small class="text-muted">
+                        Record your trades with detailed information about entries, exits, and reasoning behind each position.
+                    </small>
+                </div>
+                
+                <div class="col-md-3 text-center">
+                    <div class="mb-3">
+                        <div class="bg-info text-white rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                            <span class="fw-bold">3</span>
+                        </div>
+                    </div>
+                    <h6>Get AI Feedback</h6>
+                    <small class="text-muted">
+                        Our AI analyzes your trades and provides detailed feedback with specific drills to improve performance.
+                    </small>
+                </div>
+                
+                <div class="col-md-3 text-center">
+                    <div class="mb-3">
+                        <div class="bg-warning text-white rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                            <span class="fw-bold">4</span>
+                        </div>
+                    </div>
+                    <h6>Improve Results</h6>
+                    <small class="text-muted">
+                        Track your progress over time and see your trading performance improve with consistent practice.
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- CTA Section -->
+    <div class="row justify-content-center py-5">
+        <div class="col-lg-8 text-center">
+            <div class="card">
+                <div class="card-body py-5">
+                    {% if current_user.is_authenticated %}
+                        <h3 class="mb-3">Welcome back, {{ current_user.username }}!</h3>
+                        <p class="text-muted mb-4">
+                            Ready to analyze your next trade or review your performance? 
+                            Access all your trading tools and AI analysis from the dashboard.
+                        </p>
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                            <a href="{{ url_for('dashboard') }}" class="btn btn-primary btn-lg me-md-2">
+                                <i class="fas fa-tachometer-alt me-2"></i>
+                                Go to Dashboard
+                            </a>
+                            <a href="{{ url_for('options_calculator') }}" class="btn btn-outline-info btn-lg">
+                                <i class="fas fa-calculator me-2"></i>
+                                Options Calculator
+                            </a>
+                        </div>
+                    {% else %}
+                        <h3 class="mb-3">Ready to Improve Your Trading?</h3>
+                        <p class="text-muted mb-4">
+                            Join traders who are using AI to analyze their performance and professional-grade 
+                            options tools to accelerate their learning curve.
+                        </p>
+                        <a href="{{ url_for('register') }}" class="btn btn-primary btn-lg">
+                            <i class="fas fa-rocket me-2"></i>
+                            Start Your Free Account
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

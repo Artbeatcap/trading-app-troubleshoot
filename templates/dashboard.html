@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - AI Trading Analysis{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-tachometer-alt text-primary me-2"></i>
+        Dashboard
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        {% if current_user.is_authenticated %}
+        <a href="{{ url_for('add_trade') }}" class="btn btn-primary me-2">
+            <i class="fas fa-plus me-1"></i>
+            Add Trade
+        </a>
+        {% if not today_journal %}
+        <a href="{{ url_for('add_edit_journal') }}" class="btn btn-outline-primary">
+            <i class="fas fa-book me-1"></i>
+            Today's Journal
+        </a>
+        {% endif %}
+        {% else %}
+        <a href="{{ url_for('login') }}" class="btn btn-primary me-2">
+            <i class="fas fa-sign-in-alt me-1"></i>
+            Login
+        </a>
+        <a href="{{ url_for('register') }}" class="btn btn-outline-primary">
+            <i class="fas fa-user-plus me-1"></i>
+            Register
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+{% if current_user.is_authenticated %}
+<!-- Quick Stats -->
+<div class="row g-4 mb-4">
+    <div class="col-md-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2 text-muted">Total Trades</h6>
+                <h2 class="card-title mb-0">{{ stats.total_trades }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2 text-muted">Win Rate</h6>
+                <h2 class="card-title mb-0">{{ "%.1f"|format(stats.win_rate) }}%</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2 text-muted">Total P&L</h6>
+                <h2 class="card-title mb-0 {% if stats.total_pnl > 0 %}text-success{% elif stats.total_pnl < 0 %}text-danger{% endif %}">
+                    ${{ "%.2f"|format(stats.total_pnl) }}
+                </h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2 text-muted">Trades Analyzed</h6>
+                <h2 class="card-title mb-0">{{ stats.trades_analyzed }}</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Recent Trades -->
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-clock me-2"></i>
+                    Recent Trades
+                </h5>
+                <a href="{{ url_for('trades') }}" class="btn btn-sm btn-outline-primary">
+                    View All
+                </a>
+            </div>
+            <div class="card-body">
+                {% if recent_trades %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Symbol</th>
+                                    <th>Type</th>
+                                    <th>Entry</th>
+                                    <th>Exit</th>
+                                    <th>P&L</th>
+                                    <th>Analysis</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for trade in recent_trades %}
+                                <tr>
+                                    <td>{{ trade.symbol }}</td>
+                                    <td>{{ trade.trade_type }}</td>
+                                    <td>${{ "%.2f"|format(trade.entry_price) }}</td>
+                                    <td>{% if trade.exit_price %}${{ "%.2f"|format(trade.exit_price) }}{% else %}-{% endif %}</td>
+                                    <td class="{% if trade.pnl > 0 %}text-success{% elif trade.pnl < 0 %}text-danger{% endif %}">
+                                        {% if trade.pnl %}${{ "%.2f"|format(trade.pnl) }}{% else %}-{% endif %}
+                                    </td>
+                                    <td>
+                                        {% if trade.is_analyzed %}
+                                        <a href="{{ url_for('view_trade', id=trade.id) }}" class="btn btn-sm btn-outline-primary">
+                                            View
+                                        </a>
+                                        {% else %}
+                                        <form action="{{ url_for('analyze_trade', id=trade.id) }}" method="POST" class="d-inline">
+                                            <button type="submit" class="btn btn-sm btn-outline-secondary">
+                                                Analyze
+                                            </button>
+                                        </form>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted mb-0">No trades yet. Start by adding your first trade!</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Journal Entries -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-book me-2"></i>
+                    Recent Journal Entries
+                </h5>
+                <a href="{{ url_for('journal') }}" class="btn btn-sm btn-outline-primary">
+                    View All
+                </a>
+            </div>
+            <div class="card-body">
+                {% if recent_journals %}
+                    <div class="list-group list-group-flush">
+                        {% for journal in recent_journals %}
+                        <a href="{{ url_for('view_journal', journal_date=journal.journal_date.strftime('%Y-%m-%d')) }}" 
+                           class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">{{ journal.journal_date.strftime('%B %d, %Y') }}</h6>
+                                <small class="text-muted">{{ journal.daily_score }}/10</small>
+                            </div>
+                            <p class="mb-1 text-truncate">{{ journal.content[:100] }}...</p>
+                        </a>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted mb-0">No journal entries yet. Start documenting your trading journey!</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1000;">
+    <div class="dropdown dropup">
+        <button class="btn btn-primary btn-lg rounded-circle" type="button" data-bs-toggle="dropdown">
+            <i class="fas fa-plus"></i>
+        </button>
+        <ul class="dropdown-menu">
+            <li>
+                <a class="dropdown-item" href="{{ url_for('add_trade') }}">
+                    <i class="fas fa-exchange-alt me-2"></i>
+                    Add Trade
+                </a>
+            </li>
+            <li>
+                <a class="dropdown-item" href="{{ url_for('add_edit_journal') }}">
+                    <i class="fas fa-book me-2"></i>
+                    Journal Entry
+                </a>
+            </li>
+            <li><hr class="dropdown-divider"></li>
+            <li>
+                <a class="dropdown-item" href="{{ url_for('bulk_analysis') }}">
+                    <i class="fas fa-robot me-2"></i>
+                    Analyze Trades
+                </a>
+            </li>
+        </ul>
+    </div>
+</div>
+{% else %}
+<!-- Welcome Message for Non-Logged In Users -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body text-center">
+                <h3 class="card-title mb-4">Welcome to AI Trading Analysis</h3>
+                <p class="card-text mb-4">
+                    Get started with our powerful trading tools and analysis features. You can use our options calculator and other tools without logging in, but create an account to save your trades and journal entries.
+                </p>
+                <div class="row justify-content-center">
+                    <div class="col-md-4">
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <i class="fas fa-calculator text-primary me-2"></i>
+                                    Options Calculator
+                                </h5>
+                                <p class="card-text">Calculate options prices, P&L, and analyze different scenarios.</p>
+                                <a href="{{ url_for('options_calculator') }}" class="btn btn-primary">Try Now</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <i class="fas fa-chart-line text-primary me-2"></i>
+                                    Stock Lookup
+                                </h5>
+                                <p class="card-text">Get detailed information about any stock symbol.</p>
+                                <a href="{{ url_for('stock_lookup') }}" class="btn btn-primary">Try Now</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %} 
