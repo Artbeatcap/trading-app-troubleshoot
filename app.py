@@ -891,7 +891,7 @@ def options_calculator():
 
 @app.route('/tools/options-pnl', methods=['POST'])
 def calculate_options_pnl():
-    """Calculate comprehensive options P&L analysis like optionsplunge.com"""
+    """Calculate comprehensive options P&L analysis"""
     try:
         data = request.get_json()
         
@@ -907,77 +907,125 @@ def calculate_options_pnl():
         days_to_exp = (exp_date - datetime.now().date()).days
         time_to_exp = max(days_to_exp / 365.0, 0.001)  # Avoid division by zero
         
-        # Risk-free rate (approximate)
-        risk_free_rate = 0.05
-        
-        # Estimate implied volatility (simple approximation)
-        if premium > 0:
-            implied_vol = 0.2  # Default assumption
+        # Calculate time intervals based on days to expiration
+        time_points = []
+        if days_to_exp <= 7:
+            # For weekly options, use 1-day intervals
+            time_points = [7, 6, 5, 4, 3, 2, 1, 0]  # Reversed order
+        elif days_to_exp <= 30:
+            # For monthly options, use 5-day intervals
+            time_points = [30, 25, 20, 15, 10, 5, 0]  # Reversed order
+        elif days_to_exp <= 90:
+            # For quarterly options, use 15-day intervals
+            time_points = [90, 75, 60, 45, 30, 15, 0]  # Reversed order
         else:
-            implied_vol = 0.2
+            # For longer-term options, use monthly intervals
+            time_points = [180, 150, 120, 90, 60, 30, 0]  # Reversed order
         
-        # Calculate theoretical price and Greeks
-        theoretical_price = black_scholes(current_price, strike, time_to_exp, risk_free_rate, implied_vol, option_type)
-        greeks = calculate_greeks(current_price, strike, time_to_exp, risk_free_rate, implied_vol, option_type)
+        # Filter time points to not exceed days to expiration
+        time_points = [t for t in time_points if t <= days_to_exp]
         
-        # Calculate comprehensive P&L scenarios (like optionsplunge.com)
+        # Calculate implied volatility (simplified approximation)
+        implied_vol = 0.2  # Default assumption
+        if premium > 0:
+            # Simple approximation based on premium and time to expiration
+            implied_vol = min(1.0, max(0.1, (premium / strike) * math.sqrt(365 / days_to_exp)))
+        
+        # Calculate price range based on implied volatility and strike price
+        volatility_multiplier = implied_vol
+        price_range = strike * volatility_multiplier * math.sqrt(days_to_exp / 365)
+        
+        # Generate price scenarios centered around strike price
         price_scenarios = [
-            {'label': '-20%', 'price': current_price * 0.8},
-            {'label': '-15%', 'price': current_price * 0.85},
-            {'label': '-10%', 'price': current_price * 0.9},
-            {'label': '-5%', 'price': current_price * 0.95},
-            {'label': 'Current', 'price': current_price},
-            {'label': '+5%', 'price': current_price * 1.05},
-            {'label': '+10%', 'price': current_price * 1.1},
-            {'label': '+15%', 'price': current_price * 1.15},
-            {'label': '+20%', 'price': current_price * 1.2},
+            strike - (price_range * 2),  # -2σ from strike
+            strike - price_range,        # -1σ from strike
+            strike - (price_range * 0.5), # -0.5σ from strike
+            strike,                     # Strike price
+            strike + (price_range * 0.5), # +0.5σ from strike
+            strike + price_range,        # +1σ from strike
+            strike + (price_range * 2)   # +2σ from strike
         ]
+        price_scenarios = [max(0.01, p) for p in price_scenarios]  # Ensure prices are positive
         
-        # Calculate P&L for each scenario
-        pnl_table = []
-        for scenario in price_scenarios:
-            price = scenario['price']
-            if option_type == 'call':
-                pnl = max(0, price - strike) - premium
-            else:
-                pnl = max(0, strike - price) - premium
+        # Calculate P&L for each price scenario and time point
+        pnl_data = []
+        for price in price_scenarios:
+            time_data = []
+            for days_left in time_points:
+                # Calculate time decay factor (Theta decay)
+                time_decay_factor = math.exp(-0.1 * (days_to_exp - days_left) / 365)
+                
+                # Calculate intrinsic value
+                if option_type == 'call':
+                    intrinsic_value = max(0, price - strike)
+                else:  # put
+                    intrinsic_value = max(0, strike - price)
+                
+                # Calculate moneyness factor (how far from strike)
+                if option_type == 'call':
+                    moneyness = (price - strike) / strike
+                else:  # put
+                    moneyness = (strike - price) / strike
+                
+                # Calculate time value using a more sophisticated model
+                remaining_time = days_left / 365.0
+                
+                # Base time value calculation
+                base_time_value = premium * time_decay_factor * (remaining_time / time_to_exp)
+                
+                # Adjust time value based on moneyness and time to expiration
+                if option_type == 'call':
+                    if price < strike:  # OTM call
+                        # Higher time value for longer-dated OTM options
+                        time_value = base_time_value * (1 + (days_to_exp / 365) * 0.5)
+                    else:  # ITM call
+                        time_value = base_time_value * (1 - abs(moneyness) * 0.3)
+                else:  # put
+                    if price > strike:  # OTM put
+                        # Higher time value for longer-dated OTM options
+                        time_value = base_time_value * (1 + (days_to_exp / 365) * 0.5)
+                    else:  # ITM put
+                        time_value = base_time_value * (1 - abs(moneyness) * 0.3)
+                
+                # Ensure time value doesn't exceed premium for OTM options
+                if (option_type == 'call' and price < strike) or (option_type == 'put' and price > strike):
+                    time_value = min(time_value, premium)
+                
+                # Total option value is intrinsic value plus time value
+                option_value = intrinsic_value + time_value
+                
+                # P&L is the difference between option value and premium paid
+                pnl = (option_value - premium) * quantity * 100
+                
+                # Calculate return percentage
+                return_percent = (pnl / (premium * quantity * 100)) * 100 if premium > 0 else 0
+                
+                time_data.append({
+                    'pnl': round(pnl, 2),
+                    'return_percent': round(return_percent, 2)
+                })
             
-            pnl_table.append({
-                'scenario': scenario['label'],
-                'price': price,
-                'pnl': pnl * quantity * 100,
-                'pnl_percent': (pnl / premium * 100) if premium > 0 else 0
+            pnl_data.append({
+                'stock_price': round(price, 2),
+                'time_data': time_data
             })
         
-        # Calculate max profit/loss
-        if option_type == 'call':
-            max_loss = premium * quantity * 100
-            max_profit_numeric = 999999
-            max_profit = 'Unlimited'
-        else:
-            max_loss = premium * quantity * 100
-            max_profit_numeric = (strike - premium) * quantity * 100 if strike > premium else 0
-            max_profit = max_profit_numeric
-        
-        # Calculate return on investment potential
-        roi_at_10_percent = None
-        for scenario in pnl_table:
-            if '+10%' in scenario['scenario']:
-                roi_at_10_percent = scenario['pnl_percent']
-                break
-        
-        # Risk/reward ratio
-        risk_reward_ratio = abs(max_profit_numeric / max_loss) if max_loss > 0 and max_profit_numeric != 999999 else 'N/A'
+        # Create the analysis object
+        analysis = {
+            'option_info': {
+                'type': option_type,
+                'strike': strike,
+                'premium': premium,
+                'days_to_expiration': days_to_exp,
+                'implied_volatility': round(implied_vol * 100, 2),  # Convert to percentage
+                'time_points': time_points
+            },
+            'pnl_data': pnl_data
+        }
         
         return jsonify({
             'success': True,
-            'theoretical_price': round(theoretical_price, 4),
-            'greeks': greeks,
-            'pnl_table': pnl_table,
-            'max_loss': max_loss,
-            'max_profit': max_profit,
-            'roi_at_10_percent': roi_at_10_percent,
-            'risk_reward_ratio': risk_reward_ratio
+            'analysis': analysis
         })
         
     except Exception as e:
