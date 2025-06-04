@@ -402,12 +402,12 @@ def trades():
 
 @app.route('/add_trade', methods=['GET', 'POST'])
 def add_trade():
-    """Add trade page - requires login to save"""
-    if not current_user.is_authenticated:
+    """Display trade form. Login required only when saving."""
+    form = TradeForm()
+
+    if request.method == 'POST' and not current_user.is_authenticated:
         flash('Please log in to save trades.', 'warning')
         return redirect(url_for('login', next=url_for('add_trade')))
-        
-    form = TradeForm()
     
     if form.validate_on_submit():
         # Handle file uploads
@@ -554,13 +554,17 @@ def journal():
 
 @app.route('/journal/add', methods=['GET', 'POST'])
 @app.route('/journal/<journal_date>/edit', methods=['GET', 'POST'])
-@login_required
 def add_edit_journal(journal_date=None):
+    """Journal entry page. Login only required when saving or editing."""
+
     if journal_date:
+        if not current_user.is_authenticated:
+            flash('Please log in to edit journal entries.', 'warning')
+            return redirect(url_for('login', next=url_for('add_edit_journal', journal_date=journal_date)))
         # Edit existing journal
         journal_date_obj = datetime.strptime(journal_date, '%Y-%m-%d').date()
         journal = TradingJournal.query.filter_by(
-            user_id=current_user.id, 
+            user_id=current_user.id,
             journal_date=journal_date_obj
         ).first_or_404()
         form = JournalForm(obj=journal)
@@ -571,6 +575,10 @@ def add_edit_journal(journal_date=None):
         form = JournalForm()
         is_edit = False
     
+    if request.method == 'POST' and not current_user.is_authenticated:
+        flash('Please log in to save journal entries.', 'warning')
+        return redirect(url_for('login', next=url_for('add_edit_journal')))
+
     if form.validate_on_submit():
         if journal:
             # Update existing
