@@ -779,19 +779,32 @@ function initializeAutocomplete() {
         }, 150);
     }
     
+    let currentMatches = [];
+
     symbolInput.addEventListener('input', (e) => {
-        const query = e.target.value.trim().toUpperCase();
+        const query = e.target.value.trim();
         if (query.length === 0) {
             dropdown.style.display = 'none';
+            currentMatches = [];
             return;
         }
-        
-        const matches = POPULAR_STOCKS.filter(stock => 
-            stock.symbol.includes(query) || 
-            stock.name.toUpperCase().includes(query)
-        ).slice(0, 10);
-        
-        showDropdown(matches);
+
+        fetch(`/search_stocks?q=${encodeURIComponent(query)}`)
+            .then(res => res.json())
+            .then(data => {
+                currentMatches = data.map(item => {
+                    const parts = item.label.split('—');
+                    return {
+                        symbol: item.value,
+                        name: parts.length > 1 ? parts[1].trim() : ''
+                    };
+                });
+                showDropdown(currentMatches);
+            })
+            .catch(() => {
+                dropdown.style.display = 'none';
+                currentMatches = [];
+            });
     });
     
     symbolInput.addEventListener('keydown', (e) => {
@@ -807,16 +820,11 @@ function initializeAutocomplete() {
             updateSelection();
         } else if (e.key === 'Enter' && selectedIndex >= 0) {
             e.preventDefault();
-            const selectedStock = POPULAR_STOCKS.filter(stock => 
-                stock.symbol.includes(symbolInput.value.trim().toUpperCase()) || 
-                stock.name.toUpperCase().includes(symbolInput.value.trim().toUpperCase())
-            )[selectedIndex];
-            
+            const selectedStock = currentMatches[selectedIndex];
             if (selectedStock) {
                 symbolInput.value = selectedStock.symbol;
                 dropdown.style.display = 'none';
                 selectedIndex = -1;
-                // Submit the form after setting the symbol
                 symbolInput.closest('form').submit();
             }
         } else if (e.key === 'Escape') {
