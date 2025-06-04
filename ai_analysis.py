@@ -12,222 +12,238 @@ import json
 import re
 from models import TradeAnalysis, db
 
+
 class TradingAIAnalyzer:
     """AI-powered trading analysis using OpenAI GPT models"""
-    
+
     def __init__(self):
         """Initialize the AI analyzer with OpenAI API key"""
-        self.api_key = os.getenv('OPENAI_API_KEY')
+        self.api_key = os.getenv("OPENAI_API_KEY")
         if not self.api_key:
             raise ValueError("OPENAI_API_KEY environment variable not set")
-        
+
         openai.api_key = self.api_key
         self.model = "gpt-4"  # Use GPT-4 for better analysis
-        
+
     def analyze_trade(self, trade):
         """
         Analyze a single trade and provide detailed feedback
-        
+
         Args:
             trade: Trade object from the database
-            
+
         Returns:
             TradeAnalysis object or None if analysis fails
         """
         try:
             # Prepare trade data for analysis
             trade_data = self._prepare_trade_data(trade)
-            
+
             # Generate analysis prompt
             prompt = self._create_trade_analysis_prompt(trade_data)
-            
+
             # Get AI analysis
             response = openai.ChatCompletion.create(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": self._get_system_prompt()},
-                    {"role": "user", "content": prompt}
+                    {"role": "user", "content": prompt},
                 ],
                 max_tokens=2000,
-                temperature=0.7
+                temperature=0.7,
             )
-            
+
             analysis_text = response.choices[0].message.content
-            
+
             # Parse the analysis
             parsed_analysis = self._parse_analysis(analysis_text)
-            
+
             # Create or update TradeAnalysis record
             analysis = TradeAnalysis.query.filter_by(trade_id=trade.id).first()
             if not analysis:
                 analysis = TradeAnalysis(
-                    trade_id=trade.id,
-                    user_id=trade.user_id,
-                    ai_model_used=self.model
+                    trade_id=trade.id, user_id=trade.user_id, ai_model_used=self.model
                 )
-            
+
             # Update analysis fields
-            analysis.overall_score = parsed_analysis.get('overall_score', 5)
-            analysis.entry_analysis = parsed_analysis.get('entry_analysis', '')
-            analysis.exit_analysis = parsed_analysis.get('exit_analysis', '')
-            analysis.risk_analysis = parsed_analysis.get('risk_analysis', '')
-            analysis.market_context = parsed_analysis.get('market_context', '')
-            analysis.options_analysis = parsed_analysis.get('options_analysis', '')
-            
+            analysis.overall_score = parsed_analysis.get("overall_score", 5)
+            analysis.entry_analysis = parsed_analysis.get("entry_analysis", "")
+            analysis.exit_analysis = parsed_analysis.get("exit_analysis", "")
+            analysis.risk_analysis = parsed_analysis.get("risk_analysis", "")
+            analysis.market_context = parsed_analysis.get("market_context", "")
+            analysis.options_analysis = parsed_analysis.get("options_analysis", "")
+
             # Set JSON fields
-            analysis.set_strengths(parsed_analysis.get('strengths', []))
-            analysis.set_weaknesses(parsed_analysis.get('weaknesses', []))
-            analysis.set_improvement_areas(parsed_analysis.get('improvement_areas', []))
-            analysis.set_actionable_drills(parsed_analysis.get('actionable_drills', []))
-            analysis.set_recommendations(parsed_analysis.get('recommendations', []))
-            analysis.set_key_lessons(parsed_analysis.get('key_lessons', []))
-            
+            analysis.set_strengths(parsed_analysis.get("strengths", []))
+            analysis.set_weaknesses(parsed_analysis.get("weaknesses", []))
+            analysis.set_improvement_areas(parsed_analysis.get("improvement_areas", []))
+            analysis.set_actionable_drills(parsed_analysis.get("actionable_drills", []))
+            analysis.set_recommendations(parsed_analysis.get("recommendations", []))
+            analysis.set_key_lessons(parsed_analysis.get("key_lessons", []))
+            analysis.set_future_setups(parsed_analysis.get("future_setups", []))
+
             # Save to database
             db.session.add(analysis)
             trade.is_analyzed = True
             db.session.commit()
-            
+
             return analysis
-            
+
         except Exception as e:
             print(f"Error analyzing trade {trade.id}: {str(e)}")
             return None
-    
+
     def analyze_daily_performance(self, journal_entry, trades):
         """
         Analyze daily trading performance
-        
+
         Args:
             journal_entry: TradingJournal object
             trades: List of Trade objects for the day
-            
+
         Returns:
             Dict with analysis results
         """
         try:
             # Prepare daily data
             daily_data = self._prepare_daily_data(journal_entry, trades)
-            
+
             # Generate daily analysis prompt
             prompt = self._create_daily_analysis_prompt(daily_data)
-            
+
             # Get AI analysis
             response = openai.ChatCompletion.create(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": self._get_daily_system_prompt()},
-                    {"role": "user", "content": prompt}
+                    {"role": "user", "content": prompt},
                 ],
                 max_tokens=1500,
-                temperature=0.7
+                temperature=0.7,
             )
-            
+
             analysis_text = response.choices[0].message.content
-            
+
             # Parse daily analysis
             parsed_analysis = self._parse_daily_analysis(analysis_text)
-            
+
             return {
-                'feedback': analysis_text,
-                'daily_score': parsed_analysis.get('daily_score', 5),
-                'key_insights': parsed_analysis.get('key_insights', []),
-                'tomorrow_focus': parsed_analysis.get('tomorrow_focus', [])
+                "feedback": analysis_text,
+                "daily_score": parsed_analysis.get("daily_score", 5),
+                "key_insights": parsed_analysis.get("key_insights", []),
+                "tomorrow_focus": parsed_analysis.get("tomorrow_focus", []),
             }
-            
+
         except Exception as e:
             print(f"Error analyzing daily performance: {str(e)}")
             return None
-    
+
     def _prepare_trade_data(self, trade):
         """Prepare trade data for AI analysis"""
         data = {
-            'symbol': trade.symbol,
-            'trade_type': trade.trade_type,
-            'entry_date': trade.entry_date.strftime('%Y-%m-%d %H:%M') if trade.entry_date else None,
-            'exit_date': trade.exit_date.strftime('%Y-%m-%d %H:%M') if trade.exit_date else None,
-            'entry_price': trade.entry_price,
-            'exit_price': trade.exit_price,
-            'quantity': trade.quantity,
-            'profit_loss': trade.profit_loss,
-            'profit_loss_percent': trade.profit_loss_percent,
-            'setup_type': trade.setup_type,
-            'market_condition': trade.market_condition,
-            'timeframe': trade.timeframe,
-            'entry_reason': trade.entry_reason,
-            'exit_reason': trade.exit_reason,
-            'notes': trade.notes,
-            'tags': trade.tags,
-            'stop_loss': trade.stop_loss,
-            'take_profit': trade.take_profit,
-            'risk_amount': trade.risk_amount,
-            'hold_time': str(trade.get_hold_time()) if trade.exit_date else None,
-            'risk_reward_ratio': trade.get_risk_reward_ratio(),
-            'is_winner': trade.is_winner() if trade.exit_price else None
+            "symbol": trade.symbol,
+            "trade_type": trade.trade_type,
+            "entry_date": (
+                trade.entry_date.strftime("%Y-%m-%d %H:%M")
+                if trade.entry_date
+                else None
+            ),
+            "exit_date": (
+                trade.exit_date.strftime("%Y-%m-%d %H:%M") if trade.exit_date else None
+            ),
+            "entry_price": trade.entry_price,
+            "exit_price": trade.exit_price,
+            "quantity": trade.quantity,
+            "profit_loss": trade.profit_loss,
+            "profit_loss_percent": trade.profit_loss_percent,
+            "setup_type": trade.setup_type,
+            "market_condition": trade.market_condition,
+            "timeframe": trade.timeframe,
+            "entry_reason": trade.entry_reason,
+            "exit_reason": trade.exit_reason,
+            "notes": trade.notes,
+            "tags": trade.tags,
+            "stop_loss": trade.stop_loss,
+            "take_profit": trade.take_profit,
+            "risk_amount": trade.risk_amount,
+            "hold_time": str(trade.get_hold_time()) if trade.exit_date else None,
+            "risk_reward_ratio": trade.get_risk_reward_ratio(),
+            "is_winner": trade.is_winner() if trade.exit_price else None,
         }
-        
+
         # Add options-specific data
         if trade.is_option_trade():
-            data.update({
-                'is_option_trade': True,
-                'is_spread_trade': trade.is_spread_trade(),
-                'strike_price': trade.strike_price,
-                'expiration_date': trade.expiration_date.strftime('%Y-%m-%d') if trade.expiration_date else None,
-                'option_type': trade.option_type,
-                'premium_paid': trade.premium_paid,
-                'implied_volatility': trade.implied_volatility,
-                'underlying_price_at_entry': trade.underlying_price_at_entry,
-                'underlying_price_at_exit': trade.underlying_price_at_exit,
-                'days_to_expiration': trade.get_days_to_expiration(),
-                'moneyness': trade.get_moneyness(),
-                'intrinsic_value': trade.get_intrinsic_value(),
-                'time_value': trade.get_time_value(),
-                'delta': trade.delta,
-                'gamma': trade.gamma,
-                'theta': trade.theta,
-                'vega': trade.vega
-            })
-            
+            data.update(
+                {
+                    "is_option_trade": True,
+                    "is_spread_trade": trade.is_spread_trade(),
+                    "strike_price": trade.strike_price,
+                    "expiration_date": (
+                        trade.expiration_date.strftime("%Y-%m-%d")
+                        if trade.expiration_date
+                        else None
+                    ),
+                    "option_type": trade.option_type,
+                    "premium_paid": trade.premium_paid,
+                    "implied_volatility": trade.implied_volatility,
+                    "underlying_price_at_entry": trade.underlying_price_at_entry,
+                    "underlying_price_at_exit": trade.underlying_price_at_exit,
+                    "days_to_expiration": trade.get_days_to_expiration(),
+                    "moneyness": trade.get_moneyness(),
+                    "intrinsic_value": trade.get_intrinsic_value(),
+                    "time_value": trade.get_time_value(),
+                    "delta": trade.delta,
+                    "gamma": trade.gamma,
+                    "theta": trade.theta,
+                    "vega": trade.vega,
+                }
+            )
+
             # Add spread-specific data
             if trade.is_spread_trade():
-                data.update({
-                    'spread_type': trade.spread_type,
-                    'long_strike': trade.long_strike,
-                    'short_strike': trade.short_strike,
-                    'long_premium': trade.long_premium,
-                    'short_premium': trade.short_premium,
-                    'net_credit': trade.net_credit,
-                    'max_profit': trade.max_profit,
-                    'max_loss': trade.max_loss,
-                    'breakeven_price': trade.breakeven_price
-                })
-        
+                data.update(
+                    {
+                        "spread_type": trade.spread_type,
+                        "long_strike": trade.long_strike,
+                        "short_strike": trade.short_strike,
+                        "long_premium": trade.long_premium,
+                        "short_premium": trade.short_premium,
+                        "net_credit": trade.net_credit,
+                        "max_profit": trade.max_profit,
+                        "max_loss": trade.max_loss,
+                        "breakeven_price": trade.breakeven_price,
+                    }
+                )
+
         return data
-    
+
     def _prepare_daily_data(self, journal_entry, trades):
         """Prepare daily data for AI analysis"""
         return {
-            'date': journal_entry.journal_date.strftime('%Y-%m-%d'),
-            'daily_pnl': journal_entry.daily_pnl,
-            'market_outlook': journal_entry.market_outlook,
-            'daily_goals': journal_entry.daily_goals,
-            'what_went_well': journal_entry.what_went_well,
-            'what_went_wrong': journal_entry.what_went_wrong,
-            'emotional_state': journal_entry.emotional_state,
-            'stress_level': journal_entry.stress_level,
-            'discipline_score': journal_entry.discipline_score,
-            'market_trend': journal_entry.market_trend,
-            'volatility': journal_entry.volatility,
-            'trades_count': len(trades),
-            'winning_trades': len([t for t in trades if t.is_winner()]),
-            'losing_trades': len([t for t in trades if t.profit_loss and t.profit_loss < 0]),
-            'total_pnl': sum(t.profit_loss for t in trades if t.profit_loss),
-            'trade_types': [t.trade_type for t in trades],
-            'setups': [t.setup_type for t in trades if t.setup_type]
+            "date": journal_entry.journal_date.strftime("%Y-%m-%d"),
+            "daily_pnl": journal_entry.daily_pnl,
+            "market_outlook": journal_entry.market_outlook,
+            "daily_goals": journal_entry.daily_goals,
+            "what_went_well": journal_entry.what_went_well,
+            "what_went_wrong": journal_entry.what_went_wrong,
+            "emotional_state": journal_entry.emotional_state,
+            "stress_level": journal_entry.stress_level,
+            "discipline_score": journal_entry.discipline_score,
+            "market_trend": journal_entry.market_trend,
+            "volatility": journal_entry.volatility,
+            "trades_count": len(trades),
+            "winning_trades": len([t for t in trades if t.is_winner()]),
+            "losing_trades": len(
+                [t for t in trades if t.profit_loss and t.profit_loss < 0]
+            ),
+            "total_pnl": sum(t.profit_loss for t in trades if t.profit_loss),
+            "trade_types": [t.trade_type for t in trades],
+            "setups": [t.setup_type for t in trades if t.setup_type],
         }
-    
+
     def _get_system_prompt(self):
         """Get the system prompt for trade analysis"""
-        return """You are an expert trading coach and analyst with 20+ years of experience in stocks, options, and derivatives trading. Your role is to provide detailed, actionable analysis of individual trades to help traders improve their performance.
+        return """You are a world-class day trader and trading coach with decades of experience in stocks, options, and derivatives trading. Your role is to provide detailed, actionable analysis of individual trades to help traders improve their performance and refine their entry and exit techniques. Offer guidance as if mentoring them on future setups.
 
 Key areas to analyze:
 1. ENTRY ANALYSIS: Timing, setup quality, market context, risk/reward assessment
@@ -242,7 +258,7 @@ Provide specific, actionable feedback that helps the trader improve. Be construc
 
     def _get_daily_system_prompt(self):
         """Get the system prompt for daily analysis"""
-        return """You are an expert trading coach analyzing daily trading performance. Focus on overall execution, emotional state, market adaptation, and areas for improvement. Provide actionable feedback for tomorrow's trading session."""
+        return """You are a world-class day trader reviewing daily performance. Focus on execution quality, emotional control, and how well the trader adapted to market conditions. Provide actionable areas for improvement and tips for the next trading day."""
 
     def _create_trade_analysis_prompt(self, trade_data):
         """Create the analysis prompt for a single trade"""
@@ -274,7 +290,7 @@ RISK MANAGEMENT:
 """
 
         # Add options-specific analysis
-        if trade_data.get('is_option_trade'):
+        if trade_data.get("is_option_trade"):
             prompt += f"""
 OPTIONS DETAILS:
 - Strike Price: ${trade_data['strike_price']}
@@ -295,7 +311,7 @@ OPTIONS DETAILS:
 """
 
         # Add spread-specific analysis
-        if trade_data.get('is_spread_trade'):
+        if trade_data.get("is_spread_trade"):
             prompt += f"""
 SPREAD DETAILS:
 - Spread Type: {trade_data['spread_type']}
@@ -322,6 +338,7 @@ Please provide a comprehensive analysis with:
 10. ACTIONABLE DRILLS: Specific exercises to improve (list 2-3 points)
 11. RECOMMENDATIONS: Specific advice for similar future trades
 12. KEY LESSONS: Main takeaways from this trade
+13. FUTURE SETUPS: Example entry and exit ideas for similar setups
 
 Format your response clearly with section headers."""
 
@@ -368,48 +385,67 @@ Be specific and actionable."""
     def _parse_analysis(self, analysis_text):
         """Parse the AI analysis response into structured data"""
         parsed = {}
-        
+
         # Extract overall score
-        score_match = re.search(r'(?:OVERALL SCORE|SCORE).*?(\d+)', analysis_text, re.IGNORECASE)
+        score_match = re.search(
+            r"(?:OVERALL SCORE|SCORE).*?(\d+)", analysis_text, re.IGNORECASE
+        )
         if score_match:
-            parsed['overall_score'] = int(score_match.group(1))
-        
+            parsed["overall_score"] = int(score_match.group(1))
+
         # Extract sections using regex
         sections = {
-            'strengths': r'STRENGTHS?:?\s*(.*?)(?=\n\d+\.|WEAKNESSES?|$)',
-            'weaknesses': r'WEAKNESSES?:?\s*(.*?)(?=\n\d+\.|ENTRY ANALYSIS|$)',
-            'entry_analysis': r'ENTRY ANALYSIS:?\s*(.*?)(?=\n\d+\.|EXIT ANALYSIS|$)',
-            'exit_analysis': r'EXIT ANALYSIS:?\s*(.*?)(?=\n\d+\.|RISK ANALYSIS|$)',
-            'risk_analysis': r'RISK ANALYSIS:?\s*(.*?)(?=\n\d+\.|MARKET CONTEXT|$)',
-            'market_context': r'MARKET CONTEXT:?\s*(.*?)(?=\n\d+\.|OPTIONS ANALYSIS|$)',
-            'options_analysis': r'OPTIONS ANALYSIS:?\s*(.*?)(?=\n\d+\.|IMPROVEMENT|$)',
-            'improvement_areas': r'IMPROVEMENT AREAS?:?\s*(.*?)(?=\n\d+\.|ACTIONABLE|$)',
-            'actionable_drills': r'ACTIONABLE DRILLS?:?\s*(.*?)(?=\n\d+\.|RECOMMENDATIONS|$)',
-            'recommendations': r'RECOMMENDATIONS?:?\s*(.*?)(?=\n\d+\.|KEY LESSONS|$)',
-            'key_lessons': r'KEY LESSONS?:?\s*(.*?)(?=\n\d+\.|$)'
+            "strengths": r"STRENGTHS?:?\s*(.*?)(?=\n\d+\.|WEAKNESSES?|$)",
+            "weaknesses": r"WEAKNESSES?:?\s*(.*?)(?=\n\d+\.|ENTRY ANALYSIS|$)",
+            "entry_analysis": r"ENTRY ANALYSIS:?\s*(.*?)(?=\n\d+\.|EXIT ANALYSIS|$)",
+            "exit_analysis": r"EXIT ANALYSIS:?\s*(.*?)(?=\n\d+\.|RISK ANALYSIS|$)",
+            "risk_analysis": r"RISK ANALYSIS:?\s*(.*?)(?=\n\d+\.|MARKET CONTEXT|$)",
+            "market_context": r"MARKET CONTEXT:?\s*(.*?)(?=\n\d+\.|OPTIONS ANALYSIS|$)",
+            "options_analysis": r"OPTIONS ANALYSIS:?\s*(.*?)(?=\n\d+\.|IMPROVEMENT|$)",
+            "improvement_areas": r"IMPROVEMENT AREAS?:?\s*(.*?)(?=\n\d+\.|ACTIONABLE|$)",
+            "actionable_drills": r"ACTIONABLE DRILLS?:?\s*(.*?)(?=\n\d+\.|RECOMMENDATIONS|$)",
+            "recommendations": r"RECOMMENDATIONS?:?\s*(.*?)(?=\n\d+\.|KEY LESSONS|$)",
+            "key_lessons": r"KEY LESSONS?:?\s*(.*?)(?=\n\d+\.|FUTURE SETUPS|$)",
+            "future_setups": r"FUTURE SETUPS?:?\s*(.*?)(?=\n\d+\.|$)",
         }
-        
+
         for key, pattern in sections.items():
             match = re.search(pattern, analysis_text, re.IGNORECASE | re.DOTALL)
             if match:
                 content = match.group(1).strip()
-                if key in ['strengths', 'weaknesses', 'improvement_areas', 'actionable_drills', 'recommendations', 'key_lessons']:
+                if key in [
+                    "strengths",
+                    "weaknesses",
+                    "improvement_areas",
+                    "actionable_drills",
+                    "recommendations",
+                    "key_lessons",
+                    "future_setups",
+                ]:
                     # Parse as list
-                    items = [item.strip('- ').strip() for item in content.split('\n') if item.strip() and not item.strip().startswith('OVERALL')]
-                    parsed[key] = [item for item in items if len(item) > 10]  # Filter out short/empty items
+                    items = [
+                        item.strip("- ").strip()
+                        for item in content.split("\n")
+                        if item.strip() and not item.strip().startswith("OVERALL")
+                    ]
+                    parsed[key] = [
+                        item for item in items if len(item) > 10
+                    ]  # Filter out short/empty items
                 else:
                     # Parse as text
                     parsed[key] = content
-        
+
         return parsed
-    
+
     def _parse_daily_analysis(self, analysis_text):
         """Parse daily analysis response"""
         parsed = {}
-        
+
         # Extract daily score
-        score_match = re.search(r'(?:DAILY SCORE|SCORE).*?(\d+)', analysis_text, re.IGNORECASE)
+        score_match = re.search(
+            r"(?:DAILY SCORE|SCORE).*?(\d+)", analysis_text, re.IGNORECASE
+        )
         if score_match:
-            parsed['daily_score'] = int(score_match.group(1))
-        
-        return parsed 
+            parsed["daily_score"] = int(score_match.group(1))
+
+        return parsed

@@ -471,6 +471,15 @@
                         </ul>
                     </div>
                 </div>
+                {% if analysis.get_future_setups() %}
+                <hr>
+                <h6 class="text-primary">Future Setups</h6>
+                <ul>
+                    {% for setup in analysis.get_future_setups() %}
+                        <li>{{ setup }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
             </div>
         </div>
         {% endif %}
