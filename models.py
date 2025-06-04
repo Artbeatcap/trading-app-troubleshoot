@@ -315,7 +315,11 @@ class Trade(db.Model):
 
     def calculate_spread_pnl(self):
         """Calculate P&L for spread trades"""
-        if not self.is_spread_trade() or not self.exit_price:
+        # exit_price can legitimately be 0 if the spread expires worthless.
+        # The previous check used ``not self.exit_price`` which incorrectly
+        # treated an exit price of 0 as ``False`` and skipped the calculation.
+        # We only want to bail out when ``exit_price`` is ``None``.
+        if not self.is_spread_trade() or self.exit_price is None:
             return
 
         if self.trade_type == "credit_put_spread":
