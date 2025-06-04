@@ -283,7 +283,7 @@ body {
                             <td class="{% if call_itm %}itm-call-cell{% else %}otm-cell{% endif %}">${{ "%.2f"|format(call['ask']) if call['ask'] else 'N/A' }}</td>
                             <td class="{% if call_itm %}itm-call-cell{% else %}otm-cell{% endif %}">{{ call['volume'] if call['volume'] else '0' }}</td>
                             <td class="{% if call_itm %}itm-call-cell{% else %}otm-cell{% endif %}">
-                                <button class="btn btn-sm btn-pnl-call" onclick="analyzeOption('call', {{ call['strike'] }}, {{ context.current_price }}, '{{ context.selected_date }}', {{ call['last']|default(0) }})">View P&amp;L</button>
+                                <button class="btn btn-sm btn-pnl-call" onclick="viewPnL('call', {{ call['strike'] }}, {{ context.current_price }}, '{{ context.selected_date }}', {{ call['last']|default(0) }})">View P&amp;L</button>
                             </td>
                             <td class="{% if put_itm %}itm-put-cell{% else %}otm-cell{% endif %}"><strong>${{ "%.2f"|format(put['strike']) }}</strong></td>
                             <td class="{% if put_itm %}itm-put-cell{% else %}otm-cell{% endif %}">${{ "%.2f"|format(put['last']) if put['last'] else 'N/A' }}</td>
@@ -291,7 +291,7 @@ body {
                             <td class="{% if put_itm %}itm-put-cell{% else %}otm-cell{% endif %}">${{ "%.2f"|format(put['ask']) if put['ask'] else 'N/A' }}</td>
                             <td class="{% if put_itm %}itm-put-cell{% else %}otm-cell{% endif %}">{{ put['volume'] if put['volume'] else '0' }}</td>
                             <td class="{% if put_itm %}itm-put-cell{% else %}otm-cell{% endif %}">
-                                <button class="btn btn-sm btn-pnl-put" onclick="analyzeOption('put', {{ put['strike'] }}, {{ context.current_price }}, '{{ context.selected_date }}', {{ put['last']|default(0) }})">View P&amp;L</button>
+                                <button class="btn btn-sm btn-pnl-put" onclick="viewPnL('put', {{ put['strike'] }}, {{ context.current_price }}, '{{ context.selected_date }}', {{ put['last']|default(0) }})">View P&amp;L</button>
                             </td>
                         </tr>
                         {% if call['strike'] < context.current_price and (loop.index == loop.length or context.calls[loop.index]['strike'] >= context.current_price) %}
@@ -315,21 +315,7 @@ body {
 {% endif %}
 
 <!-- P&L Analysis Modal -->
-<div class="modal fade" id="pnlModal" tabindex="-1" aria-labelledby="pnlModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="pnlModalLabel">Options P&L Analysis</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div id="pnlAnalysisContent">
-                    <!-- Content will be loaded dynamically -->
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+{% include 'pnl_modal.html' %}
 
 <!-- Login Required Modal -->
 <div class="modal fade" id="loginRequiredModal" tabindex="-1">
@@ -350,6 +336,8 @@ body {
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
 <script>
 // Comprehensive list of 500+ popular stocks with options
 const POPULAR_STOCKS = [
@@ -839,201 +827,155 @@ function initializeAutocomplete() {
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', initializeAutocomplete);
 
-function analyzeOption(optionType, strike, currentPrice, expirationDate, premium) {
-    strike = parseFloat(strike);
-    currentPrice = parseFloat(currentPrice);
-    premium = parseFloat(premium);
-    const data = {
-        option_type: optionType,
-        strike: strike,
-        current_price: currentPrice,
-        expiration_date: expirationDate,
-        premium: premium,
-        quantity: 1
-    };
-    
-    fetch('/tools/options-pnl', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data)
-    })
-    .then(response => response.json())
-    .then(result => {
-        if (result.success) {
-            displayPnlAnalysis(result, optionType, strike, currentPrice, expirationDate, premium);
-        } else {
-            alert('Error: ' + result.error);
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Error analyzing option. Please try again.');
-    });
-}
+// P&L modal functionality using Chart.js
+document.addEventListener('DOMContentLoaded', function() {
+    const colors = ['#dc3545', '#fd7e14', '#ffc107', '#198754', '#0d6efd'];
+    let currentPnLData = null;
+    let showingDollars = true;
+    let pnlChart = null;
 
-// Display P&L analysis in modal
-function displayPnlAnalysis(data, optionType, strike, currentPrice, expirationDate, premium) {
-    const modal = new bootstrap.Modal(document.getElementById('pnlModal'));
-    const content = document.getElementById('pnlAnalysisContent');
-    
-    // Format the analysis content
-    let html = `
-        <div class="row mb-4">
-            <div class="col-md-6">
-                <h6>Option Details</h6>
-                <table class="table table-sm">
-                    <tr>
-                        <td>Type</td>
-                        <td>${optionType.toUpperCase()}</td>
-                    </tr>
-                    <tr>
-                        <td>Strike</td>
-                        <td>$${strike.toFixed(2)}</td>
-                    </tr>
-                    <tr>
-                        <td>Current Price</td>
-                        <td>$${currentPrice.toFixed(2)}</td>
-                    </tr>
-                    <tr>
-                        <td>Expiration</td>
-                        <td>${expirationDate}</td>
-                    </tr>
-                    <tr>
-                        <td>Premium</td>
-                        <td>$${premium.toFixed(2)}</td>
-                    </tr>
-                </table>
-            </div>
-            <div class="col-md-6">
-                <h6>Greeks</h6>
-                <table class="table table-sm">
-                    <tr>
-                        <td>Delta</td>
-                        <td>${data.greeks.delta.toFixed(4)}</td>
-                    </tr>
-                    <tr>
-                        <td>Gamma</td>
-                        <td>${data.greeks.gamma.toFixed(4)}</td>
-                    </tr>
-                    <tr>
-                        <td>Theta</td>
-                        <td>${data.greeks.theta.toFixed(4)}</td>
-                    </tr>
-                    <tr>
-                        <td>Vega</td>
-                        <td>${data.greeks.vega.toFixed(4)}</td>
-                    </tr>
-                </table>
-            </div>
-        </div>
-        
-        <ul class="nav nav-tabs" id="pnlTabs" role="tablist">
-            <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="scenarios-tab" data-bs-toggle="tab" data-bs-target="#scenarios" type="button" role="tab">
-                    Scenarios
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="chart-tab" data-bs-toggle="tab" data-bs-target="#chart" type="button" role="tab">
-                    Chart
-                </button>
-            </li>
-        </ul>
-        
-        <div class="tab-content mt-3" id="pnlTabContent">
-            <div class="tab-pane fade show active" id="scenarios" role="tabpanel">
-                <div class="table-responsive">
-                    <table class="table table-sm">
-                        <thead>
-                            <tr>
-                                <th>Scenario</th>
-                                <th>Price</th>
-                                <th>P&L</th>
-                                <th>ROI</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${data.pnl_table.map(scenario => `
-                                <tr>
-                                    <td>${scenario.scenario}</td>
-                                    <td>$${scenario.price.toFixed(2)}</td>
-                                    <td class="${scenario.pnl > 0 ? 'text-success' : 'text-danger'}">
-                                        $${scenario.pnl.toFixed(2)}
-                                    </td>
-                                    <td class="${scenario.pnl_percent > 0 ? 'text-success' : 'text-danger'}">
-                                        ${scenario.pnl_percent.toFixed(1)}%
-                                    </td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            <div class="tab-pane fade" id="chart" role="tabpanel">
-                <div id="pnlChart" style="height: 400px;"></div>
-            </div>
-        </div>
-    `;
-    
-    content.innerHTML = html;
-    modal.show();
-    
-    // Initialize the P&L chart
-    const prices = data.pnl_table.map(scenario => scenario.price);
-    const pnl = data.pnl_table.map(scenario => scenario.pnl);
-    
-    const trace = {
-        x: prices,
-        y: pnl,
-        type: 'scatter',
-        mode: 'lines+markers',
-        name: 'P&L',
-        line: {
-            color: '#1f77b4',
-            width: 2
-        },
-        marker: {
-            size: 6
+    function createChart(data, showDollars) {
+        const ctx = document.getElementById('pnlChart').getContext('2d');
+        if (pnlChart) {
+            pnlChart.destroy();
         }
-    };
-    
-    const layout = {
-        title: 'P&L Chart',
-        xaxis: {
-            title: 'Stock Price',
-            showgrid: true,
-            zeroline: true,
-            range: [Math.min(...prices) * 0.9, Math.max(...prices) * 1.1]
-        },
-        yaxis: {
-            title: 'P&L ($)',
-            showgrid: true,
-            zeroline: true,
-            range: [Math.min(...pnl) * 1.1, Math.max(...pnl) * 1.1]
-        },
-        showlegend: false,
-        margin: {
-            l: 50,
-            r: 20,
-            t: 50,
-            b: 50
+
+        const datasets = [];
+        data.option_info.time_points.forEach((days, index) => {
+            const label = days === 0 ? 'At Expiration' : (days === 1 ? '1 Day Left' : `${days} Days Left`);
+            datasets.push({
+                label: label,
+                data: data.pnl_data.map(point => ({ x: point.stock_price, y: showDollars ? point.time_data[index].pnl : point.time_data[index].return_percent })),
+                borderColor: colors[index % colors.length],
+                backgroundColor: colors[index % colors.length] + '20',
+                fill: false,
+                tension: 0.1,
+                borderWidth: days === 0 ? 3 : 2
+            });
+        });
+
+        pnlChart = new Chart(ctx, {
+            type: 'line',
+            data: { datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { intersect: false, mode: 'index' },
+                scales: {
+                    y: { title: { display: true, text: showDollars ? 'Profit/Loss ($)' : 'Return (%)' } },
+                    x: { title: { display: true, text: 'Stock Price ($)' } }
+                },
+                plugins: {
+                    zoom: {
+                        pan: { enabled: true, mode: 'xy', modifierKey: 'ctrl' },
+                        zoom: {
+                            wheel: { enabled: true },
+                            pinch: { enabled: true },
+                            mode: 'xy',
+                            drag: { enabled: true, backgroundColor: 'rgba(127,127,127,0.2)' }
+                        }
+                    },
+                    title: { display: true, text: showDollars ? 'Option P&L by Stock Price' : 'Option Return % by Stock Price' },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const value = context.raw.y !== undefined ? context.raw.y : context.raw;
+                                return context.dataset.label + ': ' + (showDollars ? '$' + value.toFixed(2) : value.toFixed(2) + '%');
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        document.getElementById('resetZoom').addEventListener('click', function() {
+            pnlChart.resetZoom();
+        });
+    }
+
+    function updateTable(data, showDollars) {
+        data.option_info.time_points.forEach((days, index) => {
+            const header = document.getElementById(`timeHeader${index}`);
+            if (header) header.textContent = days === 0 ? 'At Expiry' : `${days} Days Left`;
+        });
+
+        const tableBody = document.getElementById('pnlTableBody');
+        tableBody.innerHTML = '';
+
+        data.pnl_data.forEach(priceData => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>$${priceData.stock_price}</td>`;
+            priceData.time_data.forEach(timePoint => {
+                const value = showDollars ? timePoint.pnl : timePoint.return_percent;
+                const formatted = showDollars ? `$${value}` : `${value}%`;
+                const cls = value >= 0 ? 'text-success' : 'text-danger';
+                tr.innerHTML += `<td class="${cls}">${formatted}</td>`;
+            });
+            tableBody.appendChild(tr);
+        });
+
+        createChart(data, showDollars);
+    }
+
+    document.getElementById('showDollars').addEventListener('click', function() {
+        if (!showingDollars) {
+            showingDollars = true;
+            this.classList.add('active');
+            document.getElementById('showPercent').classList.remove('active');
+            if (currentPnLData) updateTable(currentPnLData, true);
         }
+    });
+
+    document.getElementById('showPercent').addEventListener('click', function() {
+        if (showingDollars) {
+            showingDollars = false;
+            this.classList.add('active');
+            document.getElementById('showDollars').classList.remove('active');
+            if (currentPnLData) updateTable(currentPnLData, false);
+        }
+    });
+
+    window.viewPnL = function(optionType, strike, currentPrice, expirationDate, premium) {
+        const payload = { option_type: optionType, strike: strike, current_price: currentPrice, expiration_date: expirationDate, premium: premium };
+        fetch('/tools/options-pnl', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(resp => resp.json())
+        .then(result => {
+            if (result.success) {
+                const analysis = result.analysis;
+                currentPnLData = analysis;
+                document.getElementById('optionType').textContent = analysis.option_info.type.toUpperCase();
+                document.getElementById('strikePrice').textContent = analysis.option_info.strike;
+                document.getElementById('premium').textContent = analysis.option_info.premium;
+                document.getElementById('daysToExp').textContent = analysis.option_info.days_to_expiration;
+                updateTable(analysis, showingDollars);
+                const modal = new bootstrap.Modal(document.getElementById('pnlModal'));
+                modal.show();
+            } else {
+                alert('Error: ' + result.error);
+            }
+        })
+        .catch(err => {
+            console.error('Error:', err);
+            alert('Error calculating P&L.');
+        });
     };
-    
-    Plotly.newPlot('pnlChart', [trace], layout);
-}
+});
 
 function addToTrades() {
     {% if current_user.is_authenticated %}
-        // This would integrate with the trade tracking system
         alert('Feature coming soon: Add this option to your trade tracking!');
     {% else %}
-        // Show login required modal
         const loginModal = new bootstrap.Modal(document.getElementById('loginRequiredModal'));
         loginModal.show();
     {% endif %}
 }
+
 </script>
+
+{% endblock %}
+
 {% endblock %} 
