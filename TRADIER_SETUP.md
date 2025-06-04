@@ -43,18 +43,18 @@ With your actual token:
 TRADIER_TOKEN = "your_actual_token_here"
 ```
 
-## Step 4: Switch to Production (Optional)
+## Step 4: Use the Sandbox API (Optional)
 
-By default, the app uses Tradier's sandbox environment for testing. To use live market data:
+The application already points to Tradier's production endpoint (`https://api.tradier.com/v1`). If you want to test without live data, switch to the sandbox URL:
 
 1. In `app.py`, change:
 ```python
-TRADIER_API_BASE = "https://sandbox.tradier.com/v1"
+TRADIER_API_BASE_URL = "https://api.tradier.com/v1"
 ```
 
 To:
 ```python
-TRADIER_API_BASE = "https://api.tradier.com/v1"
+TRADIER_API_BASE_URL = "https://sandbox.tradier.com/v1"
 ```
 
 ## Fallback Behavior
@@ -74,7 +74,7 @@ If Tradier API is not configured or fails, the application will automatically fa
 - If you see "Tradier API token not configured" messages, your token setup needs attention
 - Check that your token has the necessary permissions for market data
 - Ensure your Tradier account is approved for options data access
-- Verify you're using the correct API endpoint (sandbox vs production)
+- Verify you're using the correct API endpoint (production by default, sandbox for testing)
 
 ## Support
 
