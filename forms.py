@@ -208,7 +208,7 @@ class QuickTradeForm(FlaskForm):
     submit = SubmitField('Add Trade')
 
 class JournalForm(FlaskForm):
-    journal_date = DateField('Date', validators=[DataRequired()], default=datetime.now().date())
+    journal_date = DateField('Date', validators=[DataRequired()], default=date.today)
     daily_pnl = FloatField('Daily P&L ($)', validators=[Optional()],
                           render_kw={"step": "0.01", "placeholder": "Total P&L for the day"})
     
