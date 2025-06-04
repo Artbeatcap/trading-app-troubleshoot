@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Journal - AI Trading Analysis{% endblock %}
+{% block content %}
+<div class="container py-4">
+  <h1 class="h3 mb-3">Trading Journal</h1>
+  {% if journals %}
+    <p>Journal entries will appear here.</p>
+  {% else %}
+    <p class="text-muted">No journal entries found.</p>
+  {% endif %}
+</div>
+{% endblock %}
