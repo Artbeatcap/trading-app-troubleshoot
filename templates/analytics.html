@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Analytics - AI Trading Analysis{% endblock %}
+{% block content %}
+<div class="container py-4">
+  <h1 class="h3 mb-3">Analytics</h1>
+  {% if no_data %}
+    <p class="text-muted">No analytics data available.</p>
+  {% else %}
+    <p>Analytics charts will display here.</p>
+  {% endif %}
+</div>
+{% endblock %}
