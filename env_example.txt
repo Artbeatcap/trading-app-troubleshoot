@@ -1,0 +1,3 @@
+# Example environment variables
+TRADIER_API_TOKEN=your-tradier-token
+
