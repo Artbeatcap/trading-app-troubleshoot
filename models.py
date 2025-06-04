@@ -264,35 +264,49 @@ class Trade(db.Model):
             self.max_loss = (strike_width * self.quantity * 100) - self.max_profit
             self.breakeven_price = self.short_strike + (self.net_credit or 0)
     
-    def calculate_spread_pnl(self):
-        """Calculate P&L for spread trades"""
-        if not self.is_spread_trade() or not self.exit_price:
-            return
-        
-        if self.trade_type == 'credit_put_spread':
-            # P&L = Net credit received - cost to close
-            # If expired worthless, keep full credit
-            # If assigned, pay intrinsic value
-            if self.underlying_price_at_exit and self.underlying_price_at_exit >= self.short_strike:
-                # Expired worthless - keep full credit
-                self.profit_loss = self.net_credit * self.quantity * 100
-            else:
-                # Calculate based on exit premium
-                self.profit_loss = (self.net_credit - self.exit_price) * self.quantity * 100
-        
-        elif self.trade_type == 'credit_call_spread':
-            # Similar logic for call spreads
-            if self.underlying_price_at_exit and self.underlying_price_at_exit <= self.short_strike:
-                # Expired worthless - keep full credit
-                self.profit_loss = self.net_credit * self.quantity * 100
-            else:
-                # Calculate based on exit premium
-                self.profit_loss = (self.net_credit - self.exit_price) * self.quantity * 100
-        
-        # Calculate percentage return
-        if self.net_credit and self.net_credit > 0:
-            cost_basis = self.max_loss  # Risk amount
-            self.profit_loss_percent = (self.profit_loss / cost_basis) * 100 if cost_basis > 0 else 0
+    def calculate_spread_pnl(self, current_price=None):
+        """Calculate P&L for credit spread trades.
+
+        If ``current_price`` is provided, the method returns the unrealized
+        P&L based on that price without mutating the trade instance.  When
+        ``current_price`` is ``None`` the trade is assumed closed and
+        ``self.exit_price`` is used, updating ``profit_loss`` fields.
+        """
+        if not self.is_spread_trade():
+            return 0, 0
+
+        price = self.exit_price if current_price is None else current_price
+        if price is None:
+            return 0, 0
+
+        pnl = 0
+        pct = 0
+        if current_price is None:
+            # Closed trade - check if spread expired worthless
+            if self.trade_type == 'credit_put_spread':
+                if self.underlying_price_at_exit and \
+                        self.underlying_price_at_exit >= self.short_strike:
+                    pnl = self.net_credit * self.quantity * 100
+                else:
+                    pnl = (self.net_credit - price) * self.quantity * 100
+            elif self.trade_type == 'credit_call_spread':
+                if self.underlying_price_at_exit and \
+                        self.underlying_price_at_exit <= self.short_strike:
+                    pnl = self.net_credit * self.quantity * 100
+                else:
+                    pnl = (self.net_credit - price) * self.quantity * 100
+        else:
+            # Mark-to-market calculation
+            pnl = (self.net_credit - price) * self.quantity * 100
+
+        if self.net_credit and self.max_loss and self.max_loss > 0:
+            pct = (pnl / self.max_loss) * 100
+
+        if current_price is None:
+            self.profit_loss = pnl
+            self.profit_loss_percent = pct
+
+        return pnl, pct
     
     def calculate_pnl(self):
         """Calculate P&L for both open and closed trades"""
