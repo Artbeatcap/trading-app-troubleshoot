@@ -16,6 +16,7 @@ import requests
 import numpy as np
 from scipy.stats import norm
 import math
+from itertools import zip_longest
 from werkzeug.utils import secure_filename
 
 # Load environment variables from .env file
@@ -867,13 +868,22 @@ def options_calculator():
                 
                 # Get options chain data from Tradier
                 calls, puts, price, expirations = get_options_chain_tradier(symbol)
-                
+
                 if calls is not None and puts is not None and not calls.empty and not puts.empty:
-                    # Convert DataFrames to list of dictionaries
-                    context['calls'] = calls.to_dict('records')
-                    context['puts'] = puts.to_dict('records')
+                    # Sort by strike to ensure correct ordering
+                    calls_sorted = calls.sort_values("strike")
+                    puts_sorted = puts.sort_values("strike")
+
+                    context['calls'] = calls_sorted.to_dict('records')
+                    context['puts'] = puts_sorted.to_dict('records')
                     context['expiration_dates'] = expirations
-                    
+
+                    # Combine calls and puts so template can iterate safely even if lengths differ
+                    options_rows = []
+                    for c, p in zip_longest(context['calls'], context['puts']):
+                        options_rows.append({'call': c, 'put': p})
+                    context['options_rows'] = options_rows
+
                     # Get selected expiration date
                     selected_date = request.form.get('expiration_date')
                     if selected_date and selected_date in expirations:
