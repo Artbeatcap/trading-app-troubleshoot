@@ -26,6 +26,12 @@
                 </h5>
             </div>
             <div class="card-body">
+                {% if not current_user.is_authenticated %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Log in or create an account to save this trade.
+                </div>
+                {% endif %}
                 <form method="POST" enctype="multipart/form-data">
                     {{ form.hidden_tag() }}
                     
