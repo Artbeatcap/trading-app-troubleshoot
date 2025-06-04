@@ -46,7 +46,7 @@ A comprehensive trading platform that combines AI-powered trade analysis with pr
 
 3. **Set up environment variables**
    ```bash
-   cp env.example .env
+   cp env_example.txt .env
    # Edit .env with your configuration
    ```
 
