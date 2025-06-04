@@ -377,7 +377,26 @@ def _r(val, places=2):
             return
 
         if self.is_spread_trade():
-            pnl, pct = self.calculate_spread_pnl(live)
+            # For open spread positions we don't have an exit price yet.  Use
+            # the current market price as the cost to close the spread so we can
+            # mark to market.  ``net_credit`` represents the credit received at
+            # entry so the unrealised P&L is that credit minus the cost to close
+            # (``live``).  If we don't have the necessary data just skip the
+            # calculation.
+            if live is None or self.net_credit is None:
+                return
+
+            pnl = (self.net_credit - live) * self.quantity * 100
+
+            if self.max_loss:
+                cost_basis = self.max_loss
+            else:
+                strike_width = 0
+                if self.short_strike and self.long_strike:
+                    strike_width = abs(self.short_strike - self.long_strike) * self.quantity * 100
+                cost_basis = strike_width - (self.net_credit * self.quantity * 100)
+
+            pct = _r((pnl / cost_basis) * 100, 2) if cost_basis else 0
         elif self.is_option_trade():
             pnl = (live - self.entry_price) * self.quantity * 100
             cost = self.entry_price * self.quantity * 100
