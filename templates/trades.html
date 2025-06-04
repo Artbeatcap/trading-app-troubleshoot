@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Trades - AI Trading Analysis{% endblock %}
+{% block content %}
+<div class="container py-4">
+  <h1 class="h3 mb-3">Trades</h1>
+  {% if trades %}
+    <p>Trade history will appear here.</p>
+  {% else %}
+    <p class="text-muted">No trades to display.</p>
+  {% endif %}
+</div>
+{% endblock %}
