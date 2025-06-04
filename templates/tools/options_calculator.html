@@ -910,14 +910,35 @@ document.addEventListener('DOMContentLoaded', function() {
         const tableBody = document.getElementById('pnlTableBody');
         tableBody.innerHTML = '';
 
+        const values = [];
+        data.pnl_data.forEach(priceData => {
+            priceData.time_data.forEach(tp => {
+                values.push(showDollars ? tp.pnl : tp.return_percent);
+            });
+        });
+        const maxAbs = Math.max(...values.map(v => Math.abs(v)), 1);
+
         data.pnl_data.forEach(priceData => {
             const tr = document.createElement('tr');
             tr.innerHTML = `<td>$${priceData.stock_price}</td>`;
             priceData.time_data.forEach(timePoint => {
                 const value = showDollars ? timePoint.pnl : timePoint.return_percent;
                 const formatted = showDollars ? `$${value}` : `${value}%`;
-                const cls = value >= 0 ? 'text-success' : 'text-danger';
-                tr.innerHTML += `<td class="${cls}">${formatted}</td>`;
+                const cls = value >= 0 ? 'text-success' : (value < 0 ? 'text-danger' : '');
+
+                const intensity = Math.min(1, Math.abs(value) / maxAbs);
+                let bg = 'transparent';
+                if (value > 0) {
+                    bg = `rgba(25,135,84,${0.2 + 0.5 * intensity})`;
+                } else if (value < 0) {
+                    bg = `rgba(220,53,69,${0.2 + 0.5 * intensity})`;
+                }
+
+                const td = document.createElement('td');
+                td.className = cls;
+                td.style.backgroundColor = bg;
+                td.textContent = formatted;
+                tr.appendChild(td);
             });
             tableBody.appendChild(tr);
         });
@@ -971,6 +992,15 @@ document.addEventListener('DOMContentLoaded', function() {
             alert('Error calculating P&L.');
         });
     };
+
+    const pnlTabs = document.getElementById('pnlTabs');
+    if (pnlTabs) {
+        pnlTabs.addEventListener('shown.bs.tab', function(e) {
+            if (e.target.id === 'chart-tab' && pnlChart) {
+                pnlChart.resize();
+            }
+        });
+    }
 });
 
 function addToTrades() {
