@@ -448,42 +448,75 @@
                 <h5 class="mb-0">
                     <i class="fas fa-robot text-success me-2"></i>
                     AI Analysis
-                    <span class="badge bg-primary ms-2">Score: {{ analysis.overall_score }}/10</span>
                 </h5>
             </div>
             <div class="card-body">
-                <!-- Analysis content would go here -->
-                <div class="row">
-                    <div class="col-md-6">
-                        <h6 class="text-success">Strengths</h6>
-                        <ul>
-                            {% for strength in analysis.get_strengths() %}
-                                <li>{{ strength }}</li>
-                            {% endfor %}
-                        </ul>
-                    </div>
-                    <div class="col-md-6">
-                        <h6 class="text-warning">Areas for Improvement</h6>
-                        <ul>
-                            {% for weakness in analysis.get_weaknesses() %}
-                                <li>{{ weakness }}</li>
-                            {% endfor %}
-                        </ul>
-                    </div>
-                </div>
-                {% if analysis.get_future_setups() %}
-                <hr>
-                <h6 class="text-primary">Future Setups</h6>
-                <ul>
-                    {% for setup in analysis.get_future_setups() %}
-                        <li>{{ setup }}</li>
-                    {% endfor %}
-                </ul>
+                {% set score_class = 'score-poor' %}
+                {% if analysis.overall_score >= 8 %}
+                    {% set score_class = 'score-excellent' %}
+                {% elif analysis.overall_score >= 6 %}
+                    {% set score_class = 'score-good' %}
+                {% elif analysis.overall_score >= 4 %}
+                    {% set score_class = 'score-average' %}
                 {% endif %}
+
+                <div class="text-center mb-4">
+                    <div class="analysis-score {{ score_class }}">
+                        {{ analysis.overall_score }}
+                    </div>
+                    <small class="text-muted d-block mt-2">Overall Score</small>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h6 class="text-success mb-3">
+                                    <i class="fas fa-thumbs-up me-1"></i>Strengths
+                                </h6>
+                                <ul class="list-unstyled mb-0 small">
+                                    {% for strength in analysis.get_strengths() %}
+                                        <li>{{ strength }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h6 class="text-warning mb-3">
+                                    <i class="fas fa-exclamation-circle me-1"></i>Areas for Improvement
+                                </h6>
+                                <ul class="list-unstyled mb-0 small">
+                                    {% for weakness in analysis.get_weaknesses() %}
+                                        <li>{{ weakness }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    {% if analysis.get_future_setups() %}
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h6 class="text-primary mb-3">
+                                    <i class="fas fa-lightbulb me-1"></i>Future Setups
+                                </h6>
+                                <ul class="list-unstyled mb-0 small">
+                                    {% for setup in analysis.get_future_setups() %}
+                                        <li>{{ setup }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
             </div>
         </div>
-        {% endif %}
     </div>
+        {% endif %}
 
     <!-- Sidebar with Additional Info -->
     <div class="col-lg-4">
