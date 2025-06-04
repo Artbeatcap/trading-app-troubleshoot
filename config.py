@@ -7,6 +7,9 @@ class Config:
     
     # OpenAI Configuration
     OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
+
+    # Tradier Configuration
+    TRADIER_API_TOKEN = os.environ.get('TRADIER_API_TOKEN')
     
     # Mail Configuration (for user registration/password reset)
     MAIL_SERVER = os.environ.get('MAIL_SERVER') or 'smtp.gmail.com'
