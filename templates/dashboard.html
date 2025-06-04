@@ -150,7 +150,7 @@
                 {% if recent_journals %}
                     <div class="list-group list-group-flush">
                         {% for journal in recent_journals %}
-                        <a href="{{ url_for('view_journal', journal_date=journal.journal_date.strftime('%Y-%m-%d')) }}" 
+                        <a href="{{ url_for('add_edit_journal', journal_date=journal.journal_date.strftime('%Y-%m-%d')) }}"
                            class="list-group-item list-group-item-action">
                             <div class="d-flex w-100 justify-content-between">
                                 <h6 class="mb-1">{{ journal.journal_date.strftime('%B %d, %Y') }}</h6>

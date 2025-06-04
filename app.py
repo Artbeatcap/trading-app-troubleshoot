@@ -16,6 +16,7 @@ import requests
 import numpy as np
 from scipy.stats import norm
 import math
+from itertools import zip_longest
 from werkzeug.utils import secure_filename
 
 # Load environment variables from .env file
@@ -402,12 +403,12 @@ def trades():
 
 @app.route('/add_trade', methods=['GET', 'POST'])
 def add_trade():
-    """Add trade page - requires login to save"""
-    if not current_user.is_authenticated:
+    """Display trade form. Login required only when saving."""
+    form = TradeForm()
+
+    if request.method == 'POST' and not current_user.is_authenticated:
         flash('Please log in to save trades.', 'warning')
         return redirect(url_for('login', next=url_for('add_trade')))
-        
-    form = TradeForm()
     
     if form.validate_on_submit():
         # Handle file uploads
@@ -554,13 +555,17 @@ def journal():
 
 @app.route('/journal/add', methods=['GET', 'POST'])
 @app.route('/journal/<journal_date>/edit', methods=['GET', 'POST'])
-@login_required
 def add_edit_journal(journal_date=None):
+    """Journal entry page. Login only required when saving or editing."""
+
     if journal_date:
+        if not current_user.is_authenticated:
+            flash('Please log in to edit journal entries.', 'warning')
+            return redirect(url_for('login', next=url_for('add_edit_journal', journal_date=journal_date)))
         # Edit existing journal
         journal_date_obj = datetime.strptime(journal_date, '%Y-%m-%d').date()
         journal = TradingJournal.query.filter_by(
-            user_id=current_user.id, 
+            user_id=current_user.id,
             journal_date=journal_date_obj
         ).first_or_404()
         form = JournalForm(obj=journal)
@@ -571,6 +576,10 @@ def add_edit_journal(journal_date=None):
         form = JournalForm()
         is_edit = False
     
+    if request.method == 'POST' and not current_user.is_authenticated:
+        flash('Please log in to save journal entries.', 'warning')
+        return redirect(url_for('login', next=url_for('add_edit_journal')))
+
     if form.validate_on_submit():
         if journal:
             # Update existing
@@ -867,13 +876,22 @@ def options_calculator():
                 
                 # Get options chain data from Tradier
                 calls, puts, price, expirations = get_options_chain_tradier(symbol)
-                
+
                 if calls is not None and puts is not None and not calls.empty and not puts.empty:
-                    # Convert DataFrames to list of dictionaries
-                    context['calls'] = calls.to_dict('records')
-                    context['puts'] = puts.to_dict('records')
+                    # Sort by strike to ensure correct ordering
+                    calls_sorted = calls.sort_values("strike")
+                    puts_sorted = puts.sort_values("strike")
+
+                    context['calls'] = calls_sorted.to_dict('records')
+                    context['puts'] = puts_sorted.to_dict('records')
                     context['expiration_dates'] = expirations
-                    
+
+                    # Combine calls and puts so template can iterate safely even if lengths differ
+                    options_rows = []
+                    for c, p in zip_longest(context['calls'], context['puts']):
+                        options_rows.append({'call': c, 'put': p})
+                    context['options_rows'] = options_rows
+
                     # Get selected expiration date
                     selected_date = request.form.get('expiration_date')
                     if selected_date and selected_date in expirations:

@@ -239,7 +239,7 @@ body {
 </div>
 {% endif %}
 
-{% if context.calls and context.puts %}
+{% if context.options_rows %}
 <div class="card mb-4">
     <div class="card-header">
         <h5 class="mb-0">
@@ -271,30 +271,31 @@ body {
                     </tr>
                 </thead>
                 <tbody>
-                    {% for i in range(context.calls|length) %}
-                        {% set call = context.calls[i] %}
-                        {% set put = context.puts[i] %}
-                        {% set call_itm = call['strike'] < context.current_price %}
-                        {% set put_itm = put['strike'] > context.current_price %}
-                        <tr class="{% if i % 2 == 1 %}alt-row{% endif %}">
-                            <td class="{% if call_itm %}itm-call-cell{% else %}otm-cell{% endif %}"><strong>${{ "%.2f"|format(call['strike']) }}</strong></td>
-                            <td class="{% if call_itm %}itm-call-cell{% else %}otm-cell{% endif %}">${{ "%.2f"|format(call['last']) if call['last'] else 'N/A' }}</td>
-                            <td class="{% if call_itm %}itm-call-cell{% else %}otm-cell{% endif %}">${{ "%.2f"|format(call['bid']) if call['bid'] else 'N/A' }}</td>
-                            <td class="{% if call_itm %}itm-call-cell{% else %}otm-cell{% endif %}">${{ "%.2f"|format(call['ask']) if call['ask'] else 'N/A' }}</td>
-                            <td class="{% if call_itm %}itm-call-cell{% else %}otm-cell{% endif %}">{{ call['volume'] if call['volume'] else '0' }}</td>
+                    {% for row in context.options_rows %}
+                        {% set call = row.call %}
+                        {% set put = row.put %}
+                        {% set call_itm = call and (call['strike'] < context.current_price) %}
+                        {% set put_itm = put and (put['strike'] > context.current_price) %}
+                        <tr class="{% if loop.index0 % 2 == 1 %}alt-row{% endif %}">
+                            <td class="{% if call_itm %}itm-call-cell{% else %}otm-cell{% endif %}">{% if call %}<strong>${{ "%.2f"|format(call['strike']) }}</strong>{% endif %}</td>
+                            <td class="{% if call_itm %}itm-call-cell{% else %}otm-cell{% endif %}">{% if call %}${{ "%.2f"|format(call['last']) if call['last'] else 'N/A' }}{% endif %}</td>
+                            <td class="{% if call_itm %}itm-call-cell{% else %}otm-cell{% endif %}">{% if call %}${{ "%.2f"|format(call['bid']) if call['bid'] else 'N/A' }}{% endif %}</td>
+                            <td class="{% if call_itm %}itm-call-cell{% else %}otm-cell{% endif %}">{% if call %}${{ "%.2f"|format(call['ask']) if call['ask'] else 'N/A' }}{% endif %}</td>
+                            <td class="{% if call_itm %}itm-call-cell{% else %}otm-cell{% endif %}">{% if call %}{{ call['volume'] if call['volume'] else '0' }}{% endif %}</td>
                             <td class="{% if call_itm %}itm-call-cell{% else %}otm-cell{% endif %}">
-                                <button class="btn btn-sm btn-pnl-call" onclick="viewPnL('call', {{ call['strike'] }}, {{ context.current_price }}, '{{ context.selected_date }}', {{ call['last']|default(0) }})">View P&amp;L</button>
+                                {% if call %}<button class="btn btn-sm btn-pnl-call" onclick="viewPnL('call', {{ call['strike'] }}, {{ context.current_price }}, '{{ context.selected_date }}', {{ call['last']|default(0) }})">View P&amp;L</button>{% endif %}
                             </td>
-                            <td class="{% if put_itm %}itm-put-cell{% else %}otm-cell{% endif %}"><strong>${{ "%.2f"|format(put['strike']) }}</strong></td>
-                            <td class="{% if put_itm %}itm-put-cell{% else %}otm-cell{% endif %}">${{ "%.2f"|format(put['last']) if put['last'] else 'N/A' }}</td>
-                            <td class="{% if put_itm %}itm-put-cell{% else %}otm-cell{% endif %}">${{ "%.2f"|format(put['bid']) if put['bid'] else 'N/A' }}</td>
-                            <td class="{% if put_itm %}itm-put-cell{% else %}otm-cell{% endif %}">${{ "%.2f"|format(put['ask']) if put['ask'] else 'N/A' }}</td>
-                            <td class="{% if put_itm %}itm-put-cell{% else %}otm-cell{% endif %}">{{ put['volume'] if put['volume'] else '0' }}</td>
+                            <td class="{% if put_itm %}itm-put-cell{% else %}otm-cell{% endif %}">{% if put %}<strong>${{ "%.2f"|format(put['strike']) }}</strong>{% endif %}</td>
+                            <td class="{% if put_itm %}itm-put-cell{% else %}otm-cell{% endif %}">{% if put %}${{ "%.2f"|format(put['last']) if put['last'] else 'N/A' }}{% endif %}</td>
+                            <td class="{% if put_itm %}itm-put-cell{% else %}otm-cell{% endif %}">{% if put %}${{ "%.2f"|format(put['bid']) if put['bid'] else 'N/A' }}{% endif %}</td>
+                            <td class="{% if put_itm %}itm-put-cell{% else %}otm-cell{% endif %}">{% if put %}${{ "%.2f"|format(put['ask']) if put['ask'] else 'N/A' }}{% endif %}</td>
+                            <td class="{% if put_itm %}itm-put-cell{% else %}otm-cell{% endif %}">{% if put %}{{ put['volume'] if put['volume'] else '0' }}{% endif %}</td>
                             <td class="{% if put_itm %}itm-put-cell{% else %}otm-cell{% endif %}">
-                                <button class="btn btn-sm btn-pnl-put" onclick="viewPnL('put', {{ put['strike'] }}, {{ context.current_price }}, '{{ context.selected_date }}', {{ put['last']|default(0) }})">View P&amp;L</button>
+                                {% if put %}<button class="btn btn-sm btn-pnl-put" onclick="viewPnL('put', {{ put['strike'] }}, {{ context.current_price }}, '{{ context.selected_date }}', {{ put['last']|default(0) }})">View P&amp;L</button>{% endif %}
                             </td>
                         </tr>
-                        {% if call['strike'] < context.current_price and (loop.index == loop.length or context.calls[loop.index]['strike'] >= context.current_price) %}
+                        {% set next_call = context.options_rows[loop.index].call if loop.index < loop.length else None %}
+                        {% if call and call['strike'] < context.current_price and (not next_call or next_call['strike'] >= context.current_price) %}
                         <tr class="current-price-row">
                             <td colspan="12" class="text-center text-dark p-2 fw-bold" style="background-color:#f8f9fa; font-size:14px;">
                                 &larr; Current Stock Price: ${{ "%.2f"|format(context.current_price) }} &rarr;
@@ -910,14 +911,35 @@ document.addEventListener('DOMContentLoaded', function() {
         const tableBody = document.getElementById('pnlTableBody');
         tableBody.innerHTML = '';
 
+        const values = [];
+        data.pnl_data.forEach(priceData => {
+            priceData.time_data.forEach(tp => {
+                values.push(showDollars ? tp.pnl : tp.return_percent);
+            });
+        });
+        const maxAbs = Math.max(...values.map(v => Math.abs(v)), 1);
+
         data.pnl_data.forEach(priceData => {
             const tr = document.createElement('tr');
             tr.innerHTML = `<td>$${priceData.stock_price}</td>`;
             priceData.time_data.forEach(timePoint => {
                 const value = showDollars ? timePoint.pnl : timePoint.return_percent;
                 const formatted = showDollars ? `$${value}` : `${value}%`;
-                const cls = value >= 0 ? 'text-success' : 'text-danger';
-                tr.innerHTML += `<td class="${cls}">${formatted}</td>`;
+                const cls = value >= 0 ? 'text-success' : (value < 0 ? 'text-danger' : '');
+
+                const intensity = Math.min(1, Math.abs(value) / maxAbs);
+                let bg = 'transparent';
+                if (value > 0) {
+                    bg = `rgba(25,135,84,${0.2 + 0.5 * intensity})`;
+                } else if (value < 0) {
+                    bg = `rgba(220,53,69,${0.2 + 0.5 * intensity})`;
+                }
+
+                const td = document.createElement('td');
+                td.className = cls;
+                td.style.backgroundColor = bg;
+                td.textContent = formatted;
+                tr.appendChild(td);
             });
             tableBody.appendChild(tr);
         });
@@ -971,6 +993,15 @@ document.addEventListener('DOMContentLoaded', function() {
             alert('Error calculating P&L.');
         });
     };
+
+    const pnlTabs = document.getElementById('pnlTabs');
+    if (pnlTabs) {
+        pnlTabs.addEventListener('shown.bs.tab', function(e) {
+            if (e.target.id === 'chart-tab' && pnlChart) {
+                pnlChart.resize();
+            }
+        });
+    }
 });
 
 function addToTrades() {
