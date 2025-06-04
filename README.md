@@ -80,6 +80,9 @@ DATABASE_URL=sqlite:///app.db
 # OpenAI API (for AI analysis)
 OPENAI_API_KEY=your-openai-api-key
 
+# Tradier Configuration
+TRADIER_API_TOKEN=your-tradier-token
+
 # Email Configuration (optional)
 MAIL_SERVER=smtp.gmail.com
 MAIL_PORT=587

@@ -32,6 +32,9 @@ export TRADIER_API_TOKEN=your_actual_token_here
 python app.py
 ```
 
+The application reads this value from the `TRADIER_API_TOKEN` environment
+variable (see `config.py`).
+
 ### Option B: Direct Code Modification
 Edit `app.py` and replace:
 ```python
