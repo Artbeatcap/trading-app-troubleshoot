@@ -150,6 +150,7 @@ The platform fully supports credit spread strategies:
 - **Daily Performance**: AI analysis of daily trading performance
 - **Pattern Recognition**: Identify strengths and weaknesses
 - **Improvement Suggestions**: Actionable advice for better trading
+- **Potential Setup Guidance**: Example entries and exits from a world-class day trader perspective
 
 ## 🏗️ Technical Architecture
 
