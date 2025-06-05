@@ -1107,9 +1107,16 @@ def calculate_options_pnl():
         days_to_exp = (exp_date - datetime.now().date()).days
         time_to_exp = max(days_to_exp / 365.0, 0.001)  # Avoid division by zero
 
-        # Calculate 5 time points as percentages of days to expiration
-        fractions = [0.0, 0.2, 0.4, 0.6, 0.8]
-        time_points = [max(0, round(days_to_exp * f)) for f in fractions]
+        # Calculate time points starting at 100% of time remaining
+        fractions = [1.0, 0.75, 0.5, 0.25, 0.0]
+        # Round to whole days, remove duplicates, and sort descending
+        time_points = sorted(
+            {
+                max(0, int(round(days_to_exp * f)))
+                for f in fractions
+            },
+            reverse=True,
+        )
 
         # Calculate implied volatility (simplified approximation)
         implied_vol = 0.2  # Default assumption
