@@ -876,7 +876,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 interaction: { intersect: false, mode: 'index' },
                 scales: {
                     y: { title: { display: true, text: showDollars ? 'Profit/Loss ($)' : 'Return (%)' } },
-                    x: { title: { display: true, text: 'Stock Price ($)' } }
+                    x: {
+                        type: 'linear',
+                        title: { display: true, text: 'Stock Price ($)' }
+                    }
                 },
                 plugins: {
                     zoom: {
