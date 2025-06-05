@@ -196,7 +196,11 @@ body {
                            placeholder="Enter stock symbol (e.g., AAPL)" required autocomplete="off">
                     <button type="submit" class="btn btn-primary">
                         <i class="fas fa-search me-1"></i>
-                        Get Options Chain
+                        {% if context.expiration_dates %}
+                            Get Options Chain
+                        {% else %}
+                            Get Expirations
+                        {% endif %}
                     </button>
                 </div>
             </div>
