@@ -1107,23 +1107,9 @@ def calculate_options_pnl():
         days_to_exp = (exp_date - datetime.now().date()).days
         time_to_exp = max(days_to_exp / 365.0, 0.001)  # Avoid division by zero
 
-        # Calculate time intervals based on days to expiration
-        time_points = []
-        if days_to_exp <= 7:
-            # For weekly options, use 1-day intervals
-            time_points = [7, 6, 5, 4, 3, 2, 1, 0]  # Reversed order
-        elif days_to_exp <= 30:
-            # For monthly options, use 5-day intervals
-            time_points = [30, 25, 20, 15, 10, 5, 0]  # Reversed order
-        elif days_to_exp <= 90:
-            # For quarterly options, use 15-day intervals
-            time_points = [90, 75, 60, 45, 30, 15, 0]  # Reversed order
-        else:
-            # For longer-term options, use monthly intervals
-            time_points = [180, 150, 120, 90, 60, 30, 0]  # Reversed order
-
-        # Filter time points to not exceed days to expiration
-        time_points = [t for t in time_points if t <= days_to_exp]
+        # Calculate 5 time points as percentages of days to expiration
+        fractions = [0.0, 0.2, 0.4, 0.6, 0.8]
+        time_points = [max(0, round(days_to_exp * f)) for f in fractions]
 
         # Calculate implied volatility (simplified approximation)
         implied_vol = 0.2  # Default assumption
