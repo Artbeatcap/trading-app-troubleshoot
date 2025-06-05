@@ -1119,23 +1119,16 @@ def calculate_options_pnl():
                 1.0, max(0.1, (premium / strike) * math.sqrt(365 / days_to_exp))
             )
 
-        # Calculate price range based on implied volatility and strike price
-        volatility_multiplier = implied_vol
-        price_range = strike * volatility_multiplier * math.sqrt(days_to_exp / 365)
+        # Calculate price scenarios centered on breakeven or current price using standard deviation
+        breakeven = strike + premium if option_type == "call" else strike - premium
+        center_price = breakeven if breakeven > 0 else current_price
 
-        # Generate price scenarios centered around strike price
-        price_scenarios = [
-            strike - (price_range * 2),  # -2σ from strike
-            strike - price_range,  # -1σ from strike
-            strike - (price_range * 0.5),  # -0.5σ from strike
-            strike,  # Strike price
-            strike + (price_range * 0.5),  # +0.5σ from strike
-            strike + price_range,  # +1σ from strike
-            strike + (price_range * 2),  # +2σ from strike
-        ]
-        price_scenarios = [
-            max(0.01, p) for p in price_scenarios
-        ]  # Ensure prices are positive
+        volatility_multiplier = implied_vol
+        std_dev = current_price * volatility_multiplier * math.sqrt(days_to_exp / 365)
+
+        multipliers = [-2, -1, -0.5, 0, 0.5, 1, 2]
+        price_scenarios = [center_price + (m * std_dev) for m in multipliers]
+        price_scenarios = [max(0.01, p) for p in price_scenarios]
 
         # Calculate P&L for each price scenario and time point
         pnl_data = []
@@ -1209,10 +1202,10 @@ def calculate_options_pnl():
                 "strike": strike,
                 "premium": premium,
                 "days_to_expiration": days_to_exp,
-                "implied_volatility": round(
-                    implied_vol * 100, 2
-                ),  # Convert to percentage
+                "implied_volatility": round(implied_vol * 100, 2),
                 "time_points": time_points,
+                "center_price": round(center_price, 2),
+                "standard_deviation": round(std_dev, 2),
             },
             "pnl_data": pnl_data,
         }
