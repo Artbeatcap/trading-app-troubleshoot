@@ -855,8 +855,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const datasets = [];
         data.option_info.time_points.forEach((days, index) => {
-            const percent = data.option_info.days_to_expiration ? Math.round((days / data.option_info.days_to_expiration) * 100) : 0;
-            const label = days === 0 ? 'At Expiry' : `${percent}% Time Left`;
+            const label = days === 0 ? 'At Expiry' : `${days} Days Left`;
             datasets.push({
                 label: label,
                 data: data.pnl_data.map(point => ({ x: point.stock_price, y: showDollars ? point.time_data[index].pnl : point.time_data[index].return_percent })),
@@ -914,12 +913,7 @@ document.addEventListener('DOMContentLoaded', function() {
         data.option_info.time_points.forEach((days, index) => {
             const header = document.getElementById(`timeHeader${index}`);
             if (header) {
-                if (days === 0) {
-                    header.textContent = 'At Expiry';
-                } else {
-                    const pct = data.option_info.days_to_expiration ? Math.round((days / data.option_info.days_to_expiration) * 100) : 0;
-                    header.textContent = `${pct}% Time Left`;
-                }
+                header.textContent = days === 0 ? 'At Expiry' : `${days} Days Left`;
             }
         });
 
