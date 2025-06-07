@@ -938,7 +938,33 @@ def settings():
 def bulk_analysis():
     form = BulkAnalysisForm()
 
+    # Populate trade choices for individual analysis
+    trades = (
+        Trade.query.filter_by(user_id=current_user.id)
+        .filter(Trade.exit_price.isnot(None))
+        .order_by(Trade.entry_date.desc())
+        .all()
+    )
+    form.trade_id.choices = [
+        (0, "Select a trade...")
+    ] + [
+        (t.id, f"{t.symbol} - {t.entry_date.strftime('%Y-%m-%d')}") for t in trades
+    ]
+
     if form.validate_on_submit():
+        # Handle individual trade analysis first
+        if form.trade_id.data and form.trade_id.data != 0:
+            trade = Trade.query.filter_by(
+                id=form.trade_id.data, user_id=current_user.id
+            ).first()
+            if trade:
+                try:
+                    ai_analyzer.analyze_trade(trade)
+                    flash("Trade analyzed successfully!", "success")
+                except Exception as e:
+                    flash(f"Analysis failed: {str(e)}", "error")
+                return redirect(url_for("view_trade", id=trade.id))
+
         trades_to_analyze = []
 
         if form.analyze_all_unanalyzed.data:
