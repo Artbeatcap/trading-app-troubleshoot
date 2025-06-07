@@ -992,6 +992,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 currentPnLData = analysis;
                 document.getElementById('optionType').textContent = analysis.option_info.type.toUpperCase();
                 document.getElementById('strikePrice').textContent = analysis.option_info.strike;
+                document.getElementById('currentPrice').textContent = analysis.option_info.center_price;
                 document.getElementById('premium').textContent = analysis.option_info.premium;
                 document.getElementById('daysToExp').textContent = analysis.option_info.days_to_expiration;
                 updateTable(analysis, showingDollars);
