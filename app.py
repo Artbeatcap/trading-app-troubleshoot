@@ -304,6 +304,14 @@ def get_options_chain(symbol, expiration_date=None):
 def black_scholes(S, K, T, r, sigma, option_type="call"):
     """Calculate Black-Scholes option price"""
     try:
+        # Handle edge cases
+        if S <= 0 or K <= 0 or T <= 0 or sigma <= 0:
+            return 0
+            
+        # Avoid division by zero in d1 calculation
+        if sigma * np.sqrt(T) == 0:
+            return 0
+            
         d1 = (np.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * np.sqrt(T))
         d2 = d1 - sigma * np.sqrt(T)
 
@@ -320,6 +328,14 @@ def black_scholes(S, K, T, r, sigma, option_type="call"):
 def calculate_greeks(S, K, T, r, sigma, option_type="call"):
     """Calculate option Greeks"""
     try:
+        # Handle edge cases
+        if S <= 0 or K <= 0 or T <= 0 or sigma <= 0:
+            return {"delta": 0, "gamma": 0, "theta": 0, "vega": 0}
+            
+        # Avoid division by zero in d1 calculation
+        if sigma * np.sqrt(T) == 0:
+            return {"delta": 0, "gamma": 0, "theta": 0, "vega": 0}
+            
         d1 = (np.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * np.sqrt(T))
         d2 = d1 - sigma * np.sqrt(T)
 
@@ -1126,80 +1142,27 @@ def calculate_options_pnl():
                 1.0, max(0.1, (premium / strike) * math.sqrt(365 / days_to_exp))
             )
 
-        # Calculate price scenarios centered on the current price using standard deviation
-        center_price = current_price
+        # Calculate price scenarios centered on current price (S) with percentage changes
+        price_steps = [round(current_price * (1 + pct), 2) for pct in
+                       [-0.15, -0.1, -0.05, 0, 0.05, 0.1, 0.15]]
+        time_slices = [round(t, 3) for t in
+                       [time_to_exp,
+                        max(time_to_exp*0.75, 1/365),
+                        max(time_to_exp*0.50, 1/365),
+                        max(time_to_exp*0.25, 1/365),
+                        0]]
 
-        volatility_multiplier = implied_vol
-        std_dev = current_price * volatility_multiplier * math.sqrt(days_to_exp / 365)
-
-        multipliers = [-2, -1, -0.5, 0, 0.5, 1, 2]
-        price_scenarios = [center_price + (m * std_dev) for m in multipliers]
-        price_scenarios = [max(0.01, p) for p in price_scenarios]
-
-        # Calculate P&L for each price scenario and time point
-        pnl_data = []
-        for price in price_scenarios:
-            time_data = []
-            for days_left in time_points:
-                # Calculate time decay factor (Theta decay)
-                time_decay_factor = math.exp(-0.1 * (days_to_exp - days_left) / 365)
-
-                # Calculate intrinsic value
-                if option_type == "call":
-                    intrinsic_value = max(0, price - strike)
-                else:  # put
-                    intrinsic_value = max(0, strike - price)
-
-                # Calculate moneyness factor (how far from strike)
-                if option_type == "call":
-                    moneyness = (price - strike) / strike
-                else:  # put
-                    moneyness = (strike - price) / strike
-
-                # Calculate time value using a more sophisticated model
-                remaining_time = days_left / 365.0
-
-                # Base time value calculation
-                base_time_value = (
-                    premium * time_decay_factor * (remaining_time / time_to_exp)
-                )
-
-                # Adjust time value based on moneyness and time to expiration
-                if option_type == "call":
-                    if price < strike:  # OTM call
-                        # Reduce value the further out-of-the-money we are
-                        time_value = base_time_value * (1 - min(abs(moneyness), 1) * 0.5)
-                    else:  # ITM call
-                        time_value = base_time_value * (1 - abs(moneyness) * 0.3)
-                else:  # put
-                    if price > strike:  # OTM put
-                        # Reduce value the further out-of-the-money we are
-                        time_value = base_time_value * (1 - min(abs(moneyness), 1) * 0.5)
-                    else:  # ITM put
-                        time_value = base_time_value * (1 - abs(moneyness) * 0.3)
-
-                # Ensure time value doesn't exceed premium for OTM options
-                if (option_type == "call" and price < strike) or (
-                    option_type == "put" and price > strike
-                ):
-                    time_value = min(time_value, premium)
-
-                # Total option value is intrinsic value plus time value
-                option_value = intrinsic_value + time_value
-
-                # P&L is the difference between option value and premium paid
-                pnl = (option_value - premium) * quantity * 100
-
-                # Calculate return percentage
-                return_percent = (
-                    (pnl / (premium * quantity * 100)) * 100 if premium > 0 else 0
-                )
-
-                time_data.append(
-                    {"pnl": round(pnl, 2), "return_percent": round(return_percent, 2)}
-                )
-
-            pnl_data.append({"stock_price": round(price, 2), "time_data": time_data})
+        scenarios = []
+        for t in time_slices:
+            for Px in price_steps:
+                theo = black_scholes(Px, strike, t, 0.02, implied_vol, option_type)
+                pnl  = (theo - premium) * quantity * 100
+                scenarios.append({
+                    "t_years": round(t,3),
+                    "underlying": Px,
+                    "theo_price": round(theo, 2),
+                    "pnl": round(pnl, 2)
+                })
 
         # Create the analysis object
         analysis = {
@@ -1210,10 +1173,10 @@ def calculate_options_pnl():
                 "days_to_expiration": days_to_exp,
                 "implied_volatility": round(implied_vol * 100, 2),
                 "time_points": time_points,
-                "center_price": round(center_price, 2),
-                "standard_deviation": round(std_dev, 2),
+                "center_price": round(current_price, 2),
+                "standard_deviation": round(implied_vol * current_price, 2),
             },
-            "pnl_data": pnl_data,
+            "pnl_data": scenarios,
         }
 
         return jsonify({"success": True, "analysis": analysis})
