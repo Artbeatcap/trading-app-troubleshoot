@@ -346,6 +346,12 @@ class UserSettingsForm(FlaskForm):
 
 class BulkAnalysisForm(FlaskForm):
     """Form for analyzing multiple trades at once"""
+    trade_id = SelectField(
+        "Analyze Individual Trade",
+        coerce=int,
+        choices=[],
+        validators=[Optional()],
+    )
     analyze_all_unanalyzed = BooleanField('Analyze all unanalyzed trades')
     analyze_recent = BooleanField('Analyze trades from last 30 days')
-    submit = SubmitField('Start Bulk Analysis') 
+    submit = SubmitField('Start Bulk Analysis')
