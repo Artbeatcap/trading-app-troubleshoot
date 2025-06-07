@@ -858,7 +858,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const label = days === 0 ? 'At Expiry' : `${days} Days Left`;
             datasets.push({
                 label: label,
-                data: data.pnl_data.map(point => ({ x: point.stock_price, y: showDollars ? point.time_data[index].pnl : point.time_data[index].return_percent })),
+                data: data.pnl_data.map(point => ({
+                    x: Number(point.stock_price),
+                    y: Number(showDollars ? point.time_data[index].pnl : point.time_data[index].return_percent)
+                })),
                 borderColor: colors[index % colors.length],
                 backgroundColor: colors[index % colors.length] + '20',
                 fill: false,
