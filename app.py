@@ -1167,14 +1167,14 @@ def calculate_options_pnl():
                 # Adjust time value based on moneyness and time to expiration
                 if option_type == "call":
                     if price < strike:  # OTM call
-                        # Higher time value for longer-dated OTM options
-                        time_value = base_time_value * (1 + (days_to_exp / 365) * 0.5)
+                        # Reduce value the further out-of-the-money we are
+                        time_value = base_time_value * (1 - min(abs(moneyness), 1) * 0.5)
                     else:  # ITM call
                         time_value = base_time_value * (1 - abs(moneyness) * 0.3)
                 else:  # put
                     if price > strike:  # OTM put
-                        # Higher time value for longer-dated OTM options
-                        time_value = base_time_value * (1 + (days_to_exp / 365) * 0.5)
+                        # Reduce value the further out-of-the-money we are
+                        time_value = base_time_value * (1 - min(abs(moneyness), 1) * 0.5)
                     else:  # ITM put
                         time_value = base_time_value * (1 - abs(moneyness) * 0.3)
 
