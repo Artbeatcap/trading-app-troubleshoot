@@ -1159,12 +1159,12 @@ def calculate_options_pnl():
             if est_iv > 0:
                 implied_vol = est_iv
 
-        # Calculate price scenarios centered on current price (S) with percentage changes
-
-        price_steps = [
-            round(current_price * (1 + pct), 2)
-            for pct in [-0.15, -0.1, -0.05, 0, 0.05, 0.1, 0.15]
-        ]
+        # Calculate price scenarios spanning below current price and
+        # extending past the strike price to properly show profits for
+        # far OTM options moving in-the-money
+        min_price = min(current_price, strike) * 0.85
+        max_price = max(current_price, strike) * 1.15
+        price_steps = [round(p, 2) for p in np.linspace(min_price, max_price, 7)]
         time_slices = [
             round(t, 3)
             for t in [
@@ -1180,7 +1180,14 @@ def calculate_options_pnl():
         for Px in price_steps:
             row = {"stock_price": Px, "time_data": []}
             for t in time_slices:
-                theo = black_scholes(Px, strike, t, 0.02, implied_vol, option_type)
+                if t == 0:
+                    # At expiration use intrinsic value instead of Black-Scholes
+                    if option_type == "call":
+                        theo = max(Px - strike, 0)
+                    else:
+                        theo = max(strike - Px, 0)
+                else:
+                    theo = black_scholes(Px, strike, t, 0.02, implied_vol, option_type)
                 pnl = (theo - premium) * quantity * 100
 
                 ret_pct = (pnl / (premium * quantity * 100)) * 100 if premium else 0
