@@ -1126,8 +1126,8 @@ def calculate_options_pnl():
                 1.0, max(0.1, (premium / strike) * math.sqrt(365 / days_to_exp))
             )
 
-        # Calculate price scenarios centered on the current price using standard deviation
-        center_price = current_price
+        # Calculate price scenarios centered on the selected strike price using standard deviation
+        center_price = strike
 
         volatility_multiplier = implied_vol
         std_dev = current_price * volatility_multiplier * math.sqrt(days_to_exp / 365)
