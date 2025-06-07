@@ -5,9 +5,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def test_tradier_api():
-    api_key = os.getenv('TRADIER_API_KEY')
+    api_token = os.getenv('TRADIER_API_TOKEN')
     headers = {
-        'Authorization': f'Bearer {api_key}',
+        'Authorization': f'Bearer {api_token}',
         'Accept': 'application/json'
     }
     
