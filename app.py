@@ -1145,6 +1145,7 @@ def calculate_options_pnl():
             )
 
         # Calculate price scenarios centered on current price (S) with percentage changes
+
         price_steps = [
             round(current_price * (1 + pct), 2)
             for pct in [-0.15, -0.1, -0.05, 0, 0.05, 0.1, 0.15]
@@ -1175,6 +1176,7 @@ def calculate_options_pnl():
             pnl_rows.append(row)
 
 
+
         # Create the analysis object
         analysis = {
             "option_info": {
@@ -1187,7 +1189,9 @@ def calculate_options_pnl():
                 "center_price": round(current_price, 2),
                 "standard_deviation": round(implied_vol * current_price, 2),
             },
+
             "pnl_data": pnl_rows,
+
         }
 
         return jsonify({"success": True, "analysis": analysis})
