@@ -1160,19 +1160,20 @@ def calculate_options_pnl():
             ]
         ]
 
-        scenarios = []
-        for t in time_slices:
-            for Px in price_steps:
+        pnl_rows = []
+        for Px in price_steps:
+            row = {"stock_price": Px, "time_data": []}
+            for t in time_slices:
                 theo = black_scholes(Px, strike, t, 0.02, implied_vol, option_type)
                 pnl = (theo - premium) * quantity * 100
-                scenarios.append(
-                    {
-                        "t_years": round(t, 3),
-                        "underlying": Px,
-                        "theo_price": round(theo, 2),
-                        "pnl": round(pnl, 2),
-                    }
-                )
+
+                ret_pct = (pnl / (premium * quantity * 100)) * 100 if premium else 0
+                row["time_data"].append({
+                    "pnl": round(pnl, 2),
+                    "return_percent": round(ret_pct, 2)
+                })
+            pnl_rows.append(row)
+
 
         # Create the analysis object
         analysis = {
@@ -1186,7 +1187,7 @@ def calculate_options_pnl():
                 "center_price": round(current_price, 2),
                 "standard_deviation": round(implied_vol * current_price, 2),
             },
-            "pnl_data": scenarios,
+            "pnl_data": pnl_rows,
         }
 
         return jsonify({"success": True, "analysis": analysis})
