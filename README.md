@@ -43,6 +43,7 @@ A comprehensive trading platform that combines AI-powered trade analysis with pr
    ```bash
    pip install -r requirements.txt
    ```
+   This installs all required packages, including **SciPy** for mathematical functions.
 
 3. **Set up environment variables**
    ```bash

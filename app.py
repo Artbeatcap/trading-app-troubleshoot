@@ -65,23 +65,23 @@ def load_user(id):
 ai_analyzer = TradingAIAnalyzer()
 
 # Initialize Tradier API configuration
-TRADIER_API_KEY = os.getenv("TRADIER_API_KEY")
+TRADIER_API_TOKEN = os.getenv("TRADIER_API_TOKEN")
 TRADIER_API_BASE_URL = "https://api.tradier.com/v1"  # Production environment
 print(f"Tradier API Base URL: {TRADIER_API_BASE_URL}")
-print(f"Tradier token configured: {'Yes' if TRADIER_API_KEY else 'No'}")
+print(f"Tradier token configured: {'Yes' if TRADIER_API_TOKEN else 'No'}")
 
-if not TRADIER_API_KEY:
-    print("Warning: TRADIER_API_KEY environment variable not set")
+if not TRADIER_API_TOKEN:
+    print("Warning: TRADIER_API_TOKEN environment variable not set")
 
 
 def get_tradier_headers():
     """Get headers for Tradier API requests"""
-    if not TRADIER_API_KEY:
-        print("Tradier API key not configured")
+    if not TRADIER_API_TOKEN:
+        print("Tradier API token not configured")
         return None  # Token not configured
 
     headers = {
-        "Authorization": f"Bearer {TRADIER_API_KEY}",
+        "Authorization": f"Bearer {TRADIER_API_TOKEN}",
         "Accept": "application/json",
     }
     return headers
@@ -89,8 +89,8 @@ def get_tradier_headers():
 
 def get_expiration_dates_tradier(symbol):
     """Return available option expiration dates from Tradier"""
-    if not TRADIER_API_KEY:
-        print("Tradier API key not configured")
+    if not TRADIER_API_TOKEN:
+        print("Tradier API token not configured")
         return None
 
     try:
@@ -125,8 +125,8 @@ def get_expiration_dates_tradier(symbol):
 
 def get_options_chain_tradier(symbol, expiration_date=None):
     """Get options chain data using Tradier API"""
-    if not TRADIER_API_KEY:
-        print("Tradier API key not configured")
+    if not TRADIER_API_TOKEN:
+        print("Tradier API token not configured")
         return None, None, None, None
 
     try:
@@ -224,8 +224,8 @@ def get_options_chain_tradier(symbol, expiration_date=None):
 
 def get_stock_price_tradier(symbol):
     """Get current stock price and company name using Tradier API"""
-    if not TRADIER_API_KEY:
-        print("Tradier API key not configured")
+    if not TRADIER_API_TOKEN:
+        print("Tradier API token not configured")
         return None, None
 
     try:
@@ -271,8 +271,8 @@ def get_stock_price_tradier(symbol):
 
 def get_options_chain(symbol, expiration_date=None):
     """Get options chain data using Tradier API only"""
-    if not TRADIER_API_KEY:
-        print("Tradier API key not configured")
+    if not TRADIER_API_TOKEN:
+        print("Tradier API token not configured")
         return None, None, None
 
     try:
@@ -307,11 +307,11 @@ def black_scholes(S, K, T, r, sigma, option_type="call"):
         # Handle edge cases
         if S <= 0 or K <= 0 or T <= 0 or sigma <= 0:
             return 0
-            
+
         # Avoid division by zero in d1 calculation
         if sigma * np.sqrt(T) == 0:
             return 0
-            
+
         d1 = (np.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * np.sqrt(T))
         d2 = d1 - sigma * np.sqrt(T)
 
@@ -331,11 +331,11 @@ def calculate_greeks(S, K, T, r, sigma, option_type="call"):
         # Handle edge cases
         if S <= 0 or K <= 0 or T <= 0 or sigma <= 0:
             return {"delta": 0, "gamma": 0, "theta": 0, "vega": 0}
-            
+
         # Avoid division by zero in d1 calculation
         if sigma * np.sqrt(T) == 0:
             return {"delta": 0, "gamma": 0, "theta": 0, "vega": 0}
-            
+
         d1 = (np.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * np.sqrt(T))
         d2 = d1 - sigma * np.sqrt(T)
 
@@ -1121,52 +1121,61 @@ def calculate_options_pnl():
         # Calculate days to expiration
         exp_date = datetime.strptime(expiration_date, "%Y-%m-%d").date()
         days_to_exp = (exp_date - datetime.now().date()).days
-        time_to_exp = max(days_to_exp / 365.0, 0.001)  # Avoid division by zero
+        if days_to_exp <= 0:
+            return jsonify({"success": False, "error": "Option already expired"})
+
+        # Convert to years for pricing models
+        time_to_exp = days_to_exp / 365.0
 
         # Calculate time points starting at 100% of time remaining
         fractions = [1.0, 0.75, 0.5, 0.25, 0.0]
         # Round to whole days, remove duplicates, and sort descending
         time_points = sorted(
-            {
-                max(0, int(round(days_to_exp * f)))
-                for f in fractions
-            },
+            {max(0, int(round(days_to_exp * f))) for f in fractions},
             reverse=True,
         )
 
         # Calculate implied volatility (simplified approximation)
         implied_vol = 0.2  # Default assumption
-        if premium > 0:
+        if premium > 0 and strike > 0 and days_to_exp > 0:
             # Simple approximation based on premium and time to expiration
             implied_vol = min(
-                1.0, max(0.1, (premium / strike) * math.sqrt(365 / days_to_exp))
+                1.0,
+                max(0.1, (premium / strike) * math.sqrt(365 / days_to_exp)),
             )
 
         # Calculate price scenarios centered on current price (S) with percentage changes
-        price_steps = [round(current_price * (1 + pct), 2) for pct in
-                       [-0.15, -0.1, -0.05, 0, 0.05, 0.1, 0.15]]
-        time_slices = [round(t, 3) for t in
-                       [time_to_exp,
-                        max(time_to_exp * 0.75, 1 / 365),
-                        max(time_to_exp * 0.50, 1 / 365),
-                        max(time_to_exp * 0.25, 1 / 365),
-                        0]]
 
-        pnl_data = []
+        price_steps = [
+            round(current_price * (1 + pct), 2)
+            for pct in [-0.15, -0.1, -0.05, 0, 0.05, 0.1, 0.15]
+        ]
+        time_slices = [
+            round(t, 3)
+            for t in [
+                time_to_exp,
+                max(time_to_exp * 0.75, 1 / 365),
+                max(time_to_exp * 0.50, 1 / 365),
+                max(time_to_exp * 0.25, 1 / 365),
+                0,
+            ]
+        ]
+
+        pnl_rows = []
         for Px in price_steps:
-            time_data = []
+            row = {"stock_price": Px, "time_data": []}
             for t in time_slices:
                 theo = black_scholes(Px, strike, t, 0.02, implied_vol, option_type)
                 pnl = (theo - premium) * quantity * 100
-                ret_pct = (pnl / (premium * quantity * 100) * 100) if premium else 0
-                time_data.append({
+
+                ret_pct = (pnl / (premium * quantity * 100)) * 100 if premium else 0
+                row["time_data"].append({
                     "pnl": round(pnl, 2),
                     "return_percent": round(ret_pct, 2)
                 })
-            pnl_data.append({
-                "stock_price": Px,
-                "time_data": time_data
-            })
+            pnl_rows.append(row)
+
+
 
         # Create the analysis object
         analysis = {
@@ -1180,7 +1189,9 @@ def calculate_options_pnl():
                 "center_price": round(current_price, 2),
                 "standard_deviation": round(implied_vol * current_price, 2),
             },
-            "pnl_data": pnl_data,
+
+            "pnl_data": pnl_rows,
+
         }
 
         return jsonify({"success": True, "analysis": analysis})
@@ -1402,8 +1413,8 @@ def test_options(symbol):
     # Test Tradier API
     result = {
         "symbol": symbol,
-        "tradier_configured": TRADIER_API_KEY != "your_tradier_token_here"
-        and TRADIER_API_KEY,
+        "tradier_configured": TRADIER_API_TOKEN != "your_tradier_token_here"
+        and TRADIER_API_TOKEN,
         "tradier_result": None,
         "errors": [],
     }
