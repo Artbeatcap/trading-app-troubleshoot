@@ -307,11 +307,11 @@ def black_scholes(S, K, T, r, sigma, option_type="call"):
         # Handle edge cases
         if S <= 0 or K <= 0 or T <= 0 or sigma <= 0:
             return 0
-            
+
         # Avoid division by zero in d1 calculation
         if sigma * np.sqrt(T) == 0:
             return 0
-            
+
         d1 = (np.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * np.sqrt(T))
         d2 = d1 - sigma * np.sqrt(T)
 
@@ -331,11 +331,11 @@ def calculate_greeks(S, K, T, r, sigma, option_type="call"):
         # Handle edge cases
         if S <= 0 or K <= 0 or T <= 0 or sigma <= 0:
             return {"delta": 0, "gamma": 0, "theta": 0, "vega": 0}
-            
+
         # Avoid division by zero in d1 calculation
         if sigma * np.sqrt(T) == 0:
             return {"delta": 0, "gamma": 0, "theta": 0, "vega": 0}
-            
+
         d1 = (np.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * np.sqrt(T))
         d2 = d1 - sigma * np.sqrt(T)
 
@@ -1121,48 +1121,58 @@ def calculate_options_pnl():
         # Calculate days to expiration
         exp_date = datetime.strptime(expiration_date, "%Y-%m-%d").date()
         days_to_exp = (exp_date - datetime.now().date()).days
-        time_to_exp = max(days_to_exp / 365.0, 0.001)  # Avoid division by zero
+        if days_to_exp <= 0:
+            return jsonify({"success": False, "error": "Option already expired"})
+
+        # Convert to years for pricing models
+        time_to_exp = days_to_exp / 365.0
 
         # Calculate time points starting at 100% of time remaining
         fractions = [1.0, 0.75, 0.5, 0.25, 0.0]
         # Round to whole days, remove duplicates, and sort descending
         time_points = sorted(
-            {
-                max(0, int(round(days_to_exp * f)))
-                for f in fractions
-            },
+            {max(0, int(round(days_to_exp * f))) for f in fractions},
             reverse=True,
         )
 
         # Calculate implied volatility (simplified approximation)
         implied_vol = 0.2  # Default assumption
-        if premium > 0:
+        if premium > 0 and strike > 0 and days_to_exp > 0:
             # Simple approximation based on premium and time to expiration
             implied_vol = min(
-                1.0, max(0.1, (premium / strike) * math.sqrt(365 / days_to_exp))
+                1.0,
+                max(0.1, (premium / strike) * math.sqrt(365 / days_to_exp)),
             )
 
         # Calculate price scenarios centered on current price (S) with percentage changes
-        price_steps = [round(current_price * (1 + pct), 2) for pct in
-                       [-0.15, -0.1, -0.05, 0, 0.05, 0.1, 0.15]]
-        time_slices = [round(t, 3) for t in
-                       [time_to_exp,
-                        max(time_to_exp*0.75, 1/365),
-                        max(time_to_exp*0.50, 1/365),
-                        max(time_to_exp*0.25, 1/365),
-                        0]]
+        price_steps = [
+            round(current_price * (1 + pct), 2)
+            for pct in [-0.15, -0.1, -0.05, 0, 0.05, 0.1, 0.15]
+        ]
+        time_slices = [
+            round(t, 3)
+            for t in [
+                time_to_exp,
+                max(time_to_exp * 0.75, 1 / 365),
+                max(time_to_exp * 0.50, 1 / 365),
+                max(time_to_exp * 0.25, 1 / 365),
+                0,
+            ]
+        ]
 
         scenarios = []
         for t in time_slices:
             for Px in price_steps:
                 theo = black_scholes(Px, strike, t, 0.02, implied_vol, option_type)
-                pnl  = (theo - premium) * quantity * 100
-                scenarios.append({
-                    "t_years": round(t,3),
-                    "underlying": Px,
-                    "theo_price": round(theo, 2),
-                    "pnl": round(pnl, 2)
-                })
+                pnl = (theo - premium) * quantity * 100
+                scenarios.append(
+                    {
+                        "t_years": round(t, 3),
+                        "underlying": Px,
+                        "theo_price": round(theo, 2),
+                        "pnl": round(pnl, 2),
+                    }
+                )
 
         # Create the analysis object
         analysis = {
