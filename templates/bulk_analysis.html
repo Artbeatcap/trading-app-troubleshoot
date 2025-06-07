@@ -1,14 +1,14 @@
 {% extends "base.html" %}
 
 
-{% block title %}AI Bulk Analysis{% endblock %}
+{% block title %}AI Trade Analysis{% endblock %}
 
 {% block content %}
 <div class="container py-5">
     <div class="text-center mb-5">
         <h1 class="display-5 fw-bold">
             <i class="fas fa-robot text-success me-2"></i>
-            Bulk Trade Analysis
+            AI Trade Analysis
         </h1>
         <p class="lead text-muted">
             Quickly analyze multiple trades with AI-powered insights and spot
@@ -49,6 +49,10 @@
                             {{ form.analyze_recent(class="form-check-input") }}
                             {{ form.analyze_recent.label(class="form-check-label") }}
                             <small class="text-muted">({{ recent_count }} trades)</small>
+                        </div>
+                        <div class="mb-4">
+                            {{ form.trade_id.label(class="form-label fw-bold") }}
+                            {{ form.trade_id(class="form-select") }}
                         </div>
                         {{ form.submit(class="btn btn-success") }}
                     </form>
