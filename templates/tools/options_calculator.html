@@ -934,7 +934,7 @@ document.addEventListener('DOMContentLoaded', function() {
             priceData.time_data.forEach(timePoint => {
                 const value = showDollars ? timePoint.pnl : timePoint.return_percent;
                 const formatted = showDollars ? `$${value}` : `${value}%`;
-                const cls = value >= 0 ? 'text-success' : (value < 0 ? 'text-danger' : '');
+                const cls = 'text-dark';
 
                 const intensity = Math.min(1, Math.abs(value) / maxAbs);
                 let bg = 'transparent';
@@ -947,6 +947,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const td = document.createElement('td');
                 td.className = cls;
                 td.style.backgroundColor = bg;
+                td.style.color = '#000';
                 td.textContent = formatted;
                 tr.appendChild(td);
             });
