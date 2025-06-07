@@ -29,6 +29,7 @@ import secrets
 import requests
 import numpy as np
 from scipy.stats import norm
+from scipy.optimize import brentq
 import math
 from itertools import zip_longest
 from werkzeug.utils import secure_filename
@@ -323,6 +324,20 @@ def black_scholes(S, K, T, r, sigma, option_type="call"):
         return max(price, 0)
     except:
         return 0
+
+
+def implied_volatility(price, S, K, T, r, option_type="call"):
+    """Estimate implied volatility from option price."""
+    if price <= 0 or S <= 0 or K <= 0 or T <= 0:
+        return 0.0
+
+    def objective(sigma):
+        return black_scholes(S, K, T, r, sigma, option_type) - price
+
+    try:
+        return brentq(objective, 1e-6, 5.0, maxiter=100)
+    except Exception:
+        return 0.0
 
 
 def calculate_greeks(S, K, T, r, sigma, option_type="call"):
@@ -1135,14 +1150,14 @@ def calculate_options_pnl():
             reverse=True,
         )
 
-        # Calculate implied volatility (simplified approximation)
-        implied_vol = 0.2  # Default assumption
+        # Estimate implied volatility from the option's market price
+        implied_vol = 0.2
         if premium > 0 and strike > 0 and days_to_exp > 0:
-            # Simple approximation based on premium and time to expiration
-            implied_vol = min(
-                1.0,
-                max(0.1, (premium / strike) * math.sqrt(365 / days_to_exp)),
+            est_iv = implied_volatility(
+                premium, current_price, strike, time_to_exp, 0.02, option_type
             )
+            if est_iv > 0:
+                implied_vol = est_iv
 
         # Calculate price scenarios centered on current price (S) with percentage changes
 
