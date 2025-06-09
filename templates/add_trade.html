@@ -100,11 +100,7 @@
                             </div>
                             <div class="col-md-3">
                                 <div class="mb-3">
-                                    {{ form.premium_paid.label(class="form-label") }}
-                                    {{ form.premium_paid(class="form-control") }}
-                                    {% if form.premium_paid.errors %}
-                                        <div class="text-danger small">
-                                            {% for error in form.premium_paid.errors %}
+
                                                 <div>{{ error }}</div>
                                             {% endfor %}
                                         </div>
@@ -143,45 +139,6 @@
                             </div>
                         </div>
                         
-                        <!-- Greeks (collapsible section) -->
-                        <div class="mb-4">
-                            <button class="btn btn-outline-secondary btn-sm mb-3" type="button" data-bs-toggle="collapse" data-bs-target="#greeks-section" aria-expanded="false">
-                                <i class="fas fa-calculator me-1"></i>
-                                Advanced: Greeks (Optional)
-                            </button>
-                            <div class="collapse" id="greeks-section">
-                                <div class="row">
-                                    <div class="col-md-3">
-                                        <div class="mb-3">
-                                            {{ form.delta.label(class="form-label") }}
-                                            {{ form.delta(class="form-control") }}
-                                            <small class="text-muted">Price sensitivity</small>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="mb-3">
-                                            {{ form.gamma.label(class="form-label") }}
-                                            {{ form.gamma(class="form-control") }}
-                                            <small class="text-muted">Delta sensitivity</small>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="mb-3">
-                                            {{ form.theta.label(class="form-label") }}
-                                            {{ form.theta(class="form-control") }}
-                                            <small class="text-muted">Time decay</small>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="mb-3">
-                                            {{ form.vega.label(class="form-label") }}
-                                            {{ form.vega(class="form-control") }}
-                                            <small class="text-muted">Volatility sensitivity</small>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                     
                     <!-- Spread-specific fields (hidden by default) -->
