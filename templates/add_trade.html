@@ -100,19 +100,6 @@
                             </div>
                             <div class="col-md-3">
                                 <div class="mb-3">
-                                    {{ form.premium_paid.label(class="form-label") }}
-                                    {{ form.premium_paid(class="form-control") }}
-                                    {% if form.premium_paid.errors %}
-                                        <div class="text-danger small">
-                                            {% for error in form.premium_paid.errors %}
-                                                <div>{{ error }}</div>
-                                            {% endfor %}
-                                        </div>
-                                    {% endif %}
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="mb-3">
                                     {{ form.implied_volatility.label(class="form-label") }}
                                     {{ form.implied_volatility(class="form-control") }}
                                     {% if form.implied_volatility.errors %}
