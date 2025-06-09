@@ -111,19 +111,6 @@
                                     {% endif %}
                                 </div>
                             </div>
-                            <div class="col-md-3">
-                                <div class="mb-3">
-                                    {{ form.implied_volatility.label(class="form-label") }}
-                                    {{ form.implied_volatility(class="form-control") }}
-                                    {% if form.implied_volatility.errors %}
-                                        <div class="text-danger small">
-                                            {% for error in form.implied_volatility.errors %}
-                                                <div>{{ error }}</div>
-                                            {% endfor %}
-                                        </div>
-                                    {% endif %}
-                                </div>
-                            </div>
                         </div>
                         
                         <!-- Underlying Stock Prices -->
