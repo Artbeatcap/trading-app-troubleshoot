@@ -16,7 +16,7 @@
         </p>
         {% if current_user.is_authenticated %}
             <a href="#bulk-form" class="btn btn-primary btn-lg">
-                <i class="fas fa-bolt me-2"></i>Run Bulk Analysis
+                <i class="fas fa-bolt me-2"></i>Run AI Analysis
             </a>
         {% else %}
             <a href="{{ url_for('register') }}" class="btn btn-primary btn-lg">
