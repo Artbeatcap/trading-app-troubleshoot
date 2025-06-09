@@ -402,41 +402,6 @@ class Trade(db.Model):
         else:
             # Open trade - calculate unrealized P&L
             self.calculate_unrealized_pnl()
-
-
-# helper for finance‑style rounding
-def _r(val, places=2):
-    return float(Decimal(val).quantize(Decimal(10) ** -places, rounding=ROUND_HALF_UP))
-
-    # ‑‑‑ inside the Trade class (replace the two methods you just removed) ‑‑‑
-    # ---------------------------------------------------------------
-    def get_current_market_price(self):
-        """
-        Live quote via Tradier.
-        Works for stocks/ETFs and OCC‑formatted option symbols.
-        Returns entry_price on error so P&L won't crash.
-        """
-        token = Config.TRADIER_API_TOKEN or os.getenv("TRADIER_API_TOKEN")
-        if not token:
-            return self.entry_price
-
-        url = "https://api.tradier.com/v1/markets/quotes"
-        headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
-
-        try:
-            r = requests.get(url, headers=headers, params={"symbols": self.symbol})
-            r.raise_for_status()
-            q = r.json()["quotes"]["quote"]
-            if isinstance(q, list):
-                q = q[0]
-            last = q.get("last") or 0
-            if last == 0 and q.get("bid") and q.get("ask"):
-                last = (q["bid"] + q["ask"]) / 2
-            return float(last) if last else self.entry_price
-        except Exception:
-            return self.entry_price
-
-    # ---------------------------------------------------------------
     def calculate_unrealized_pnl(self):
         """Always mark open positions to the latest market price."""
         if self.exit_price is not None:
