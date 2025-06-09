@@ -354,4 +354,4 @@ class BulkAnalysisForm(FlaskForm):
     )
     analyze_all_unanalyzed = BooleanField('Analyze all unanalyzed trades')
     analyze_recent = BooleanField('Analyze trades from last 30 days')
-    submit = SubmitField('Start Bulk Analysis')
+    submit = SubmitField('Start AI Analysis')
