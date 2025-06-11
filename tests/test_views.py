@@ -49,7 +49,7 @@ def test_journal_add_page_renders_form():
     client = app.test_client()
     response = client.get("/journal/add")
     assert response.status_code == 200
-    assert b"Journal entry form" in response.data
+    assert b"Journal Entry" in response.data
 
 
 def test_journal_edit_page_renders_form_after_login():
@@ -63,7 +63,7 @@ def test_journal_edit_page_renders_form_after_login():
     login(client, "user", "test")
     response = client.get(f"/journal/{journal_date}/edit")
     assert response.status_code == 200
-    assert b"Journal entry form" in response.data
+    assert b"Journal Entry" in response.data
 
 
 def test_analytics_route_returns_json_when_trades_exist():
