@@ -1,8 +1,177 @@
 {% extends "base.html" %}
-{% block title %}Journal Entry - AI Trading Analysis{% endblock %}
+
+{% block title %}{% if is_edit %}Edit Journal Entry{% else %}Add Journal Entry{% endif %} - AI Trading Analysis{% endblock %}
+
 {% block content %}
 <div class="container py-4">
-  <h1 class="h3 mb-3">Journal Entry</h1>
-  <p class="text-muted">Journal entry form placeholder.</p>
+  <h1 class="h3 mb-3">{% if is_edit %}Edit{% else %}Add{% endif %} Journal Entry</h1>
+  <form method="POST">
+    {{ form.hidden_tag() }}
+
+    <div class="mb-3">
+      {{ form.journal_date.label(class="form-label") }}
+      {{ form.journal_date(class="form-control") }}
+      {% if form.journal_date.errors %}
+        <div class="text-danger small">
+          {% for error in form.journal_date.errors %}
+            <div>{{ error }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="mb-3">
+      {{ form.daily_pnl.label(class="form-label") }}
+      {{ form.daily_pnl(class="form-control") }}
+      {% if form.daily_pnl.errors %}
+        <div class="text-danger small">
+          {% for error in form.daily_pnl.errors %}
+            <div>{{ error }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+
+    <h5 class="mt-4">Morning Planning</h5>
+    <div class="mb-3">
+      {{ form.market_outlook.label(class="form-label") }}
+      {{ form.market_outlook(class="form-control") }}
+      {% if form.market_outlook.errors %}
+        <div class="text-danger small">
+          {% for error in form.market_outlook.errors %}
+            <div>{{ error }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+    <div class="mb-3">
+      {{ form.daily_goals.label(class="form-label") }}
+      {{ form.daily_goals(class="form-control") }}
+      {% if form.daily_goals.errors %}
+        <div class="text-danger small">
+          {% for error in form.daily_goals.errors %}
+            <div>{{ error }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+
+    <h5 class="mt-4">End of Day Reflection</h5>
+    <div class="mb-3">
+      {{ form.what_went_well.label(class="form-label") }}
+      {{ form.what_went_well(class="form-control") }}
+      {% if form.what_went_well.errors %}
+        <div class="text-danger small">
+          {% for error in form.what_went_well.errors %}
+            <div>{{ error }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+    <div class="mb-3">
+      {{ form.what_went_wrong.label(class="form-label") }}
+      {{ form.what_went_wrong(class="form-control") }}
+      {% if form.what_went_wrong.errors %}
+        <div class="text-danger small">
+          {% for error in form.what_went_wrong.errors %}
+            <div>{{ error }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+    <div class="mb-3">
+      {{ form.lessons_learned.label(class="form-label") }}
+      {{ form.lessons_learned(class="form-control") }}
+      {% if form.lessons_learned.errors %}
+        <div class="text-danger small">
+          {% for error in form.lessons_learned.errors %}
+            <div>{{ error }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+    <div class="mb-3">
+      {{ form.tomorrow_focus.label(class="form-label") }}
+      {{ form.tomorrow_focus(class="form-control") }}
+      {% if form.tomorrow_focus.errors %}
+        <div class="text-danger small">
+          {% for error in form.tomorrow_focus.errors %}
+            <div>{{ error }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+
+    <h5 class="mt-4">Psychology &amp; State</h5>
+    <div class="row">
+      <div class="col-md-4 mb-3">
+        {{ form.emotional_state.label(class="form-label") }}
+        {{ form.emotional_state(class="form-select") }}
+        {% if form.emotional_state.errors %}
+          <div class="text-danger small">
+            {% for error in form.emotional_state.errors %}
+              <div>{{ error }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+      <div class="col-md-4 mb-3">
+        {{ form.stress_level.label(class="form-label") }}
+        {{ form.stress_level(class="form-select") }}
+        {% if form.stress_level.errors %}
+          <div class="text-danger small">
+            {% for error in form.stress_level.errors %}
+              <div>{{ error }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+      <div class="col-md-4 mb-3">
+        {{ form.discipline_score.label(class="form-label") }}
+        {{ form.discipline_score(class="form-select") }}
+        {% if form.discipline_score.errors %}
+          <div class="text-danger small">
+            {% for error in form.discipline_score.errors %}
+              <div>{{ error }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <h5 class="mt-4">Market Context</h5>
+    <div class="row">
+      <div class="col-md-6 mb-3">
+        {{ form.market_trend.label(class="form-label") }}
+        {{ form.market_trend(class="form-select") }}
+        {% if form.market_trend.errors %}
+          <div class="text-danger small">
+            {% for error in form.market_trend.errors %}
+              <div>{{ error }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+      <div class="col-md-6 mb-3">
+        {{ form.volatility.label(class="form-label") }}
+        {{ form.volatility(class="form-select") }}
+        {% if form.volatility.errors %}
+          <div class="text-danger small">
+            {% for error in form.volatility.errors %}
+              <div>{{ error }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="d-grid mt-4">
+      {% if is_edit %}
+        {{ form.submit(class="btn btn-primary btn-lg", value="Update Journal Entry") }}
+      {% else %}
+        {{ form.submit(class="btn btn-primary btn-lg") }}
+      {% endif %}
+    </div>
+  </form>
 </div>
 {% endblock %}
