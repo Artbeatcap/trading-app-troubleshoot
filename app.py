@@ -33,6 +33,7 @@ from scipy.optimize import brentq
 import math
 from itertools import zip_longest
 from werkzeug.utils import secure_filename
+from flask_migrate import Migrate
 
 # Load environment variables from .env file
 try:
@@ -49,9 +50,8 @@ except Exception as e:
 
 app = Flask(__name__)
 app.config.from_object(Config)
-
-# Initialize extensions
 db.init_app(app)
+migrate = Migrate(app, db)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
@@ -479,39 +479,34 @@ def logout():
 def dashboard():
     """Dashboard page - shows basic stats and recent trades if logged in"""
     if current_user.is_authenticated:
-        # Get recent trades
-        recent_trades = current_user.get_recent_trades(10)
-
-        # Get statistics
-        stats = {
-            "total_trades": Trade.query.filter_by(user_id=current_user.id).count(),
-            "win_rate": current_user.get_win_rate(),
-            "total_pnl": current_user.get_total_pnl(),
-            "trades_analyzed": Trade.query.filter_by(
-                user_id=current_user.id, is_analyzed=True
-            ).count(),
-        }
-
         # Get recent journal entries
-        recent_journals = (
-            TradingJournal.query.filter_by(user_id=current_user.id)
-            .order_by(TradingJournal.journal_date.desc())
-            .limit(5)
-            .all()
-        )
-
-        # Check if today's journal exists
-        today_journal = TradingJournal.query.filter_by(
-            user_id=current_user.id, journal_date=date.today()
-        ).first()
-
-        return render_template(
-            "dashboard.html",
-            recent_trades=recent_trades,
-            stats=stats,
-            recent_journals=recent_journals,
-            today_journal=today_journal,
-        )
+        recent_journals = TradingJournal.query.filter_by(user_id=current_user.id)\
+            .order_by(TradingJournal.created_at.desc())\
+            .limit(5).all()
+        
+        # Get recent trades
+        recent_trades = Trade.query.filter_by(user_id=current_user.id)\
+            .order_by(Trade.entry_date.desc())\
+            .limit(5).all()
+        
+        # Calculate basic statistics
+        total_trades = Trade.query.filter_by(user_id=current_user.id).count()
+        winning_trades = sum(1 for trade in Trade.query.filter_by(user_id=current_user.id).all() if trade.is_winner())
+        win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
+        total_pnl = sum(trade.profit_loss for trade in Trade.query.filter_by(user_id=current_user.id).all() if trade.profit_loss is not None)
+        trades_analyzed = Trade.query.filter_by(user_id=current_user.id, is_analyzed=True).count()
+        
+        stats = {
+            'total_trades': total_trades,
+            'win_rate': win_rate,
+            'total_pnl': total_pnl,
+            'trades_analyzed': trades_analyzed
+        }
+        
+        return render_template('dashboard.html',
+                             recent_journals=recent_journals,
+                             recent_trades=recent_trades,
+                             stats=stats)
     else:
         # Show basic dashboard for non-logged in users
         return render_template(
@@ -690,63 +685,54 @@ def analyze_trade(id):
 @login_required
 def journal():
     page = request.args.get("page", 1, type=int)
-    journals = (
-        TradingJournal.query.filter_by(user_id=current_user.id)
-        .order_by(TradingJournal.journal_date.desc())
-        .paginate(page=page, per_page=20, error_out=False)
-    )
-    return render_template("journal.html", journals=journals)
+    entry_type = request.args.get("type", None)
+    
+    query = TradingJournal.query.filter_by(user_id=current_user.id)
+    if entry_type:
+        query = query.filter_by(entry_type=entry_type)
+    
+    journals = query.order_by(TradingJournal.created_at.desc()).paginate(page=page, per_page=20, error_out=False)
+    
+    # Get statistics for the cards
+    stats = {
+        "total": journals.total,
+        "trade_analysis": TradingJournal.query.filter_by(user_id=current_user.id, entry_type="trade_analysis").count(),
+        "market_notes": TradingJournal.query.filter_by(user_id=current_user.id, entry_type="market_notes").count(),
+        "strategy_ideas": TradingJournal.query.filter_by(user_id=current_user.id, entry_type="strategy_ideas").count()
+    }
+    
+    return render_template("journal.html", journals=journals, stats=stats)
 
 
 @app.route("/journal/add", methods=["GET", "POST"])
-@app.route("/journal/<journal_date>/edit", methods=["GET", "POST"])
-def add_edit_journal(journal_date=None):
-    """Journal entry page. Login only required when saving or editing."""
-
-    if journal_date:
-        if not current_user.is_authenticated:
-            flash("Please log in to edit journal entries.", "warning")
-            return redirect(
-                url_for(
-                    "login", next=url_for("add_edit_journal", journal_date=journal_date)
-                )
-            )
-        # Edit existing journal
-        journal_date_obj = datetime.strptime(journal_date, "%Y-%m-%d").date()
-        journal = TradingJournal.query.filter_by(
-            user_id=current_user.id, journal_date=journal_date_obj
-        ).first_or_404()
+@app.route("/journal/<int:id>/edit", methods=["GET", "POST"])
+@login_required
+def add_edit_journal(id=None):
+    if id:
+        journal = TradingJournal.query.filter_by(id=id, user_id=current_user.id).first_or_404()
         form = JournalForm(obj=journal)
         is_edit = True
     else:
-        # Add new journal
         journal = None
         form = JournalForm()
         is_edit = False
 
-    if request.method == "POST" and not current_user.is_authenticated:
-        flash("Please log in to save journal entries.", "warning")
-        return redirect(url_for("login", next=url_for("add_edit_journal")))
-
     if form.validate_on_submit():
         if journal:
-            # Update existing
+            # Update existing journal
             form.populate_obj(journal)
         else:
-            # Create new
+            # Create new journal
             journal = TradingJournal(user_id=current_user.id)
             form.populate_obj(journal)
 
-        # Get trades for this day and analyze daily performance
-        day_trades = journal.get_day_trades()
-        if day_trades or journal.daily_pnl:
+        # Try to get AI analysis if it's a trade analysis entry
+        if journal.entry_type == "trade_analysis":
             try:
-                daily_analysis = ai_analyzer.analyze_daily_performance(
-                    journal, day_trades
-                )
-                if daily_analysis:
-                    journal.ai_daily_feedback = daily_analysis["feedback"]
-                    journal.daily_score = daily_analysis["daily_score"]
+                analysis = ai_analyzer.analyze_journal_entry(journal)
+                if analysis:
+                    journal.ai_feedback = analysis["feedback"]
+                    journal.ai_score = analysis["score"]
             except:
                 pass  # Continue without AI analysis if it fails
 
@@ -757,84 +743,102 @@ def add_edit_journal(journal_date=None):
         flash(f"Journal entry {action} successfully!", "success")
         return redirect(url_for("journal"))
 
-    # Get trades for this day (for context)
-    if journal_date:
-        day_trades = journal.get_day_trades()
-    else:
-        day_trades = []
-
     return render_template(
         "add_edit_journal.html",
         form=form,
         journal=journal,
-        is_edit=is_edit,
-        day_trades=day_trades,
+        is_edit=is_edit
     )
+
+
+@app.route("/journal/<int:id>")
+@login_required
+def view_journal(id):
+    journal = TradingJournal.query.filter_by(id=id, user_id=current_user.id).first_or_404()
+    return render_template("view_journal.html", journal=journal)
 
 
 @app.route("/analytics")
 @login_required
 def analytics():
+    # Get time range from query parameters
+    time_range = request.args.get("range", "all")
+    end_date = datetime.now()
+    
+    if time_range == "7d":
+        start_date = end_date - timedelta(days=7)
+    elif time_range == "30d":
+        start_date = end_date - timedelta(days=30)
+    elif time_range == "90d":
+        start_date = end_date - timedelta(days=90)
+    elif time_range == "1y":
+        start_date = end_date - timedelta(days=365)
+    else:
+        start_date = None
+
     # Get all closed trades for analysis
-    closed_trades = (
-        Trade.query.filter_by(user_id=current_user.id)
-        .filter(Trade.exit_price.isnot(None))
-        .all()
-    )
+    query = Trade.query.filter_by(user_id=current_user.id).filter(Trade.exit_price.isnot(None))
+    if start_date:
+        query = query.filter(Trade.exit_date >= start_date)
+    closed_trades = query.all()
 
     if not closed_trades:
-        return render_template(
-            "analytics.html", no_data=True, charts_json=None, stats=None
-        )
+        return render_template("analytics.html", no_data=True, charts_json=None, stats=None)
 
     # Create analytics data
-    df = pd.DataFrame(
-        [
-            {
-                "date": trade.exit_date,
-                "symbol": trade.symbol,
-                "pnl": trade.profit_loss or 0,
-                "pnl_percent": trade.profit_loss_percent or 0,
-                "setup_type": trade.setup_type,
-                "timeframe": trade.timeframe,
-                "is_winner": trade.is_winner(),
-            }
-            for trade in closed_trades
-        ]
-    )
+    df = pd.DataFrame([
+        {
+            "date": trade.exit_date,
+            "symbol": trade.symbol,
+            "pnl": trade.profit_loss or 0,
+            "pnl_percent": trade.profit_loss_percent or 0,
+            "setup_type": trade.setup_type,
+            "timeframe": trade.timeframe,
+            "is_winner": trade.is_winner(),
+            "hold_time": (trade.exit_date - trade.entry_date).total_seconds() / 3600,  # in hours
+            "risk_reward": trade.get_risk_reward_ratio() or 0,
+            "trade_type": trade.trade_type
+        }
+        for trade in closed_trades
+    ])
 
     # Calculate statistics
     stats = {
         "total_trades": len(closed_trades),
         "winning_trades": len([t for t in closed_trades if t.is_winner()]),
-        "losing_trades": len(
-            [t for t in closed_trades if t.profit_loss and t.profit_loss < 0]
-        ),
-        "win_rate": len([t for t in closed_trades if t.is_winner()])
-        / len(closed_trades)
-        * 100,
+        "losing_trades": len([t for t in closed_trades if t.profit_loss and t.profit_loss < 0]),
+        "win_rate": len([t for t in closed_trades if t.is_winner()]) / len(closed_trades) * 100,
         "total_pnl": sum(t.profit_loss for t in closed_trades if t.profit_loss),
         "avg_win": df[df["pnl"] > 0]["pnl"].mean() if len(df[df["pnl"] > 0]) > 0 else 0,
-        "avg_loss": (
-            df[df["pnl"] < 0]["pnl"].mean() if len(df[df["pnl"] < 0]) > 0 else 0
-        ),
+        "avg_loss": df[df["pnl"] < 0]["pnl"].mean() if len(df[df["pnl"] < 0]) > 0 else 0,
         "largest_win": df["pnl"].max(),
         "largest_loss": df["pnl"].min(),
-        "profit_factor": (
-            abs(df[df["pnl"] > 0]["pnl"].sum() / df[df["pnl"] < 0]["pnl"].sum())
-            if df[df["pnl"] < 0]["pnl"].sum() != 0
-            else 0
-        ),
+        "profit_factor": abs(df[df["pnl"] > 0]["pnl"].sum() / df[df["pnl"] < 0]["pnl"].sum()) if df[df["pnl"] < 0]["pnl"].sum() != 0 else 0,
+        "avg_hold_time": df["hold_time"].mean(),
+        "avg_risk_reward": df["risk_reward"].mean(),
+        "max_drawdown": calculate_max_drawdown(df["pnl"].cumsum()),
+        "sharpe_ratio": calculate_sharpe_ratio(df["pnl"]),
+        "avg_trades_per_day": len(closed_trades) / ((end_date - start_date).days if start_date else 30)
     }
 
     # Create charts
     charts = create_analytics_charts(df)
     charts_json = json.dumps(charts, cls=plotly.utils.PlotlyJSONEncoder)
 
-    return render_template(
-        "analytics.html", charts_json=charts_json, stats=stats, no_data=False
-    )
+    return render_template("analytics.html", charts_json=charts_json, stats=stats, no_data=False, time_range=time_range)
 
+def calculate_max_drawdown(equity_curve):
+    """Calculate maximum drawdown from equity curve"""
+    rolling_max = equity_curve.expanding().max()
+    drawdowns = equity_curve - rolling_max
+    return abs(drawdowns.min())
+
+def calculate_sharpe_ratio(returns, risk_free_rate=0.02):
+    """Calculate Sharpe ratio from returns"""
+    if len(returns) < 2:
+        return 0
+    excess_returns = returns - risk_free_rate/252  # Daily risk-free rate
+    return np.sqrt(252) * excess_returns.mean() / excess_returns.std()
 
 def create_analytics_charts(df):
     """Create analytics charts"""
@@ -843,6 +847,7 @@ def create_analytics_charts(df):
     # P&L over time
     df_sorted = df.sort_values("date")
     df_sorted["cumulative_pnl"] = df_sorted["pnl"].cumsum()
+    df_sorted["drawdown"] = df_sorted["cumulative_pnl"] - df_sorted["cumulative_pnl"].expanding().max()
 
     charts["pnl_over_time"] = {
         "data": [
@@ -852,15 +857,29 @@ def create_analytics_charts(df):
                 "type": "scatter",
                 "mode": "lines",
                 "name": "Cumulative P&L",
-                "line": {"color": "#1f77b4"},
+                "line": {"color": "#1f77b4"}
+            },
+            {
+                "x": df_sorted["date"].tolist(),
+                "y": df_sorted["drawdown"].tolist(),
+                "type": "scatter",
+                "mode": "lines",
+                "name": "Drawdown",
+                "line": {"color": "#e74c3c"},
+                "yaxis": "y2"
             }
         ],
         "layout": {
-            "title": "Cumulative P&L Over Time",
+            "title": "Cumulative P&L and Drawdown",
             "xaxis": {"title": "Date"},
             "yaxis": {"title": "Cumulative P&L ($)"},
-            "height": 400,
-        },
+            "yaxis2": {
+                "title": "Drawdown ($)",
+                "overlaying": "y",
+                "side": "right"
+            },
+            "height": 400
+        }
     }
 
     # Win/Loss distribution
@@ -871,36 +890,107 @@ def create_analytics_charts(df):
                 "values": [win_loss_counts.get(True, 0), win_loss_counts.get(False, 0)],
                 "labels": ["Wins", "Losses"],
                 "type": "pie",
-                "colors": ["#2ecc71", "#e74c3c"],
-            }
-        ],
-        "layout": {"title": "Win/Loss Distribution", "height": 400},
-    }
-
-    # Setup type performance
-    setup_performance = (
-        df.groupby("setup_type")["pnl"].sum().sort_values(ascending=False)
-    )
-    charts["setup_performance"] = {
-        "data": [
-            {
-                "x": setup_performance.index.tolist(),
-                "y": setup_performance.values.tolist(),
-                "type": "bar",
-                "marker": {
-                    "color": [
-                        "#2ecc71" if x > 0 else "#e74c3c"
-                        for x in setup_performance.values
-                    ]
-                },
+                "colors": ["#2ecc71", "#e74c3c"]
             }
         ],
         "layout": {
-            "title": "P&L by Setup Type",
+            "title": "Win/Loss Distribution",
+            "height": 400
+        }
+    }
+
+    # Setup type performance
+    setup_performance = df.groupby("setup_type")["pnl"].agg(["sum", "mean", "count"]).reset_index()
+    setup_performance = setup_performance.sort_values("sum", ascending=False)
+
+    charts["setup_performance"] = {
+        "data": [
+            {
+                "x": setup_performance["setup_type"].tolist(),
+                "y": setup_performance["sum"].tolist(),
+                "type": "bar",
+                "name": "Total P&L",
+                "marker": {"color": "#3498db"}
+            },
+            {
+                "x": setup_performance["setup_type"].tolist(),
+                "y": setup_performance["mean"].tolist(),
+                "type": "bar",
+                "name": "Average P&L",
+                "marker": {"color": "#2ecc71"}
+            }
+        ],
+        "layout": {
+            "title": "Performance by Setup Type",
             "xaxis": {"title": "Setup Type"},
-            "yaxis": {"title": "Total P&L ($)"},
-            "height": 400,
-        },
+            "yaxis": {"title": "P&L ($)"},
+            "barmode": "group",
+            "height": 400
+        }
+    }
+
+    # Timeframe performance
+    timeframe_performance = df.groupby("timeframe")["pnl"].agg(["sum", "mean", "count"]).reset_index()
+    timeframe_performance = timeframe_performance.sort_values("sum", ascending=False)
+
+    charts["timeframe_performance"] = {
+        "data": [
+            {
+                "x": timeframe_performance["timeframe"].tolist(),
+                "y": timeframe_performance["sum"].tolist(),
+                "type": "bar",
+                "name": "Total P&L",
+                "marker": {"color": "#9b59b6"}
+            },
+            {
+                "x": timeframe_performance["timeframe"].tolist(),
+                "y": timeframe_performance["mean"].tolist(),
+                "type": "bar",
+                "name": "Average P&L",
+                "marker": {"color": "#f1c40f"}
+            }
+        ],
+        "layout": {
+            "title": "Performance by Timeframe",
+            "xaxis": {"title": "Timeframe"},
+            "yaxis": {"title": "P&L ($)"},
+            "barmode": "group",
+            "height": 400
+        }
+    }
+
+    # Trade type distribution
+    trade_type_counts = df["trade_type"].value_counts()
+    charts["trade_type_pie"] = {
+        "data": [
+            {
+                "values": trade_type_counts.values.tolist(),
+                "labels": trade_type_counts.index.tolist(),
+                "type": "pie"
+            }
+        ],
+        "layout": {
+            "title": "Trade Type Distribution",
+            "height": 400
+        }
+    }
+
+    # Hold time distribution
+    charts["hold_time_hist"] = {
+        "data": [
+            {
+                "x": df["hold_time"].tolist(),
+                "type": "histogram",
+                "name": "Hold Time",
+                "marker": {"color": "#34495e"}
+            }
+        ],
+        "layout": {
+            "title": "Hold Time Distribution",
+            "xaxis": {"title": "Hold Time (hours)"},
+            "yaxis": {"title": "Number of Trades"},
+            "height": 400
+        }
     }
 
     return charts
