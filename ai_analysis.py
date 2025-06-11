@@ -17,13 +17,18 @@ class TradingAIAnalyzer:
     """AI-powered trading analysis using OpenAI GPT models"""
 
     def __init__(self):
-        """Initialize the AI analyzer with OpenAI API key"""
+        """Initialize the AI analyzer without enforcing the API key."""
         self.api_key = os.getenv("OPENAI_API_KEY")
-        if not self.api_key:
-            raise ValueError("OPENAI_API_KEY environment variable not set")
-
-        openai.api_key = self.api_key
         self.model = "gpt-4"  # Use GPT-4 for better analysis
+
+    def _ensure_api_key(self):
+        """Validate the OpenAI API key. Return True if available."""
+        if not self.api_key:
+            self.api_key = os.getenv("OPENAI_API_KEY")
+        if not self.api_key:
+            return False
+        openai.api_key = self.api_key
+        return True
 
     def analyze_trade(self, trade):
         """
@@ -36,6 +41,8 @@ class TradingAIAnalyzer:
             TradeAnalysis object or None if analysis fails
         """
         try:
+            if not self._ensure_api_key():
+                return {"error": "OPENAI_API_KEY environment variable not set"}
             # Prepare trade data for analysis
             trade_data = self._prepare_trade_data(trade)
 
@@ -105,6 +112,8 @@ class TradingAIAnalyzer:
             Dict with analysis results
         """
         try:
+            if not self._ensure_api_key():
+                return {"error": "OPENAI_API_KEY environment variable not set"}
             # Prepare daily data
             daily_data = self._prepare_daily_data(journal_entry, trades)
 
