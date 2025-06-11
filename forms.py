@@ -252,7 +252,7 @@ class JournalForm(FlaskForm):
     ], validators=[Optional()])
     
     stress_level = SelectField('Stress Level', choices=[
-        ('', 'Select...'),
+        (0, 'Select...'),
         (1, '1 - Very Relaxed'),
         (2, '2 - Relaxed'),
         (3, '3 - Slightly Tense'),
@@ -266,7 +266,7 @@ class JournalForm(FlaskForm):
     ], validators=[Optional()], coerce=int)
     
     discipline_score = SelectField('Discipline Score', choices=[
-        ('', 'Rate your discipline...'),
+        (0, 'Rate your discipline...'),
         (1, '1 - Very Poor'),
         (2, '2 - Poor'),
         (3, '3 - Below Average'),
