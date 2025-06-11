@@ -741,7 +741,11 @@ class TradingJournal(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
 
-    journal_date = db.Column(db.Date, nullable=False, unique=True)
+    journal_date = db.Column(db.Date, nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'journal_date', name='uix_user_journal_date'),
+    )
 
     # Daily reflections
     daily_pnl = db.Column(db.Float)
