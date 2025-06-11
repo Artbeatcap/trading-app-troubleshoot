@@ -20,4 +20,4 @@ jobs:
           pip install scipy
       - name: Run tests
         run: |
-          pytest -q tests
+          pytest -q
