@@ -421,9 +421,8 @@ def index():
 
 
 @app.route("/home")
-@login_required
 def home():
-    """Authenticated user homepage with quick access to features"""
+    """Public home page that redirects to the dashboard"""
     return redirect(url_for("dashboard"))
 
 
