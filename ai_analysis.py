@@ -1,5 +1,5 @@
 """
-AI Trading Analysis Module
+Options Plunge Analysis Module
 
 This module provides AI-powered analysis of trading performance using OpenAI's GPT models.
 It analyzes individual trades, daily performance, and provides actionable feedback.

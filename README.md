@@ -1,4 +1,5 @@
-# 🚀 AI Trading Analysis Platform
+# 🚀 Options Plunge
+# *AI Trading Analysis*
 
 A comprehensive trading platform that combines AI-powered trade analysis with professional options calculators and real-time market data. This unified platform integrates the best features of trading journals, options analysis, and live market tools.
 
