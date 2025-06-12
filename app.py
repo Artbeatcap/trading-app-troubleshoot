@@ -512,12 +512,38 @@ def dashboard():
             today_journal=today_journal,
         )
     else:
-        # Show basic dashboard for non-logged in users
+        # Show aggregate stats for guests using all available trades
+        recent_trades = (
+            Trade.query.order_by(Trade.entry_date.desc()).limit(10).all()
+        )
+
+        closed_trades = Trade.query.filter(Trade.exit_price.isnot(None)).all()
+        win_rate = (
+            len([t for t in closed_trades if t.profit_loss and t.profit_loss > 0])
+            / len(closed_trades) * 100
+            if closed_trades
+            else 0
+        )
+        total_pnl = sum(t.profit_loss for t in closed_trades if t.profit_loss)
+
+        stats = {
+            "total_trades": Trade.query.count(),
+            "win_rate": win_rate,
+            "total_pnl": total_pnl,
+            "trades_analyzed": Trade.query.filter_by(is_analyzed=True).count(),
+        }
+
+        recent_journals = (
+            TradingJournal.query.order_by(TradingJournal.journal_date.desc())
+            .limit(5)
+            .all()
+        )
+
         return render_template(
             "dashboard.html",
-            recent_trades=None,
-            stats=None,
-            recent_journals=None,
+            recent_trades=recent_trades,
+            stats=stats,
+            recent_journals=recent_journals,
             today_journal=None,
         )
 
