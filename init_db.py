@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Database initialization script for AI Trading Analysis
+Database initialization script for Options Plunge
 Run this script to create the database tables.
 """
 
@@ -43,7 +43,7 @@ def init_db():
             print("Created test user with username 'test' and password 'password'")
 
 if __name__ == '__main__':
-    print("🚀 Initializing AI Trading Analysis Database...")
+    print("🚀 Initializing Options Plunge Database...")
     init_db()
     print("\n🎉 Database initialization complete!")
     print("\nNext steps:")
