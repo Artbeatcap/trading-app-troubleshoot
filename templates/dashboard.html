@@ -9,31 +9,18 @@
         Dashboard
     </h1>
     <div class="btn-toolbar mb-2 mb-md-0">
-        {% if current_user.is_authenticated %}
         <a href="{{ url_for('add_trade') }}" class="btn btn-primary me-2">
             <i class="fas fa-plus me-1"></i>
             Add Trade
         </a>
-        {% if not today_journal %}
+        {% if current_user.is_authenticated and not today_journal %}
         <a href="{{ url_for('add_edit_journal') }}" class="btn btn-outline-primary">
             <i class="fas fa-book me-1"></i>
             Today's Journal
         </a>
         {% endif %}
-        {% else %}
-        <a href="{{ url_for('login') }}" class="btn btn-primary me-2">
-            <i class="fas fa-sign-in-alt me-1"></i>
-            Login
-        </a>
-        <a href="{{ url_for('register') }}" class="btn btn-outline-primary">
-            <i class="fas fa-user-plus me-1"></i>
-            Register
-        </a>
-        {% endif %}
     </div>
 </div>
-
-{% if current_user.is_authenticated %}
 <!-- Quick Stats -->
 <div class="row g-4 mb-4">
     <div class="col-md-3">
@@ -197,45 +184,4 @@
         </ul>
     </div>
 </div>
-{% else %}
-<!-- Welcome Message for Non-Logged In Users -->
-<div class="row">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-body text-center">
-                <h3 class="card-title mb-4">Welcome to Options Plunge</h3>
-                <p class="card-text mb-4">
-                    Get started with our powerful trading tools and analysis features. You can use our options calculator and other tools without logging in, but create an account to save your trades and journal entries.
-                </p>
-                <div class="row justify-content-center">
-                    <div class="col-md-4">
-                        <div class="card mb-3">
-                            <div class="card-body">
-                                <h5 class="card-title">
-                                    <i class="fas fa-calculator text-primary me-2"></i>
-                                    Options Calculator
-                                </h5>
-                                <p class="card-text">Calculate options prices, P&L, and analyze different scenarios.</p>
-                                <a href="{{ url_for('options_calculator') }}" class="btn btn-primary">Try Now</a>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card mb-3">
-                            <div class="card-body">
-                                <h5 class="card-title">
-                                    <i class="fas fa-chart-line text-primary me-2"></i>
-                                    Stock Lookup
-                                </h5>
-                                <p class="card-text">Get detailed information about any stock symbol.</p>
-                                <a href="{{ url_for('stock_lookup') }}" class="btn btn-primary">Try Now</a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-{% endif %}
 {% endblock %} 
