@@ -195,7 +195,6 @@
     <div class="container-fluid">
         <div class="row">
             <!-- Sidebar -->
-            {% if current_user.is_authenticated %}
             <nav class="col-md-3 col-lg-2 d-md-block sidebar collapse">
                 <div class="position-sticky">
                     <div class="text-center py-3">
@@ -206,7 +205,7 @@
                                 <small class="d-block text-white-50">AI Trading Analysis</small>
                             </h5>
                         </a>
-                        <small class="text-light">Welcome, {{ current_user.username }}</small>
+                        <small class="text-light">Welcome, {{ current_user.username if current_user.is_authenticated else 'Guest' }}</small>
                     </div>
                     
                     <ul class="nav flex-column">
@@ -258,27 +257,39 @@
                                 Settings
                             </a>
                         </li>
+                        {% if current_user.is_authenticated %}
                         <li class="nav-item mt-3">
                             <a class="nav-link" href="{{ url_for('logout') }}">
                                 <i class="fas fa-sign-out-alt me-2"></i>
                                 Logout
                             </a>
                         </li>
+                        {% else %}
+                        <li class="nav-item mt-3">
+                            <a class="nav-link" href="{{ url_for('login') }}">
+                                <i class="fas fa-sign-in-alt me-2"></i>
+                                Login
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('register') }}">
+                                <i class="fas fa-user-plus me-2"></i>
+                                Register
+                            </a>
+                        </li>
+                        {% endif %}
                     </ul>
                 </div>
             </nav>
-            {% endif %}
             
             <!-- Main content -->
-            <main class="{% if current_user.is_authenticated %}col-md-9 ms-sm-auto col-lg-10 px-md-4{% else %}col-12{% endif %} main-content">
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
                 <!-- Mobile menu button -->
-                {% if current_user.is_authenticated %}
                 <div class="d-md-none mb-3">
                     <button class="btn btn-outline-secondary" type="button" id="sidebarToggle">
                         <i class="fas fa-bars"></i>
                     </button>
                 </div>
-                {% endif %}
                 
                 <!-- Flash messages -->
                 {% with messages = get_flashed_messages(with_categories=true) %}
