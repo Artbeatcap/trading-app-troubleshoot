@@ -422,8 +422,8 @@ def index():
 
 @app.route("/home")
 def home():
-    """Public home page that redirects to the dashboard"""
-    return redirect(url_for("dashboard"))
+    """Public landing page with logged-in layout"""
+    return render_template("index.html", show_logged_in=True)
 
 
 @app.route("/login", methods=["GET", "POST"])
