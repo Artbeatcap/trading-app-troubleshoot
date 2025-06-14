@@ -3,10 +3,16 @@
 {% block content %}
 <div class="container py-4">
   <h1 class="h3 mb-3">Trades</h1>
-  {% if trades %}
+  {% if trades.items %}
     <p>Trade history will appear here.</p>
   {% else %}
-    <p class="text-muted">No trades to display.</p>
+    <div class="text-center py-5 text-muted">
+      <i class="fas fa-exchange-alt fa-3x mb-3"></i>
+      <h5 class="mb-3">No trades recorded yet</h5>
+      <a href="{{ url_for('add_trade') }}" class="btn btn-primary">
+        <i class="fas fa-plus me-2"></i>Add Your First Trade
+      </a>
+    </div>
   {% endif %}
 </div>
 {% endblock %}

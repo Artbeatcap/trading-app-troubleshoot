@@ -21,6 +21,14 @@
         {% endif %}
     </div>
 </div>
+{% if not current_user.is_authenticated %}
+<div class="alert alert-info text-center" role="alert">
+    <i class="fas fa-user-plus me-2"></i>
+    <strong>Create a free account</strong> to track your trades and get personalized analytics.
+    <a href="{{ url_for('register') }}" class="btn btn-sm btn-primary ms-2">Register</a>
+    <a href="{{ url_for('login') }}" class="btn btn-sm btn-outline-secondary ms-2">Login</a>
+</div>
+{% endif %}
 <!-- Quick Stats -->
 <div class="row g-4 mb-4">
     <div class="col-md-3">
@@ -115,7 +123,11 @@
                         </table>
                     </div>
                 {% else %}
-                    <p class="text-muted mb-0">No trades yet. Start by adding your first trade!</p>
+                    <div class="text-center py-4 text-muted">
+                        <i class="fas fa-exchange-alt fa-2x mb-2"></i>
+                        <p class="mb-2">No trades yet. Start by adding your first trade!</p>
+                        <a href="{{ url_for('add_trade') }}" class="btn btn-sm btn-primary">Add Trade</a>
+                    </div>
                 {% endif %}
             </div>
         </div>
@@ -148,7 +160,11 @@
                         {% endfor %}
                     </div>
                 {% else %}
-                    <p class="text-muted mb-0">No journal entries yet. Start documenting your trading journey!</p>
+                    <div class="text-center py-4 text-muted">
+                        <i class="fas fa-book fa-2x mb-2"></i>
+                        <p class="mb-2">No journal entries yet. Start documenting your trading journey!</p>
+                        <a href="{{ url_for('add_edit_journal') }}" class="btn btn-sm btn-primary">Add Entry</a>
+                    </div>
                 {% endif %}
             </div>
         </div>
