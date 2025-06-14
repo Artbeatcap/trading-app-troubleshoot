@@ -195,7 +195,7 @@
     <div class="container-fluid">
         <div class="row">
             <!-- Sidebar -->
-            <nav class="col-md-3 col-lg-2 d-md-block sidebar collapse">
+            <nav class="col-md-3 col-lg-2 d-md-block sidebar collapse {% if current_user.is_authenticated or show_logged_in %}show{% endif %}">
                 <div class="position-sticky">
                     <div class="text-center py-3">
                         <a href="{{ url_for('index') }}" class="text-decoration-none brand-link">
