@@ -3,10 +3,16 @@
 {% block content %}
 <div class="container py-4">
   <h1 class="h3 mb-3">Trading Journal</h1>
-  {% if journals %}
+  {% if journals.items %}
     <p>Journal entries will appear here.</p>
   {% else %}
-    <p class="text-muted">No journal entries found.</p>
+    <div class="text-center py-5 text-muted">
+      <i class="fas fa-book fa-3x mb-3"></i>
+      <h5 class="mb-3">No journal entries yet</h5>
+      <a href="{{ url_for('add_edit_journal') }}" class="btn btn-primary">
+        <i class="fas fa-plus me-2"></i>Add Your First Entry
+      </a>
+    </div>
   {% endif %}
 </div>
 {% endblock %}
