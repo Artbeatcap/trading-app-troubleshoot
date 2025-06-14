@@ -18,7 +18,7 @@
                     Track your trades, journal your progress, and get professional-grade tools to improve your trading performance.
                 </p>
                 <div class="d-grid gap-2 d-md-flex justify-content-md-center">
-                    {% if current_user.is_authenticated %}
+                    {% if current_user.is_authenticated or show_logged_in %}
                         <a href="{{ url_for('dashboard') }}" class="btn btn-primary btn-lg px-4 me-md-2">
                             <i class="fas fa-tachometer-alt me-2"></i>Go to Dashboard
                         </a>
@@ -226,10 +226,14 @@
         <div class="col-lg-8 text-center">
             <div class="card">
                 <div class="card-body py-5">
-                    {% if current_user.is_authenticated %}
-                        <h3 class="mb-3">Welcome back, {{ current_user.username }}!</h3>
+                    {% if current_user.is_authenticated or show_logged_in %}
+                        {% if current_user.is_authenticated %}
+                            <h3 class="mb-3">Welcome back, {{ current_user.username }}!</h3>
+                        {% else %}
+                            <h3 class="mb-3">Explore Options Plunge</h3>
+                        {% endif %}
                         <p class="text-muted mb-4">
-                            Ready to analyze your next trade or review your performance? 
+                            Ready to analyze your next trade or review your performance?
                             Access all your trading tools and AI analysis from the dashboard.
                         </p>
                         <div class="d-grid gap-2 d-md-flex justify-content-md-center">
@@ -245,7 +249,7 @@
                     {% else %}
                         <h3 class="mb-3">Ready to Improve Your Trading?</h3>
                         <p class="text-muted mb-4">
-                            Join traders who are using AI to analyze their performance and professional-grade 
+                            Join traders who are using AI to analyze their performance and professional-grade
                             options tools to accelerate their learning curve.
                         </p>
                         <a href="{{ url_for('register') }}" class="btn btn-primary btn-lg">
