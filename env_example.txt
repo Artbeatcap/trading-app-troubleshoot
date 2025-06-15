@@ -1,3 +1,4 @@
 # Example environment variables
+DATABASE_URL=postgresql://localhost/tradingapp
 TRADIER_API_TOKEN=your-tradier-token
 
