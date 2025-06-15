@@ -76,8 +76,8 @@ Create a `.env` file with the following variables:
 SECRET_KEY=your-secret-key-here
 FLASK_ENV=development
 
-# Database
-DATABASE_URL=sqlite:///app.db
+# Database (PostgreSQL recommended for production)
+DATABASE_URL=postgresql://localhost/tradingapp
 
 # OpenAI API (for AI analysis)
 OPENAI_API_KEY=your-openai-api-key
@@ -165,7 +165,7 @@ The platform fully supports credit spread strategies:
 
 ### Backend Stack
 - **Flask**: Web framework with SQLAlchemy ORM
-- **SQLite**: Database for development (PostgreSQL for production)
+- **PostgreSQL**: Scalable database for production (SQLite for development)
 - **OpenAI API**: AI-powered trade analysis
 - **Yahoo Finance**: Real-time market data
 - **NumPy/SciPy**: Mathematical calculations for options pricing
