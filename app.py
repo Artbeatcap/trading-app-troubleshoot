@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, flash, redirect, url_for, jsonify
+from flask import Flask, render_template, request, flash, redirect, url_for, jsonify, session
 from flask_login import (
     LoginManager,
     login_user,
@@ -6,6 +6,7 @@ from flask_login import (
     login_required,
     current_user,
 )
+from flask_migrate import Migrate
 from config import Config
 from models import db, User, Trade, TradeAnalysis, TradingJournal, UserSettings
 from forms import (
@@ -52,6 +53,7 @@ app.config.from_object(Config)
 
 # Initialize extensions
 db.init_app(app)
+migrate = Migrate(app, db)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
@@ -425,7 +427,6 @@ def home():
     """Public landing page with logged-in layout"""
     return render_template("index.html", show_logged_in=True)
 
-
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if current_user.is_authenticated:
@@ -437,7 +438,13 @@ def login():
         if user and user.check_password(form.password.data):
             login_user(user)
             flash("Welcome back!", "success")
-            return redirect(url_for("index"))
+            
+            # Check if there's a pending trade to save
+            if 'pending_trade' in session:
+                return redirect(url_for("add_trade"))
+                
+            next_page = request.args.get("next")
+            return redirect(next_page or url_for("index"))
         flash("Invalid username or password", "danger")
 
     return render_template("login.html", form=form)
@@ -454,14 +461,14 @@ def register():
         user.set_password(form.password.data)
         db.session.add(user)
         db.session.commit()
-
-        # Create default settings
-        settings = UserSettings(user_id=user.id)
-        db.session.add(settings)
-        db.session.commit()
-
-        flash("Registration successful! You can now log in.", "success")
-        return redirect(url_for("login"))
+        login_user(user)
+        flash("Welcome to Options Plunge!", "success")
+        
+        # Check if there's a pending trade to save
+        if 'pending_trade' in session:
+            return redirect(url_for("add_trade"))
+            
+        return redirect(url_for("dashboard"))
 
     return render_template("register.html", form=form)
 
@@ -549,15 +556,18 @@ def dashboard():
 
 
 @app.route("/trades")
-@login_required
 def trades():
+    """Display trades. Login required only for viewing saved trades."""
+    if not current_user.is_authenticated:
+        return render_template("trades.html", trades=None, show_login_prompt=True)
+        
     page = request.args.get("page", 1, type=int)
     trades = (
         Trade.query.filter_by(user_id=current_user.id)
         .order_by(Trade.entry_date.desc())
         .paginate(page=page, per_page=20, error_out=False)
     )
-    return render_template("trades.html", trades=trades)
+    return render_template("trades.html", trades=trades, show_login_prompt=False)
 
 
 @app.route("/add_trade", methods=["GET", "POST"])
@@ -566,7 +576,52 @@ def add_trade():
     form = TradeForm()
 
     if request.method == "POST" and not current_user.is_authenticated:
-        flash("Please log in to save trades.", "warning")
+        # Store form data in session for later use
+        session['pending_trade'] = {
+            'symbol': form.symbol.data.upper(),
+            'trade_type': form.trade_type.data,
+            'entry_date': form.entry_date.data.isoformat() if form.entry_date.data else None,
+            'entry_price': form.entry_price.data,
+            'quantity': form.quantity.data,
+            'stop_loss': form.stop_loss.data,
+            'take_profit': form.take_profit.data,
+            'risk_amount': form.risk_amount.data,
+            'exit_date': form.exit_date.data.isoformat() if form.exit_date.data else None,
+            'exit_price': form.exit_price.data,
+            'setup_type': form.setup_type.data,
+            'market_condition': form.market_condition.data,
+            'timeframe': form.timeframe.data,
+            'entry_reason': form.entry_reason.data,
+            'exit_reason': form.exit_reason.data,
+            'notes': form.notes.data,
+            'tags': form.tags.data,
+            'strike_price': form.strike_price.data,
+            'expiration_date': form.expiration_date.data.isoformat() if form.expiration_date.data else None,
+            'premium_paid': form.premium_paid.data,
+            'underlying_price_at_entry': form.underlying_price_at_entry.data,
+            'underlying_price_at_exit': form.underlying_price_at_exit.data,
+            'implied_volatility': form.implied_volatility.data,
+            'delta': form.delta.data,
+            'gamma': form.gamma.data,
+            'theta': form.theta.data,
+            'vega': form.vega.data,
+            'long_strike': form.long_strike.data,
+            'short_strike': form.short_strike.data,
+            'long_premium': form.long_premium.data,
+            'short_premium': form.short_premium.data,
+            'net_credit': form.net_credit.data
+        }
+        
+        # Store uploaded files in session if they exist
+        if form.entry_chart_image.data:
+            entry_chart_filename = save_uploaded_file(form.entry_chart_image.data, "entry")
+            session['pending_trade']['entry_chart_image'] = entry_chart_filename
+            
+        if form.exit_chart_image.data:
+            exit_chart_filename = save_uploaded_file(form.exit_chart_image.data, "exit")
+            session['pending_trade']['exit_chart_image'] = exit_chart_filename
+            
+        flash("Trade details saved! Please log in or create an account to save this trade permanently.", "info")
         return redirect(url_for("login", next=url_for("add_trade")))
 
     if form.validate_on_submit():
@@ -575,12 +630,14 @@ def add_trade():
         exit_chart_filename = None
 
         if form.entry_chart_image.data:
-            entry_chart_filename = save_uploaded_file(
-                form.entry_chart_image.data, "entry"
-            )
+            entry_chart_filename = save_uploaded_file(form.entry_chart_image.data, "entry")
+        elif 'pending_trade' in session and 'entry_chart_image' in session['pending_trade']:
+            entry_chart_filename = session['pending_trade']['entry_chart_image']
 
         if form.exit_chart_image.data:
             exit_chart_filename = save_uploaded_file(form.exit_chart_image.data, "exit")
+        elif 'pending_trade' in session and 'exit_chart_image' in session['pending_trade']:
+            exit_chart_filename = session['pending_trade']['exit_chart_image']
 
         trade = Trade(
             user_id=current_user.id,
@@ -640,6 +697,10 @@ def add_trade():
         db.session.add(trade)
         db.session.commit()
 
+        # Clear any pending trade data from session
+        if 'pending_trade' in session:
+            session.pop('pending_trade')
+
         # Auto-analyze if trade is closed and user has auto-analysis enabled
         if (
             trade.exit_price
@@ -650,13 +711,21 @@ def add_trade():
                 ai_analyzer.analyze_trade(trade)
                 flash("Trade added and analyzed successfully!", "success")
             except:
-                flash(
-                    "Trade added successfully! Analysis will be done later.", "success"
-                )
+                flash("Trade added successfully! Analysis will be done later.", "success")
         else:
             flash("Trade added successfully!", "success")
 
         return redirect(url_for("trades"))
+
+    # If there's pending trade data in session, populate the form
+    if 'pending_trade' in session and not current_user.is_authenticated:
+        pending_trade = session['pending_trade']
+        for field in form:
+            if field.name in pending_trade and pending_trade[field.name] is not None:
+                if isinstance(field.data, datetime):
+                    field.data = datetime.fromisoformat(pending_trade[field.name])
+                else:
+                    field.data = pending_trade[field.name]
 
     return render_template("add_trade.html", form=form)
 
@@ -712,21 +781,24 @@ def analyze_trade(id):
 
 
 @app.route("/journal")
-@login_required
 def journal():
+    """Display journal entries. Login required only for viewing saved entries."""
+    if not current_user.is_authenticated:
+        return render_template("journal.html", journals=None, show_login_prompt=True)
+        
     page = request.args.get("page", 1, type=int)
     journals = (
         TradingJournal.query.filter_by(user_id=current_user.id)
         .order_by(TradingJournal.journal_date.desc())
         .paginate(page=page, per_page=20, error_out=False)
     )
-    return render_template("journal.html", journals=journals)
+    return render_template("journal.html", journals=journals, show_login_prompt=False)
 
 
 @app.route("/journal/add", methods=["GET", "POST"])
 @app.route("/journal/<journal_date>/edit", methods=["GET", "POST"])
 def add_edit_journal(journal_date=None):
-    """Journal entry page. Login only required when saving or editing."""
+    """Journal entry page. Login required only when saving or editing."""
 
     if journal_date:
         if not current_user.is_authenticated:
@@ -750,7 +822,18 @@ def add_edit_journal(journal_date=None):
         is_edit = False
 
     if request.method == "POST" and not current_user.is_authenticated:
-        flash("Please log in to save journal entries.", "warning")
+        # Store form data in session for later use
+        session['pending_journal'] = {
+            'journal_date': form.journal_date.data.isoformat() if form.journal_date.data else None,
+            'market_notes': form.market_notes.data,
+            'trading_notes': form.trading_notes.data,
+            'emotions': form.emotions.data,
+            'lessons_learned': form.lessons_learned.data,
+            'tomorrow_plan': form.tomorrow_plan.data,
+            'daily_pnl': form.daily_pnl.data,
+            'daily_score': form.daily_score.data
+        }
+        flash("Journal entry saved! Please log in or create an account to save permanently.", "info")
         return redirect(url_for("login", next=url_for("add_edit_journal")))
 
     if form.validate_on_submit():
@@ -778,9 +861,23 @@ def add_edit_journal(journal_date=None):
         db.session.add(journal)
         db.session.commit()
 
+        # Clear any pending journal data from session
+        if 'pending_journal' in session:
+            session.pop('pending_journal')
+
         action = "updated" if is_edit else "added"
         flash(f"Journal entry {action} successfully!", "success")
         return redirect(url_for("journal"))
+
+    # If there's pending journal data in session, populate the form
+    if 'pending_journal' in session and not current_user.is_authenticated:
+        pending_journal = session['pending_journal']
+        for field in form:
+            if field.name in pending_journal and pending_journal[field.name] is not None:
+                if isinstance(field.data, datetime):
+                    field.data = datetime.fromisoformat(pending_journal[field.name])
+                else:
+                    field.data = pending_journal[field.name]
 
     # Get trades for this day (for context)
     if journal_date:
@@ -798,8 +895,11 @@ def add_edit_journal(journal_date=None):
 
 
 @app.route("/analytics")
-@login_required
 def analytics():
+    """Display analytics. Login required only for viewing saved analytics."""
+    if not current_user.is_authenticated:
+        return render_template("analytics.html", no_data=True, charts_json=None, stats=None, show_login_prompt=True)
+        
     # Get all closed trades for analysis
     closed_trades = (
         Trade.query.filter_by(user_id=current_user.id)
@@ -809,7 +909,7 @@ def analytics():
 
     if not closed_trades:
         return render_template(
-            "analytics.html", no_data=True, charts_json=None, stats=None
+            "analytics.html", no_data=True, charts_json=None, stats=None, show_login_prompt=False
         )
 
     # Create analytics data
@@ -857,7 +957,7 @@ def analytics():
     charts_json = json.dumps(charts, cls=plotly.utils.PlotlyJSONEncoder)
 
     return render_template(
-        "analytics.html", charts_json=charts_json, stats=stats, no_data=False
+        "analytics.html", charts_json=charts_json, stats=stats, no_data=False, show_login_prompt=False
     )
 
 
@@ -959,93 +1059,132 @@ def settings():
 
 
 @app.route("/bulk_analysis", methods=["GET", "POST"])
-@login_required
 def bulk_analysis():
     form = BulkAnalysisForm()
 
-    # Populate trade choices for individual analysis
-    trades = (
-        Trade.query.filter_by(user_id=current_user.id)
-        .filter(Trade.exit_price.isnot(None))
-        .order_by(Trade.entry_date.desc())
-        .all()
-    )
-    form.trade_id.choices = [
-        (0, "Select a trade...")
-    ] + [
-        (t.id, f"{t.symbol} - {t.entry_date.strftime('%Y-%m-%d')}") for t in trades
-    ]
+    # Sample trade data for non-authenticated users
+    sample_trade = {
+        'symbol': 'AAPL',
+        'trade_type': 'stock',
+        'entry_date': datetime.now() - timedelta(days=5),
+        'entry_price': 175.50,
+        'exit_date': datetime.now(),
+        'exit_price': 182.75,
+        'quantity': 100,
+        'setup_type': 'breakout',
+        'market_condition': 'bullish',
+        'timeframe': 'daily',
+        'entry_reason': 'Breakout from consolidation with high volume',
+        'exit_reason': 'Target reached at previous resistance level',
+        'notes': 'Trade followed the overall market trend and showed strong momentum'
+    }
 
-    if form.validate_on_submit():
-        # Handle individual trade analysis first
-        if form.trade_id.data and form.trade_id.data != 0:
-            trade = Trade.query.filter_by(
-                id=form.trade_id.data, user_id=current_user.id
-            ).first()
-            if trade:
+    if current_user.is_authenticated:
+        trades = (
+            Trade.query.filter_by(user_id=current_user.id)
+            .filter(Trade.exit_price.isnot(None))
+            .order_by(Trade.entry_date.desc())
+            .all()
+        )
+        form.trade_id.choices = [
+            (0, "Select a trade...")
+        ] + [
+            (t.id, f"{t.symbol} - {t.entry_date.strftime('%Y-%m-%d')}") for t in trades
+        ]
+
+        if form.validate_on_submit():
+            # Handle individual trade analysis first
+            if form.trade_id.data and form.trade_id.data != 0:
+                trade = Trade.query.filter_by(
+                    id=form.trade_id.data, user_id=current_user.id
+                ).first()
+                if trade:
+                    try:
+                        ai_analyzer.analyze_trade(trade)
+                        flash("Trade analyzed successfully!", "success")
+                    except Exception as e:
+                        flash(f"Analysis failed: {str(e)}", "error")
+                    return redirect(url_for("view_trade", id=trade.id))
+
+            trades_to_analyze = []
+
+            if form.analyze_all_unanalyzed.data:
+                trades_to_analyze.extend(
+                    Trade.query.filter_by(user_id=current_user.id, is_analyzed=False)
+                    .filter(Trade.exit_price.isnot(None))
+                    .all()
+                )
+
+            if form.analyze_recent.data:
+                thirty_days_ago = datetime.now() - timedelta(days=30)
+                recent_trades = (
+                    Trade.query.filter_by(user_id=current_user.id)
+                    .filter(Trade.entry_date >= thirty_days_ago)
+                    .filter(Trade.exit_price.isnot(None))
+                    .all()
+                )
+                trades_to_analyze.extend(recent_trades)
+
+            # Remove duplicates
+            trades_to_analyze = list(set(trades_to_analyze))
+
+            success_count = 0
+            for trade in trades_to_analyze:
                 try:
                     ai_analyzer.analyze_trade(trade)
-                    flash("Trade analyzed successfully!", "success")
-                except Exception as e:
-                    flash(f"Analysis failed: {str(e)}", "error")
-                return redirect(url_for("view_trade", id=trade.id))
+                    success_count += 1
+                except:
+                    continue
 
-        trades_to_analyze = []
-
-        if form.analyze_all_unanalyzed.data:
-            trades_to_analyze.extend(
-                Trade.query.filter_by(user_id=current_user.id, is_analyzed=False)
-                .filter(Trade.exit_price.isnot(None))
-                .all()
+            flash(
+                f"Successfully analyzed {success_count} out of {len(trades_to_analyze)} trades.",
+                "success",
             )
+            return redirect(url_for("trades"))
 
-        if form.analyze_recent.data:
-            thirty_days_ago = datetime.now() - timedelta(days=30)
-            recent_trades = (
-                Trade.query.filter_by(user_id=current_user.id)
-                .filter(Trade.entry_date >= thirty_days_ago)
-                .filter(Trade.exit_price.isnot(None))
-                .all()
-            )
-            trades_to_analyze.extend(recent_trades)
-
-        # Remove duplicates
-        trades_to_analyze = list(set(trades_to_analyze))
-
-        success_count = 0
-        for trade in trades_to_analyze:
-            try:
-                ai_analyzer.analyze_trade(trade)
-                success_count += 1
-            except:
-                continue
-
-        flash(
-            f"Successfully analyzed {success_count} out of {len(trades_to_analyze)} trades.",
-            "success",
+        # Get counts for display
+        unanalyzed_count = (
+            Trade.query.filter_by(user_id=current_user.id, is_analyzed=False)
+            .filter(Trade.exit_price.isnot(None))
+            .count()
         )
-        return redirect(url_for("trades"))
 
-    # Get counts for display
-    unanalyzed_count = (
-        Trade.query.filter_by(user_id=current_user.id, is_analyzed=False)
-        .filter(Trade.exit_price.isnot(None))
-        .count()
-    )
-
-    thirty_days_ago = datetime.now() - timedelta(days=30)
-    recent_count = (
-        Trade.query.filter_by(user_id=current_user.id)
-        .filter(Trade.entry_date >= thirty_days_ago)
-        .filter(Trade.exit_price.isnot(None))
-        .count()
-    )
+        thirty_days_ago = datetime.now() - timedelta(days=30)
+        recent_count = (
+            Trade.query.filter_by(user_id=current_user.id)
+            .filter(Trade.entry_date >= thirty_days_ago)
+            .filter(Trade.exit_price.isnot(None))
+            .count()
+        )
+    else:
+        unanalyzed_count = 0
+        recent_count = 0
+        # Generate sample analysis for non-authenticated users
+        try:
+            sample_analysis = ai_analyzer.analyze_trade(sample_trade)
+        except Exception as e:
+            sample_analysis = {
+                'overall_score': 7,
+                'entry_analysis': 'Good entry timing based on breakout pattern with volume confirmation.',
+                'exit_analysis': 'Well-executed exit at resistance level, capturing most of the move.',
+                'risk_analysis': 'Position size was appropriate for the account size.',
+                'market_context': 'Trade aligned well with overall market trend.',
+                'strengths': ['Good entry timing', 'Clear exit strategy', 'Proper position sizing'],
+                'weaknesses': ['Could have documented more detailed entry criteria'],
+                'improvement_areas': ['Add more detailed trade documentation', 'Consider trailing stops'],
+                'actionable_drills': ['Practice identifying breakout patterns', 'Work on exit timing'],
+                'recommendations': ['Continue trading with trend', 'Document trade setups more thoroughly'],
+                'key_lessons': ['Breakout trades work well in trending markets', 'Volume confirmation is key'],
+                'future_setups': ['Look for similar consolidation patterns', 'Watch for volume confirmation']
+            }
 
     return render_template(
         "bulk_analysis.html",
         form=form,
         unanalyzed_count=unanalyzed_count,
         recent_count=recent_count,
+        sample_trade=sample_trade if not current_user.is_authenticated else None,
+        sample_analysis=sample_analysis if not current_user.is_authenticated else None
     )
 
 
