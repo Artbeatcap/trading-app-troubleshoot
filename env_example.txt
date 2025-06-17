@@ -1,4 +1,27 @@
 # Example environment variables
+
+# Flask Configuration
+SECRET_KEY=your-secret-key-here
+FLASK_ENV=development
+
+# Database (PostgreSQL recommended for production)
 DATABASE_URL=postgresql://localhost/tradingapp
+
+# OpenAI API (for AI analysis)
+OPENAI_API_KEY=your-openai-api-key
+
+# Tradier Configuration
 TRADIER_API_TOKEN=your-tradier-token
 
+# Email Configuration (optional)
+MAIL_SERVER=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USE_TLS=True
+MAIL_USERNAME=your-email@gmail.com
+MAIL_PASSWORD=your-app-password
+MAIL_DEFAULT_SENDER=your-email@gmail.com
+
+# File Upload Settings
+UPLOAD_FOLDER=static/uploads
+MAX_CONTENT_LENGTH=16777216  # 16MB
+ALLOWED_EXTENSIONS=png,jpg,jpeg,gif,pdf
