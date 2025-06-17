@@ -800,23 +800,23 @@ def add_edit_journal(journal_date=None):
 @app.route("/analytics")
 @login_required
 def analytics():
-    # Get all closed trades for analysis
-    closed_trades = (
-        Trade.query.filter_by(user_id=current_user.id)
-        .filter(Trade.exit_price.isnot(None))
-        .all()
-    )
+    """Show performance analytics for both open and closed trades."""
+    trades = Trade.query.filter_by(user_id=current_user.id).all()
 
-    if not closed_trades:
+    if not trades:
         return render_template(
             "analytics.html", no_data=True, charts_json=None, stats=None
         )
 
-    # Create analytics data
+    for trade in trades:
+        if trade.is_open_position():
+            # Update unrealized P&L so open trades are included accurately
+            trade.calculate_pnl()
+
     df = pd.DataFrame(
         [
             {
-                "date": trade.exit_date,
+                "date": trade.exit_date or trade.entry_date,
                 "symbol": trade.symbol,
                 "pnl": trade.profit_loss or 0,
                 "pnl_percent": trade.profit_loss_percent or 0,
@@ -824,21 +824,18 @@ def analytics():
                 "timeframe": trade.timeframe,
                 "is_winner": trade.is_winner(),
             }
-            for trade in closed_trades
+            for trade in trades
         ]
     )
 
-    # Calculate statistics
     stats = {
-        "total_trades": len(closed_trades),
-        "winning_trades": len([t for t in closed_trades if t.is_winner()]),
+        "total_trades": len(trades),
+        "winning_trades": len([t for t in trades if t.is_winner()]),
         "losing_trades": len(
-            [t for t in closed_trades if t.profit_loss and t.profit_loss < 0]
+            [t for t in trades if t.profit_loss is not None and t.profit_loss < 0]
         ),
-        "win_rate": len([t for t in closed_trades if t.is_winner()])
-        / len(closed_trades)
-        * 100,
-        "total_pnl": sum(t.profit_loss for t in closed_trades if t.profit_loss),
+        "win_rate": len([t for t in trades if t.is_winner()]) / len(trades) * 100,
+        "total_pnl": sum(t.profit_loss or 0 for t in trades),
         "avg_win": df[df["pnl"] > 0]["pnl"].mean() if len(df[df["pnl"] > 0]) > 0 else 0,
         "avg_loss": (
             df[df["pnl"] < 0]["pnl"].mean() if len(df[df["pnl"] < 0]) > 0 else 0

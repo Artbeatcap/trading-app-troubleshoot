@@ -361,7 +361,7 @@ class Trade(db.Model):
 
     def calculate_pnl(self):
         """Calculate P&L for both open and closed trades"""
-        if self.exit_price:
+        if self.exit_price is not None:
             # Closed trade - use actual exit price
             if self.is_spread_trade():
                 self.calculate_spread_pnl()
