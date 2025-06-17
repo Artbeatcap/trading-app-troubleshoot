@@ -91,10 +91,12 @@ def test_analytics_route_returns_json_when_trades_exist():
         data = json.loads(context["charts_json"])
         assert set(["pnl_over_time", "win_loss_pie", "setup_performance"]).issubset(data.keys())
         stats_keys = {"total_trades", "winning_trades", "losing_trades", "win_rate"}
+
         assert stats_keys.issubset(context["stats"].keys())
 
 
 def test_bulk_analysis_includes_open_trades():
+
     client = app.test_client()
     with app.app_context():
         user = create_user()
@@ -105,6 +107,7 @@ def test_bulk_analysis_includes_open_trades():
             entry_date=datetime.utcnow(),
             entry_price=100,
             quantity=1,
+
         )
         db.session.add(trade)
         db.session.commit()
