@@ -91,4 +91,27 @@ def test_analytics_route_returns_json_when_trades_exist():
         data = json.loads(context["charts_json"])
         assert set(["pnl_over_time", "win_loss_pie", "setup_performance"]).issubset(data.keys())
         stats_keys = {"total_trades", "winning_trades", "losing_trades", "win_rate"}
-        assert stats_keys.issubset(context["stats"].keys())
+    assert stats_keys.issubset(context["stats"].keys())
+
+
+def test_trades_page_displays_saved_trades():
+    client = app.test_client()
+    with app.app_context():
+        user = create_user()
+        trade = Trade(
+            user_id=user.id,
+            symbol="AAPL",
+            trade_type="long",
+            entry_date=datetime.utcnow(),
+            entry_price=100,
+            quantity=1,
+            exit_price=110,
+            exit_date=datetime.utcnow(),
+        )
+        trade.calculate_pnl()
+        db.session.add(trade)
+        db.session.commit()
+    login(client, "user", "test")
+    response = client.get("/trades")
+    assert response.status_code == 200
+    assert b"AAPL" in response.data

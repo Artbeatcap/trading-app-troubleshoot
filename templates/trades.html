@@ -1,18 +1,92 @@
 {% extends "base.html" %}
 {% block title %}Trades - Options Plunge{% endblock %}
 {% block content %}
-<div class="container py-4">
-  <h1 class="h3 mb-3">Trades</h1>
-  {% if trades.items %}
-    <p>Trade history will appear here.</p>
-  {% else %}
-    <div class="text-center py-5 text-muted">
-      <i class="fas fa-exchange-alt fa-3x mb-3"></i>
-      <h5 class="mb-3">No trades recorded yet</h5>
-      <a href="{{ url_for('add_trade') }}" class="btn btn-primary">
-        <i class="fas fa-plus me-2"></i>Add Your First Trade
-      </a>
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-exchange-alt text-primary me-2"></i>
+        Trades
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{{ url_for('add_trade') }}" class="btn btn-primary">
+            <i class="fas fa-plus me-1"></i>
+            Add Trade
+        </a>
     </div>
-  {% endif %}
 </div>
+
+{% if trades.items %}
+<div class="table-responsive">
+    <table class="table table-hover align-middle">
+        <thead>
+            <tr>
+                <th>Symbol</th>
+                <th>Type</th>
+                <th>Entry Date</th>
+                <th>Exit Date</th>
+                <th>Entry</th>
+                <th>Exit</th>
+                <th>P&L</th>
+                <th>P&L %</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for trade in trades.items %}
+            <tr class="trade-row {% if trade.profit_loss and trade.profit_loss > 0 %}profit{% elif trade.profit_loss and trade.profit_loss < 0 %}loss{% endif %}">
+                <td><a href="{{ url_for('view_trade', id=trade.id) }}">{{ trade.symbol }}</a></td>
+                <td>{{ trade.trade_type.replace('_', ' ').title() }}</td>
+                <td>{{ trade.entry_date.strftime('%Y-%m-%d') }}</td>
+                <td>{% if trade.exit_date %}{{ trade.exit_date.strftime('%Y-%m-%d') }}{% else %}-{% endif %}</td>
+                <td>${{ "%.2f"|format(trade.entry_price) }}</td>
+                <td>{% if trade.exit_price is not none %}${{ "%.2f"|format(trade.exit_price) }}{% else %}-{% endif %}</td>
+                <td class="{% if trade.profit_loss and trade.profit_loss > 0 %}text-success{% elif trade.profit_loss and trade.profit_loss < 0 %}text-danger{% endif %}">
+                    {% if trade.profit_loss is not none %}${{ "%.2f"|format(trade.profit_loss) }}{% else %}-{% endif %}
+                </td>
+                <td class="{% if trade.profit_loss_percent and trade.profit_loss_percent > 0 %}text-success{% elif trade.profit_loss_percent and trade.profit_loss_percent < 0 %}text-danger{% endif %}">
+                    {% if trade.profit_loss_percent is not none %}{{ "%.2f"|format(trade.profit_loss_percent) }}%{% else %}-{% endif %}
+                </td>
+                <td>
+                    <a href="{{ url_for('edit_trade', id=trade.id) }}" class="btn btn-sm btn-outline-secondary me-1">Edit</a>
+                    {% if trade.is_analyzed %}
+                        <a href="{{ url_for('view_trade', id=trade.id) }}" class="btn btn-sm btn-outline-primary">View</a>
+                    {% elif trade.exit_price %}
+                        <form action="{{ url_for('analyze_trade', id=trade.id) }}" method="POST" class="d-inline">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary">Analyze</button>
+                        </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<nav aria-label="Trades pagination" class="mt-4">
+    <ul class="pagination">
+        {% if trades.has_prev %}
+        <li class="page-item">
+            <a class="page-link" href="{{ url_for('trades', page=trades.prev_num) }}">&laquo; Prev</a>
+        </li>
+        {% else %}
+        <li class="page-item disabled"><span class="page-link">&laquo; Prev</span></li>
+        {% endif %}
+        <li class="page-item disabled"><span class="page-link">Page {{ trades.page }} of {{ trades.pages }}</span></li>
+        {% if trades.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="{{ url_for('trades', page=trades.next_num) }}">Next &raquo;</a>
+        </li>
+        {% else %}
+        <li class="page-item disabled"><span class="page-link">Next &raquo;</span></li>
+        {% endif %}
+    </ul>
+</nav>
+{% else %}
+<div class="text-center py-5 text-muted">
+    <i class="fas fa-exchange-alt fa-3x mb-3"></i>
+    <h5 class="mb-3">No trades recorded yet</h5>
+    <a href="{{ url_for('add_trade') }}" class="btn btn-primary">
+        <i class="fas fa-plus me-2"></i>Add Your First Trade
+    </a>
+</div>
+{% endif %}
 {% endblock %}
