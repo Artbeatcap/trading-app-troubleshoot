@@ -19,58 +19,289 @@
                 <i class="fas fa-bolt me-2"></i>Run AI Analysis
             </a>
         {% else %}
-            <a href="{{ url_for('register') }}" class="btn btn-primary btn-lg">
-                <i class="fas fa-user-plus me-2"></i>Create Free Account
-            </a>
-            <a href="{{ url_for('login') }}" class="btn btn-outline-secondary btn-lg ms-2">
-                <i class="fas fa-sign-in-alt me-2"></i>Login
-            </a>
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                Try out our AI analysis tool with a sample trade below. Create an account to analyze your own trades!
+            </div>
+            <div class="mt-3">
+                <a href="{{ url_for('register') }}" class="btn btn-primary btn-lg">
+                    <i class="fas fa-user-plus me-2"></i>Create Free Account
+                </a>
+                <a href="{{ url_for('login') }}" class="btn btn-outline-secondary btn-lg ms-2">
+                    <i class="fas fa-sign-in-alt me-2"></i>Login
+                </a>
+            </div>
         {% endif %}
     </div>
 
-    {% if current_user.is_authenticated %}
-        {% if unanalyzed_count == 0 and recent_count == 0 %}
-        <div class="text-center py-5 text-muted">
-            <i class="fas fa-exclamation-circle fa-3x mb-3"></i>
-            <h5 class="mb-3">No closed trades to analyze yet</h5>
-            <a href="{{ url_for('add_trade') }}" class="btn btn-primary">
-                <i class="fas fa-plus me-2"></i>Add Trade
-            </a>
+    <!-- Preview for non-authenticated users -->
+    {% if not current_user.is_authenticated %}
+    <div class="row mb-5">
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-chart-line fa-3x text-primary mb-3"></i>
+                    <h5>Trade Analysis</h5>
+                    <p class="text-muted">Get detailed analysis of individual trades, including entry/exit timing, risk management, and market context.</p>
+                </div>
+            </div>
         </div>
-        {% else %}
-        <div id="bulk-form" class="row justify-content-center">
-            <div class="col-md-8">
-                <div class="card">
-                    <div class="card-header text-center">
-                        <h5 class="mb-0">
-                            <i class="fas fa-list me-2"></i>Select Trades to Analyze
-                        </h5>
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-robot fa-3x text-success mb-3"></i>
+                    <h5>AI-Powered Insights</h5>
+                    <p class="text-muted">Our AI analyzes your trading patterns and provides actionable recommendations to improve your strategy.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-chart-bar fa-3x text-info mb-3"></i>
+                    <h5>Performance Tracking</h5>
+                    <p class="text-muted">Track your trading performance over time and identify areas for improvement.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sample Trade Analysis -->
+    <div class="card mb-5">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-chart-line text-primary me-2"></i>
+                Sample Trade Analysis
+            </h5>
+        </div>
+        <div class="card-body">
+            <!-- Trade Details -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <h6 class="text-primary mb-3">Trade Details</h6>
+                    <table class="table table-sm">
+                        <tr>
+                            <th>Symbol:</th>
+                            <td>{{ sample_trade.symbol }}</td>
+                        </tr>
+                        <tr>
+                            <th>Type:</th>
+                            <td>{{ sample_trade.trade_type|title }}</td>
+                        </tr>
+                        <tr>
+                            <th>Entry:</th>
+                            <td>{{ sample_trade.entry_date.strftime('%Y-%m-%d') }} @ ${{ "%.2f"|format(sample_trade.entry_price) }}</td>
+                        </tr>
+                        <tr>
+                            <th>Exit:</th>
+                            <td>{{ sample_trade.exit_date.strftime('%Y-%m-%d') }} @ ${{ "%.2f"|format(sample_trade.exit_price) }}</td>
+                        </tr>
+                        <tr>
+                            <th>Quantity:</th>
+                            <td>{{ sample_trade.quantity }} shares</td>
+                        </tr>
+                        <tr>
+                            <th>Setup:</th>
+                            <td>{{ sample_trade.setup_type|title }}</td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="text-primary mb-3">Trade Context</h6>
+                    <p><strong>Market Condition:</strong> {{ sample_trade.market_condition|title }}</p>
+                    <p><strong>Timeframe:</strong> {{ sample_trade.timeframe|title }}</p>
+                    <p><strong>Entry Reason:</strong> {{ sample_trade.entry_reason }}</p>
+                    <p><strong>Exit Reason:</strong> {{ sample_trade.exit_reason }}</p>
+                </div>
+            </div>
+
+            <!-- AI Analysis -->
+            <div class="row">
+                <div class="col-md-12">
+                    <h6 class="text-success mb-3">
+                        <i class="fas fa-robot me-2"></i>
+                        AI Analysis
+                    </h6>
+                    <div class="text-center mb-4">
+                        <div class="analysis-score {% if sample_analysis.overall_score >= 8 %}score-excellent{% elif sample_analysis.overall_score >= 6 %}score-good{% elif sample_analysis.overall_score >= 4 %}score-average{% else %}score-poor{% endif %}">
+                            {{ sample_analysis.overall_score }}
+                        </div>
+                        <small class="text-muted d-block mt-2">Overall Score</small>
                     </div>
-                    <div class="card-body">
-                        <form method="POST">
-                            {{ form.hidden_tag() }}
-                            <div class="form-check mb-3">
-                                {{ form.analyze_all_unanalyzed(class="form-check-input") }}
-                                {{ form.analyze_all_unanalyzed.label(class="form-check-label") }}
-                                <small class="text-muted">({{ unanalyzed_count }} trades)</small>
-                            </div>
-                            <div class="form-check mb-4">
-                                {{ form.analyze_recent(class="form-check-input") }}
-                                {{ form.analyze_recent.label(class="form-check-label") }}
-                                <small class="text-muted">({{ recent_count }} trades)</small>
-                            </div>
-                            <div class="mb-4">
-                                {{ form.trade_id.label(class="form-label fw-bold") }}
-                                {{ form.trade_id(class="form-select") }}
-                            </div>
-                            {{ form.submit(class="btn btn-success") }}
-                        </form>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <h6 class="text-primary">Strengths</h6>
+                    <ul class="list-unstyled">
+                        {% for strength in sample_analysis.strengths %}
+                        <li><i class="fas fa-check text-success me-2"></i>{{ strength }}</li>
+                        {% endfor %}
+                    </ul>
+
+                    <h6 class="text-danger mt-4">Areas for Improvement</h6>
+                    <ul class="list-unstyled">
+                        {% for weakness in sample_analysis.weaknesses %}
+                        <li><i class="fas fa-exclamation-triangle text-warning me-2"></i>{{ weakness }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="text-info">Key Lessons</h6>
+                    <ul class="list-unstyled">
+                        {% for lesson in sample_analysis.key_lessons %}
+                        <li><i class="fas fa-lightbulb text-warning me-2"></i>{{ lesson }}</li>
+                        {% endfor %}
+                    </ul>
+
+                    <h6 class="text-success mt-4">Recommendations</h6>
+                    <ul class="list-unstyled">
+                        {% for rec in sample_analysis.recommendations %}
+                        <li><i class="fas fa-arrow-right text-success me-2"></i>{{ rec }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+
+            <div class="row mt-4">
+                <div class="col-md-12">
+                    <h6 class="text-primary">Detailed Analysis</h6>
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <p><strong>Entry Analysis:</strong> {{ sample_analysis.entry_analysis }}</p>
+                            <p><strong>Exit Analysis:</strong> {{ sample_analysis.exit_analysis }}</p>
+                            <p><strong>Risk Analysis:</strong> {{ sample_analysis.risk_analysis }}</p>
+                            <p><strong>Market Context:</strong> {{ sample_analysis.market_context }}</p>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-        {% endif %}
+    </div>
+    {% endif %}
+
+    {% if current_user.is_authenticated %}
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card" id="bulk-form">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-bolt text-warning me-2"></i>
+                        Run Analysis
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        {{ form.hidden_tag() }}
+                        
+                        <div class="mb-4">
+                            <h6 class="text-primary">Individual Trade Analysis</h6>
+                            <div class="mb-3">
+                                {{ form.trade_id.label(class="form-label") }}
+                                {{ form.trade_id(class="form-select") }}
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <h6 class="text-success">Bulk Analysis Options</h6>
+                            <div class="form-check mb-2">
+                                {{ form.analyze_all_unanalyzed(class="form-check-input") }}
+                                {{ form.analyze_all_unanalyzed.label(class="form-check-label") }}
+                                <small class="text-muted d-block">
+                                    {{ unanalyzed_count }} unanalyzed trades available
+                                </small>
+                            </div>
+                            <div class="form-check">
+                                {{ form.analyze_recent(class="form-check-input") }}
+                                {{ form.analyze_recent.label(class="form-check-label") }}
+                                <small class="text-muted d-block">
+                                    {{ recent_count }} recent trades available
+                                </small>
+                            </div>
+                        </div>
+                        
+                        <div class="d-grid">
+                            {{ form.submit(class="btn btn-primary btn-lg") }}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-info-circle text-info me-2"></i>
+                        About AI Analysis
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-3">
+                        Our AI analyzes your trades to provide:
+                    </p>
+                    <ul class="list-unstyled">
+                        <li class="mb-2">
+                            <i class="fas fa-check text-success me-2"></i>
+                            Entry/exit timing analysis
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-check text-success me-2"></i>
+                            Risk management evaluation
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-check text-success me-2"></i>
+                            Market context assessment
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-check text-success me-2"></i>
+                            Options-specific analysis
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-check text-success me-2"></i>
+                            Actionable recommendations
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
     {% endif %}
 </div>
+
+<style>
+.analysis-score {
+    display: inline-block;
+    width: 80px;
+    height: 80px;
+    line-height: 80px;
+    font-size: 32px;
+    font-weight: bold;
+    border-radius: 50%;
+    text-align: center;
+    margin: 0 auto;
+}
+
+.score-excellent {
+    background-color: #28a745;
+    color: white;
+}
+
+.score-good {
+    background-color: #17a2b8;
+    color: white;
+}
+
+.score-average {
+    background-color: #ffc107;
+    color: black;
+}
+
+.score-poor {
+    background-color: #dc3545;
+    color: white;
+}
+</style>
 {% endblock %}
 

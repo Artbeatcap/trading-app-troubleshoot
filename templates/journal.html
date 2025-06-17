@@ -1,18 +1,116 @@
 {% extends "base.html" %}
-{% block title %}Journal - Options Plunge{% endblock %}
+
+{% block title %}Trading Journal - Options Plunge{% endblock %}
+
 {% block content %}
-<div class="container py-4">
-  <h1 class="h3 mb-3">Trading Journal</h1>
-  {% if journals.items %}
-    <p>Journal entries will appear here.</p>
-  {% else %}
-    <div class="text-center py-5 text-muted">
-      <i class="fas fa-book fa-3x mb-3"></i>
-      <h5 class="mb-3">No journal entries yet</h5>
-      <a href="{{ url_for('add_edit_journal') }}" class="btn btn-primary">
-        <i class="fas fa-plus me-2"></i>Add Your First Entry
-      </a>
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-book text-primary me-2"></i>
+        Trading Journal
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{{ url_for('add_edit_journal') }}" class="btn btn-primary">
+            <i class="fas fa-plus me-1"></i>
+            Add Entry
+        </a>
     </div>
-  {% endif %}
 </div>
+
+{% if show_login_prompt %}
+<div class="alert alert-info">
+    <i class="fas fa-info-circle me-2"></i>
+    You can view and manage your trading journal after logging in or creating an account.
+    <div class="mt-2">
+        <a href="{{ url_for('login') }}" class="btn btn-outline-primary btn-sm me-2">Log In</a>
+        <a href="{{ url_for('register') }}" class="btn btn-outline-success btn-sm">Create Account</a>
+    </div>
+</div>
+{% else %}
+    {% if journals and journals.items %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Market Notes</th>
+                        <th>Trading Notes</th>
+                        <th>Daily P&L</th>
+                        <th>Score</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for journal in journals.items %}
+                    <tr>
+                        <td>{{ journal.journal_date.strftime('%Y-%m-%d') }}</td>
+                        <td>{{ journal.market_notes[:100] + '...' if journal.market_notes and journal.market_notes|length > 100 else journal.market_notes }}</td>
+                        <td>{{ journal.trading_notes[:100] + '...' if journal.trading_notes and journal.trading_notes|length > 100 else journal.trading_notes }}</td>
+                        <td class="{% if journal.daily_pnl > 0 %}text-success{% elif journal.daily_pnl < 0 %}text-danger{% endif %}">
+                            {{ "$%.2f"|format(journal.daily_pnl) if journal.daily_pnl else '-' }}
+                        </td>
+                        <td>
+                            {% if journal.daily_score %}
+                            <div class="progress" style="height: 20px;">
+                                <div class="progress-bar {% if journal.daily_score >= 70 %}bg-success{% elif journal.daily_score >= 40 %}bg-warning{% else %}bg-danger{% endif %}" 
+                                     role="progressbar" 
+                                     style="width: {{ journal.daily_score }}%;" 
+                                     aria-valuenow="{{ journal.daily_score }}" 
+                                     aria-valuemin="0" 
+                                     aria-valuemax="100">
+                                    {{ journal.daily_score }}%
+                                </div>
+                            </div>
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('add_edit_journal', journal_date=journal.journal_date.strftime('%Y-%m-%d')) }}" 
+                               class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Pagination -->
+        {% if journals.pages > 1 %}
+        <nav aria-label="Page navigation">
+            <ul class="pagination justify-content-center">
+                {% if journals.has_prev %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('journal', page=journals.prev_num) }}">Previous</a>
+                </li>
+                {% endif %}
+                
+                {% for page_num in journals.iter_pages() %}
+                    {% if page_num %}
+                        <li class="page-item {% if page_num == journals.page %}active{% endif %}">
+                            <a class="page-link" href="{{ url_for('journal', page=page_num) }}">{{ page_num }}</a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">...</span>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if journals.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('journal', page=journals.next_num) }}">Next</a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+    {% else %}
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i>
+            No journal entries found. Start by adding your first entry!
+        </div>
+    {% endif %}
+{% endif %}
 {% endblock %}
