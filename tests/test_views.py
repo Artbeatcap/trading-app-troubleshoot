@@ -95,12 +95,39 @@ def test_analytics_route_returns_json_when_trades_exist():
         assert stats_keys.issubset(context["stats"].keys())
 
 
-def test_bulk_analysis_includes_open_trades():
 
+def test_analytics_handles_zero_exit_price():
     client = app.test_client()
     with app.app_context():
         user = create_user()
         trade = Trade(
+            user_id=user.id,
+            symbol="MSFT",
+            trade_type="long",
+            entry_date=datetime.utcnow(),
+            entry_price=50,
+            quantity=1,
+            exit_price=0,
+            exit_date=datetime.utcnow(),
+        )
+        trade.calculate_pnl()
+        db.session.add(trade)
+        db.session.commit()
+    login(client, "user", "test")
+    with captured_templates(app) as templates:
+        response = client.get("/analytics")
+        assert response.status_code == 200
+        template, context = templates[0]
+        assert context["stats"]["total_trades"] == 1
+        assert context["stats"]["losing_trades"] == 1
+
+
+def test_analytics_includes_open_trades(monkeypatch):
+    client = app.test_client()
+    with app.app_context():
+        user = create_user()
+        closed_trade = Trade(
+
             user_id=user.id,
             symbol="AAPL",
             trade_type="long",
@@ -108,14 +135,29 @@ def test_bulk_analysis_includes_open_trades():
             entry_price=100,
             quantity=1,
 
+            exit_price=110,
+            exit_date=datetime.utcnow(),
         )
-        db.session.add(trade)
+        closed_trade.calculate_pnl()
+
+        open_trade = Trade(
+            user_id=user.id,
+            symbol="TSLA",
+            trade_type="long",
+            entry_date=datetime.utcnow(),
+            entry_price=100,
+            quantity=1,
+        )
+        monkeypatch.setattr(Trade, "get_current_market_price", lambda self: 105)
+        open_trade.calculate_pnl()
+
+        db.session.add_all([closed_trade, open_trade])
         db.session.commit()
-        trade_id = trade.id
     login(client, "user", "test")
     with captured_templates(app) as templates:
-        response = client.get("/bulk_analysis")
+        response = client.get("/analytics")
         assert response.status_code == 200
         template, context = templates[0]
-        trade_ids = [choice[0] for choice in context["form"].trade_id.choices]
-        assert trade_id in trade_ids
+        assert context["stats"]["total_trades"] == 2
+        assert context["stats"]["winning_trades"] == 2
+
