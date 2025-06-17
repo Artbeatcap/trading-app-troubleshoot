@@ -92,3 +92,27 @@ def test_analytics_route_returns_json_when_trades_exist():
         assert set(["pnl_over_time", "win_loss_pie", "setup_performance"]).issubset(data.keys())
         stats_keys = {"total_trades", "winning_trades", "losing_trades", "win_rate"}
         assert stats_keys.issubset(context["stats"].keys())
+
+
+def test_bulk_analysis_includes_open_trades():
+    client = app.test_client()
+    with app.app_context():
+        user = create_user()
+        trade = Trade(
+            user_id=user.id,
+            symbol="AAPL",
+            trade_type="long",
+            entry_date=datetime.utcnow(),
+            entry_price=100,
+            quantity=1,
+        )
+        db.session.add(trade)
+        db.session.commit()
+        trade_id = trade.id
+    login(client, "user", "test")
+    with captured_templates(app) as templates:
+        response = client.get("/bulk_analysis")
+        assert response.status_code == 200
+        template, context = templates[0]
+        trade_ids = [choice[0] for choice in context["form"].trade_id.choices]
+        assert trade_id in trade_ids
