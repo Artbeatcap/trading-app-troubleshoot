@@ -963,7 +963,6 @@ def bulk_analysis():
     # Populate trade choices for individual analysis
     trades = (
         Trade.query.filter_by(user_id=current_user.id)
-        .filter(Trade.exit_price.isnot(None))
         .order_by(Trade.entry_date.desc())
         .all()
     )
@@ -992,7 +991,6 @@ def bulk_analysis():
         if form.analyze_all_unanalyzed.data:
             trades_to_analyze.extend(
                 Trade.query.filter_by(user_id=current_user.id, is_analyzed=False)
-                .filter(Trade.exit_price.isnot(None))
                 .all()
             )
 
@@ -1001,7 +999,6 @@ def bulk_analysis():
             recent_trades = (
                 Trade.query.filter_by(user_id=current_user.id)
                 .filter(Trade.entry_date >= thirty_days_ago)
-                .filter(Trade.exit_price.isnot(None))
                 .all()
             )
             trades_to_analyze.extend(recent_trades)
@@ -1026,7 +1023,6 @@ def bulk_analysis():
     # Get counts for display
     unanalyzed_count = (
         Trade.query.filter_by(user_id=current_user.id, is_analyzed=False)
-        .filter(Trade.exit_price.isnot(None))
         .count()
     )
 
@@ -1034,7 +1030,6 @@ def bulk_analysis():
     recent_count = (
         Trade.query.filter_by(user_id=current_user.id)
         .filter(Trade.entry_date >= thirty_days_ago)
-        .filter(Trade.exit_price.isnot(None))
         .count()
     )
 

@@ -91,7 +91,9 @@ def test_analytics_route_returns_json_when_trades_exist():
         data = json.loads(context["charts_json"])
         assert set(["pnl_over_time", "win_loss_pie", "setup_performance"]).issubset(data.keys())
         stats_keys = {"total_trades", "winning_trades", "losing_trades", "win_rate"}
+
         assert stats_keys.issubset(context["stats"].keys())
+
 
 
 def test_analytics_handles_zero_exit_price():
@@ -125,12 +127,14 @@ def test_analytics_includes_open_trades(monkeypatch):
     with app.app_context():
         user = create_user()
         closed_trade = Trade(
+
             user_id=user.id,
             symbol="AAPL",
             trade_type="long",
             entry_date=datetime.utcnow(),
             entry_price=100,
             quantity=1,
+
             exit_price=110,
             exit_date=datetime.utcnow(),
         )
@@ -156,3 +160,4 @@ def test_analytics_includes_open_trades(monkeypatch):
         template, context = templates[0]
         assert context["stats"]["total_trades"] == 2
         assert context["stats"]["winning_trades"] == 2
+
