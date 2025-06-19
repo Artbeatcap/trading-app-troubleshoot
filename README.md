@@ -40,29 +40,35 @@ A comprehensive trading platform that combines AI-powered trade analysis with pr
    cd ai-trading-analysis
    ```
 
-2. **Install dependencies**
+2. **Create a virtual environment**
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate  # On Windows use "venv\\Scripts\\activate"
+   ```
+
+3. **Install dependencies**
    ```bash
    pip install -r requirements.txt
    ```
    This installs all required packages, including **SciPy** for mathematical functions.
 
-3. **Set up environment variables**
+4. **Set up environment variables**
    ```bash
    cp env_example.txt .env
    # Edit .env with your configuration
    ```
 
-4. **Initialize the database**
+5. **Initialize the database**
    ```bash
    python -c "from app import app, db; app.app_context().push(); db.create_all()"
    ```
 
-5. **Run the application**
+6. **Run the application**
    ```bash
    python app.py
    ```
 
-6. **Access the platform**
+7. **Access the platform**
    Open your browser to `http://localhost:5000`
 
 ## 🔧 Configuration
@@ -229,6 +235,26 @@ The platform fully supports credit spread strategies:
        }
    }
    ```
+
+## 🧪 Testing
+
+Before running the tests, create and activate a virtual environment, then install
+the project dependencies:
+
+```bash
+python3 -m venv venv
+source venv/bin/activate  # On Windows use "venv\\Scripts\\activate"
+pip install -r requirements.txt
+```
+
+Run the test suite with:
+
+```bash
+pytest
+```
+
+The CI workflow (`.github/workflows/ci.yml`) mirrors these steps by installing the
+dependencies and executing `pytest` on every push and pull request.
 
 ## 🤝 Contributing
 
