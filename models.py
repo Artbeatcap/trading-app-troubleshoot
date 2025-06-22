@@ -14,10 +14,12 @@ db = SQLAlchemy()
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
+    username = db.Column(db.String(64), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(128))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    reset_token = db.Column(db.String(100), unique=True)
+    reset_token_expiration = db.Column(db.DateTime)
 
     # User preferences
     default_risk_percent = db.Column(db.Float, default=2.0)  # Default risk per trade
@@ -130,6 +132,20 @@ class User(UserMixin, db.Model):
         ):
             return True
         return False
+
+    def get_reset_password_token(self, expires_in=3600):
+        token = secrets.token_urlsafe(32)
+        self.reset_token = token
+        self.reset_token_expiration = datetime.utcnow() + timedelta(seconds=expires_in)
+        db.session.commit()
+        return token
+
+    @staticmethod
+    def verify_reset_password_token(token):
+        user = User.query.filter_by(reset_token=token).first()
+        if user is None or user.reset_token_expiration < datetime.utcnow():
+            return None
+        return user
 
     def __repr__(self):
         return f"<User {self.username}>"

@@ -355,3 +355,12 @@ class BulkAnalysisForm(FlaskForm):
     analyze_all_unanalyzed = BooleanField('Analyze all unanalyzed trades')
     analyze_recent = BooleanField('Analyze trades from last 30 days')
     submit = SubmitField('Start AI Analysis')
+
+class ResetPasswordRequestForm(FlaskForm):
+    email = StringField('Email', validators=[DataRequired(), Email()])
+    submit = SubmitField('Reset Password')
+
+class ResetPasswordForm(FlaskForm):
+    password = PasswordField('New Password', validators=[DataRequired(), Length(min=8)])
+    password2 = PasswordField('Repeat Password', validators=[DataRequired(), EqualTo('password')])
+    submit = SubmitField('Reset Password')

@@ -18,6 +18,8 @@ from forms import (
     EditTradeForm,
     UserSettingsForm,
     BulkAnalysisForm,
+    ResetPasswordRequestForm,
+    ResetPasswordForm,
 )
 from ai_analysis import TradingAIAnalyzer
 from datetime import datetime, timedelta, date
@@ -34,6 +36,7 @@ from scipy.optimize import brentq
 import math
 from itertools import zip_longest
 from werkzeug.utils import secure_filename
+from flask_mail import Mail, Message
 
 # Load environment variables from .env file
 try:
@@ -50,6 +53,21 @@ except Exception as e:
 
 app = Flask(__name__)
 app.config.from_object(Config)
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev")
+app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
+    "DATABASE_URL", "sqlite:///trading_journal.db"
+)
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+# Email configuration
+app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
+app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
+app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS', True)
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
+app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER')
+
+mail = Mail(app)
 
 # Initialize extensions
 db.init_app(app)
@@ -625,97 +643,115 @@ def add_trade():
         return redirect(url_for("login", next=url_for("add_trade")))
 
     if form.validate_on_submit():
-        # Handle file uploads
-        entry_chart_filename = None
-        exit_chart_filename = None
+        try:
+            # Handle file uploads
+            entry_chart_filename = None
+            exit_chart_filename = None
 
-        if form.entry_chart_image.data:
-            entry_chart_filename = save_uploaded_file(form.entry_chart_image.data, "entry")
-        elif 'pending_trade' in session and 'entry_chart_image' in session['pending_trade']:
-            entry_chart_filename = session['pending_trade']['entry_chart_image']
+            if form.entry_chart_image.data:
+                entry_chart_filename = save_uploaded_file(form.entry_chart_image.data, "entry")
+            elif 'pending_trade' in session and 'entry_chart_image' in session['pending_trade']:
+                entry_chart_filename = session['pending_trade']['entry_chart_image']
 
-        if form.exit_chart_image.data:
-            exit_chart_filename = save_uploaded_file(form.exit_chart_image.data, "exit")
-        elif 'pending_trade' in session and 'exit_chart_image' in session['pending_trade']:
-            exit_chart_filename = session['pending_trade']['exit_chart_image']
+            if form.exit_chart_image.data:
+                exit_chart_filename = save_uploaded_file(form.exit_chart_image.data, "exit")
+            elif 'pending_trade' in session and 'exit_chart_image' in session['pending_trade']:
+                exit_chart_filename = session['pending_trade']['exit_chart_image']
 
-        trade = Trade(
-            user_id=current_user.id,
-            symbol=form.symbol.data.upper(),
-            trade_type=form.trade_type.data,
-            entry_date=form.entry_date.data,
-            entry_price=form.entry_price.data,
-            quantity=form.quantity.data,
-            stop_loss=form.stop_loss.data,
-            take_profit=form.take_profit.data,
-            risk_amount=form.risk_amount.data,
-            exit_date=form.exit_date.data,
-            exit_price=form.exit_price.data,
-            setup_type=form.setup_type.data,
-            market_condition=form.market_condition.data,
-            timeframe=form.timeframe.data,
-            entry_reason=form.entry_reason.data,
-            exit_reason=form.exit_reason.data,
-            notes=form.notes.data,
-            tags=form.tags.data,
-            entry_chart_image=entry_chart_filename,
-            exit_chart_image=exit_chart_filename,
-            # Options-specific fields
-            strike_price=form.strike_price.data,
-            expiration_date=form.expiration_date.data,
-            premium_paid=form.premium_paid.data,
-            underlying_price_at_entry=form.underlying_price_at_entry.data,
-            underlying_price_at_exit=form.underlying_price_at_exit.data,
-            implied_volatility=form.implied_volatility.data,
-            delta=form.delta.data,
-            gamma=form.gamma.data,
-            theta=form.theta.data,
-            vega=form.vega.data,
-            # Spread-specific fields
-            long_strike=form.long_strike.data,
-            short_strike=form.short_strike.data,
-            long_premium=form.long_premium.data,
-            short_premium=form.short_premium.data,
-            net_credit=form.net_credit.data,
-        )
+            print(f"Creating trade with user_id: {current_user.id}")
+            trade = Trade(
+                user_id=current_user.id,
+                symbol=form.symbol.data.upper(),
+                trade_type=form.trade_type.data,
+                entry_date=form.entry_date.data,
+                entry_price=form.entry_price.data,
+                quantity=form.quantity.data,
+                stop_loss=form.stop_loss.data,
+                take_profit=form.take_profit.data,
+                risk_amount=form.risk_amount.data,
+                exit_date=form.exit_date.data,
+                exit_price=form.exit_price.data,
+                setup_type=form.setup_type.data,
+                market_condition=form.market_condition.data,
+                timeframe=form.timeframe.data,
+                entry_reason=form.entry_reason.data,
+                exit_reason=form.exit_reason.data,
+                notes=form.notes.data,
+                tags=form.tags.data,
+                entry_chart_image=entry_chart_filename,
+                exit_chart_image=exit_chart_filename,
+                # Options-specific fields
+                strike_price=form.strike_price.data,
+                expiration_date=form.expiration_date.data,
+                premium_paid=form.premium_paid.data,
+                underlying_price_at_entry=form.underlying_price_at_entry.data,
+                underlying_price_at_exit=form.underlying_price_at_exit.data,
+                implied_volatility=form.implied_volatility.data,
+                delta=form.delta.data,
+                gamma=form.gamma.data,
+                theta=form.theta.data,
+                vega=form.vega.data,
+                # Spread-specific fields
+                long_strike=form.long_strike.data,
+                short_strike=form.short_strike.data,
+                long_premium=form.long_premium.data,
+                short_premium=form.short_premium.data,
+                net_credit=form.net_credit.data,
+            )
 
-        # Set option type from trade type
-        if trade.trade_type == "option_call":
-            trade.option_type = "call"
-        elif trade.trade_type == "option_put":
-            trade.option_type = "put"
-        elif trade.trade_type in ["credit_put_spread", "credit_call_spread"]:
-            trade.is_spread = True
-            trade.spread_type = trade.trade_type
-            trade.option_type = "put" if "put" in trade.trade_type else "call"
-            # Calculate spread metrics
-            trade.calculate_spread_metrics()
+            print("Trade object created successfully")
 
-        # Calculate P&L if trade is closed
-        trade.calculate_pnl()
+            # Set option type from trade type
+            if trade.trade_type == "option_call":
+                trade.option_type = "call"
+            elif trade.trade_type == "option_put":
+                trade.option_type = "put"
+            elif trade.trade_type in ["credit_put_spread", "credit_call_spread"]:
+                trade.is_spread = True
+                trade.spread_type = trade.trade_type
+                trade.option_type = "put" if "put" in trade.trade_type else "call"
+                # Calculate spread metrics
+                trade.calculate_spread_metrics()
 
-        db.session.add(trade)
-        db.session.commit()
+            print("Trade type and options set")
 
-        # Clear any pending trade data from session
-        if 'pending_trade' in session:
-            session.pop('pending_trade')
+            # Calculate P&L if trade is closed
+            trade.calculate_pnl()
 
-        # Auto-analyze if trade is closed and user has auto-analysis enabled
-        if (
-            trade.exit_price
-            and hasattr(current_user, "settings")
-            and current_user.settings.auto_analyze_trades
-        ):
-            try:
-                ai_analyzer.analyze_trade(trade)
-                flash("Trade added and analyzed successfully!", "success")
-            except:
-                flash("Trade added successfully! Analysis will be done later.", "success")
-        else:
-            flash("Trade added successfully!", "success")
+            print("P&L calculated")
 
-        return redirect(url_for("trades"))
+            db.session.add(trade)
+            print("Trade added to session")
+            db.session.commit()
+            print("Trade committed successfully")
+
+            # Clear any pending trade data from session
+            if 'pending_trade' in session:
+                session.pop('pending_trade')
+
+            # Auto-analyze if trade is closed and user has auto-analysis enabled
+            if (
+                trade.exit_price
+                and hasattr(current_user, "settings")
+                and current_user.settings.auto_analyze_trades
+            ):
+                try:
+                    ai_analyzer.analyze_trade(trade)
+                    flash("Trade added and analyzed successfully!", "success")
+                except Exception as e:
+                    print(f"Error in auto-analysis: {e}")
+                    flash("Trade added successfully! Analysis will be done later.", "success")
+            else:
+                flash("Trade added successfully!", "success")
+
+            return redirect(url_for("trades"))
+            
+        except Exception as e:
+            print(f"Error in add_trade: {e}")
+            import traceback
+            traceback.print_exc()
+            flash(f"Error adding trade: {str(e)}", "danger")
+            return render_template("add_trade.html", form=form)
 
     # If there's pending trade data in session, populate the form
     if 'pending_trade' in session and not current_user.is_authenticated:
@@ -1645,6 +1681,53 @@ def test_options(symbol):
         result["errors"].append(f"Tradier error: {str(e)}")
 
     return jsonify(result)
+
+
+def send_password_reset_email(user):
+    token = user.get_reset_password_token()
+    msg = Message('Reset Your Password',
+                  recipients=[user.email])
+    msg.body = f'''To reset your password, visit the following link:
+{url_for('reset_password', token=token, _external=True)}
+
+If you did not make this request then simply ignore this email and no changes will be made.
+'''
+    mail.send(msg)
+
+@app.route("/reset_password_request", methods=["GET", "POST"])
+def reset_password_request():
+    if current_user.is_authenticated:
+        return redirect(url_for("index"))
+    
+    form = ResetPasswordRequestForm()
+    if form.validate_on_submit():
+        user = User.query.filter_by(email=form.email.data).first()
+        if user:
+            send_password_reset_email(user)
+        flash("If an account exists with that email, you will receive password reset instructions.", "info")
+        return redirect(url_for("login"))
+    return render_template("reset_password_request.html", form=form)
+
+@app.route("/reset_password/<token>", methods=["GET", "POST"])
+def reset_password(token):
+    if current_user.is_authenticated:
+        return redirect(url_for("index"))
+    
+    user = User.verify_reset_password_token(token)
+    if not user:
+        flash("The password reset link is invalid or has expired.", "danger")
+        return redirect(url_for("reset_password_request"))
+    
+    form = ResetPasswordForm()
+    if form.validate_on_submit():
+        user.set_password(form.password.data)
+        user.reset_token = None
+        user.reset_token_expiration = None
+        db.session.commit()
+        flash("Your password has been reset.", "success")
+        return redirect(url_for("login"))
+    
+    return render_template("reset_password.html", form=form)
 
 
 # Error handlers
