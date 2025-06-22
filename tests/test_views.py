@@ -161,3 +161,10 @@ def test_analytics_includes_open_trades(monkeypatch):
         assert context["stats"]["total_trades"] == 2
         assert context["stats"]["winning_trades"] == 2
 
+
+def test_education_page():
+    client = app.test_client()
+    response = client.get("/education")
+    assert response.status_code == 200
+    assert b"Educational Resources" in response.data
+
