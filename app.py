@@ -549,14 +549,20 @@ def dashboard():
 
 
 @app.route("/trades")
-@login_required
 def trades():
+    """List trades. Guests see all recent trades."""
     page = request.args.get("page", 1, type=int)
-    trades = (
-        Trade.query.filter_by(user_id=current_user.id)
-        .order_by(Trade.entry_date.desc())
-        .paginate(page=page, per_page=20, error_out=False)
-    )
+    if current_user.is_authenticated:
+        trades = (
+            Trade.query.filter_by(user_id=current_user.id)
+            .order_by(Trade.entry_date.desc())
+            .paginate(page=page, per_page=20, error_out=False)
+        )
+    else:
+        trades = (
+            Trade.query.order_by(Trade.entry_date.desc())
+            .paginate(page=page, per_page=20, error_out=False)
+        )
     return render_template("trades.html", trades=trades)
 
 
@@ -712,14 +718,20 @@ def analyze_trade(id):
 
 
 @app.route("/journal")
-@login_required
 def journal():
+    """Display journal entries. Guests see all recent entries."""
     page = request.args.get("page", 1, type=int)
-    journals = (
-        TradingJournal.query.filter_by(user_id=current_user.id)
-        .order_by(TradingJournal.journal_date.desc())
-        .paginate(page=page, per_page=20, error_out=False)
-    )
+    if current_user.is_authenticated:
+        journals = (
+            TradingJournal.query.filter_by(user_id=current_user.id)
+            .order_by(TradingJournal.journal_date.desc())
+            .paginate(page=page, per_page=20, error_out=False)
+        )
+    else:
+        journals = (
+            TradingJournal.query.order_by(TradingJournal.journal_date.desc())
+            .paginate(page=page, per_page=20, error_out=False)
+        )
     return render_template("journal.html", journals=journals)
 
 
@@ -749,17 +761,16 @@ def add_edit_journal(journal_date=None):
         form = JournalForm()
         is_edit = False
 
-    if request.method == "POST" and not current_user.is_authenticated:
-        flash("Please log in to save journal entries.", "warning")
-        return redirect(url_for("login", next=url_for("add_edit_journal")))
 
     if form.validate_on_submit():
         if journal:
             # Update existing
             form.populate_obj(journal)
         else:
-            # Create new
-            journal = TradingJournal(user_id=current_user.id)
+            # Create new journal entry. Guests have no user_id
+            journal = TradingJournal(
+                user_id=current_user.id if current_user.is_authenticated else None
+            )
             form.populate_obj(journal)
 
         # Get trades for this day and analyze daily performance
