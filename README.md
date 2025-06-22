@@ -109,9 +109,10 @@ ALLOWED_EXTENSIONS=png,jpg,jpeg,gif,pdf
 
 ### Getting Started
 
-You can try the platform without logging in. The options calculator and the "Add Trade"
-and journal pages are fully accessible to guests. However, you must create an
-account or log in if you want to save your trades or get AI-powered analysis.
+You can try the platform without logging in. The options calculator, "Add Trade",
+the trades tab and journal pages are fully accessible to guests. Journal entries
+you create while logged out are stored anonymously. Log in if you want your
+trades or journals saved to your account or to access AI-powered analysis.
 
 1. **Register an Account**
    - Create your trading account with email verification
