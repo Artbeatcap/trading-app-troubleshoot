@@ -575,9 +575,66 @@ def dashboard():
 
 @app.route("/trades")
 def trades():
-    """Display trades. Login required only for viewing saved trades."""
+    """Display trades. Show sample data for unauthenticated users."""
     if not current_user.is_authenticated:
-        return render_template("trades.html", trades=None, show_login_prompt=True)
+        # Show sample trades for unauthenticated users
+        sample_trades = [
+            {
+                'id': 1,
+                'symbol': 'AAPL',
+                'trade_type': 'stock',
+                'entry_date': datetime.now() - timedelta(days=5),
+                'entry_price': 150.25,
+                'quantity': 100,
+                'exit_date': datetime.now() - timedelta(days=2),
+                'exit_price': 155.75,
+                'profit_loss': 550.00,
+                'setup_type': 'breakout',
+                'market_condition': 'bullish',
+                'timeframe': 'daily',
+                'entry_reason': 'Breakout above resistance with high volume',
+                'exit_reason': 'Target reached',
+                'notes': 'Strong earnings catalyst',
+                'tags': 'earnings, breakout, tech'
+            },
+            {
+                'id': 2,
+                'symbol': 'TSLA',
+                'trade_type': 'option_call',
+                'entry_date': datetime.now() - timedelta(days=10),
+                'entry_price': 2.50,
+                'quantity': 10,
+                'exit_date': datetime.now() - timedelta(days=7),
+                'exit_price': 4.25,
+                'profit_loss': 1750.00,
+                'setup_type': 'momentum',
+                'market_condition': 'bullish',
+                'timeframe': '4h',
+                'entry_reason': 'Strong momentum with high IV',
+                'exit_reason': 'IV crush after earnings',
+                'notes': 'Earnings play - sold before announcement',
+                'tags': 'earnings, options, momentum'
+            },
+            {
+                'id': 3,
+                'symbol': 'SPY',
+                'trade_type': 'credit_put_spread',
+                'entry_date': datetime.now() - timedelta(days=15),
+                'entry_price': 1.25,
+                'quantity': 5,
+                'exit_date': datetime.now() - timedelta(days=12),
+                'exit_price': 0.50,
+                'profit_loss': 375.00,
+                'setup_type': 'income',
+                'market_condition': 'sideways',
+                'timeframe': 'daily',
+                'entry_reason': 'High probability setup in sideways market',
+                'exit_reason': 'Early profit taking',
+                'notes': 'Theta decay working in our favor',
+                'tags': 'income, spreads, theta'
+            }
+        ]
+        return render_template("trades.html", trades=sample_trades, show_login_prompt=True, is_authenticated=False)
         
     page = request.args.get("page", 1, type=int)
     trades = (
@@ -585,7 +642,7 @@ def trades():
         .order_by(Trade.entry_date.desc())
         .paginate(page=page, per_page=20, error_out=False)
     )
-    return render_template("trades.html", trades=trades, show_login_prompt=False)
+    return render_template("trades.html", trades=trades, show_login_prompt=False, is_authenticated=True)
 
 
 @app.route("/add_trade", methods=["GET", "POST"])
@@ -818,9 +875,45 @@ def analyze_trade(id):
 
 @app.route("/journal")
 def journal():
-    """Display journal entries. Login required only for viewing saved entries."""
+    """Display journal entries. Show sample data for unauthenticated users."""
     if not current_user.is_authenticated:
-        return render_template("journal.html", journals=None, show_login_prompt=True)
+        # Show sample journal entries for unauthenticated users
+        sample_journals = [
+            {
+                'id': 1,
+                'journal_date': date.today() - timedelta(days=1),
+                'market_notes': 'Market showing strong momentum with tech leading the way. VIX at low levels indicating complacency.',
+                'trading_notes': 'Executed 3 trades today - 2 winners, 1 small loss. Stuck to my plan and managed risk well.',
+                'emotions': 'Confident but not overconfident. Maintained discipline throughout the session.',
+                'lessons_learned': 'Patience pays off. Waited for proper setups instead of forcing trades.',
+                'tomorrow_plan': 'Focus on high-probability setups only. Monitor earnings calendar for catalysts.',
+                'daily_pnl': 1250.00,
+                'daily_score': 8
+            },
+            {
+                'id': 2,
+                'journal_date': date.today() - timedelta(days=2),
+                'market_notes': 'Choppy market conditions with mixed signals. Fed minutes caused some volatility.',
+                'trading_notes': 'Reduced position sizes due to uncertainty. Took 1 trade that hit stop loss quickly.',
+                'emotions': 'Slightly frustrated but maintained composure. Did not revenge trade.',
+                'lessons_learned': 'When market is unclear, smaller positions and wider stops are better.',
+                'tomorrow_plan': 'Wait for clearer market direction. Focus on quality over quantity.',
+                'daily_pnl': -350.00,
+                'daily_score': 6
+            },
+            {
+                'id': 3,
+                'journal_date': date.today() - timedelta(days=3),
+                'market_notes': 'Strong bullish momentum across all major indices. Volume confirming the move.',
+                'trading_notes': 'Excellent day with 4 winning trades. All setups followed my criteria perfectly.',
+                'emotions': 'Very confident and focused. Market conditions aligned with my strategy.',
+                'lessons_learned': 'When market conditions are favorable, be more aggressive with position sizing.',
+                'tomorrow_plan': 'Continue with momentum strategy but watch for potential reversal signals.',
+                'daily_pnl': 2100.00,
+                'daily_score': 9
+            }
+        ]
+        return render_template("journal.html", journals=sample_journals, show_login_prompt=True, is_authenticated=False)
         
     page = request.args.get("page", 1, type=int)
     journals = (
@@ -828,13 +921,13 @@ def journal():
         .order_by(TradingJournal.journal_date.desc())
         .paginate(page=page, per_page=20, error_out=False)
     )
-    return render_template("journal.html", journals=journals, show_login_prompt=False)
+    return render_template("journal.html", journals=journals, show_login_prompt=False, is_authenticated=True)
 
 
 @app.route("/journal/add", methods=["GET", "POST"])
 @app.route("/journal/<journal_date>/edit", methods=["GET", "POST"])
 def add_edit_journal(journal_date=None):
-    """Journal entry page. Login required only when saving or editing."""
+    """Journal entry page. Allow unauthenticated users to view and fill forms."""
 
     if journal_date:
         if not current_user.is_authenticated:
@@ -872,7 +965,7 @@ def add_edit_journal(journal_date=None):
         flash("Journal entry saved! Please log in or create an account to save permanently.", "info")
         return redirect(url_for("login", next=url_for("add_edit_journal")))
 
-    if form.validate_on_submit():
+    if form.validate_on_submit() and current_user.is_authenticated:
         if journal:
             # Update existing
             form.populate_obj(journal)
@@ -916,7 +1009,7 @@ def add_edit_journal(journal_date=None):
                     field.data = pending_journal[field.name]
 
     # Get trades for this day (for context)
-    if journal_date:
+    if journal_date and current_user.is_authenticated:
         day_trades = journal.get_day_trades()
     else:
         day_trades = []
@@ -927,6 +1020,7 @@ def add_edit_journal(journal_date=None):
         journal=journal,
         is_edit=is_edit,
         day_trades=day_trades,
+        is_authenticated=current_user.is_authenticated
     )
 
 
@@ -1260,6 +1354,12 @@ def api_quick_trade():
 def tools():
     """Tools and calculators main page"""
     return render_template("tools/index.html")
+
+
+@app.route("/education")
+def education():
+    """Educational resources for options trading"""
+    return render_template("education.html")
 
 
 @app.route("/tools/options-calculator", methods=["GET", "POST"])
