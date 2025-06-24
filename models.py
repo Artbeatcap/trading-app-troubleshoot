@@ -765,6 +765,14 @@ class TradingJournal(db.Model):
 
     # Daily reflections
     daily_pnl = db.Column(db.Float)
+    
+    # Market and Trading Notes
+    market_notes = db.Column(db.Text)  # Market conditions, key levels, catalysts, etc.
+    trading_notes = db.Column(db.Text)  # Trades taken, decisions made, execution quality, etc.
+    emotions = db.Column(db.Text)  # How you felt during trading, emotional state, etc.
+    tomorrow_plan = db.Column(db.Text)  # Plans for tomorrow, setups to watch, etc.
+    
+    # Morning Planning
     market_outlook = db.Column(db.Text)  # Morning market analysis
     daily_goals = db.Column(db.Text)  # Goals for the day
 

@@ -15,9 +15,11 @@ branch_labels = None
 depends_on = None
 
 def upgrade():
-    op.add_column('user', sa.Column('reset_token', sa.String(100), unique=True))
-    op.add_column('user', sa.Column('reset_token_expiration', sa.DateTime))
+    # op.add_column('user', sa.Column('reset_token', sa.String(100), unique=True))
+    # op.add_column('user', sa.Column('reset_token_expiration', sa.DateTime))
+    pass
 
 def downgrade():
-    op.drop_column('user', 'reset_token_expiration')
-    op.drop_column('user', 'reset_token') 
+    # op.drop_column('user', 'reset_token_expiration')
+    # op.drop_column('user', 'reset_token')
+    pass 
