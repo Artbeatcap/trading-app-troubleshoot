@@ -212,6 +212,25 @@ class JournalForm(FlaskForm):
     daily_pnl = FloatField('Daily P&L ($)', validators=[Optional()],
                           render_kw={"step": "0.01", "placeholder": "Total P&L for the day"})
     
+    # Market and Trading Notes
+    market_notes = TextAreaField('Market Notes', 
+                                validators=[Optional(), Length(max=1000)],
+                                render_kw={"rows": "4", "placeholder": "Market conditions, key levels, catalysts, etc."})
+    trading_notes = TextAreaField('Trading Notes', 
+                                 validators=[Optional(), Length(max=1000)],
+                                 render_kw={"rows": "4", "placeholder": "Trades taken, decisions made, execution quality, etc."})
+    emotions = TextAreaField('Emotions', 
+                            validators=[Optional(), Length(max=1000)],
+                            render_kw={"rows": "3", "placeholder": "How you felt during trading, emotional state, etc."})
+    lessons_learned = TextAreaField('Lessons Learned', 
+                                   validators=[Optional(), Length(max=1000)],
+                                   render_kw={"rows": "3", "placeholder": "What you learned today, mistakes to avoid, etc."})
+    tomorrow_plan = TextAreaField('Tomorrow\'s Plan', 
+                                 validators=[Optional(), Length(max=1000)],
+                                 render_kw={"rows": "3", "placeholder": "Plans for tomorrow, setups to watch, etc."})
+    daily_score = IntegerField('Daily Score', validators=[Optional(), NumberRange(min=1, max=10)],
+                              render_kw={"min": "1", "max": "10", "placeholder": "1-10"})
+    
     # Morning Planning
     market_outlook = TextAreaField('Morning Market Analysis', 
                                   validators=[Optional(), Length(max=1000)],
@@ -227,9 +246,6 @@ class JournalForm(FlaskForm):
     what_went_wrong = TextAreaField('What Went Wrong', 
                                    validators=[Optional(), Length(max=1000)],
                                    render_kw={"rows": "4", "placeholder": "What mistakes did you make? What could be improved?"})
-    lessons_learned = TextAreaField('Key Lessons Learned', 
-                                   validators=[Optional(), Length(max=1000)],
-                                   render_kw={"rows": "3", "placeholder": "What are the main takeaways from today?"})
     tomorrow_focus = TextAreaField('Tomorrow\'s Focus', 
                                   validators=[Optional(), Length(max=500)],
                                   render_kw={"rows": "2", "placeholder": "What will you focus on improving tomorrow?"})
@@ -355,3 +371,12 @@ class BulkAnalysisForm(FlaskForm):
     analyze_all_unanalyzed = BooleanField('Analyze all unanalyzed trades')
     analyze_recent = BooleanField('Analyze trades from last 30 days')
     submit = SubmitField('Start AI Analysis')
+
+class ResetPasswordRequestForm(FlaskForm):
+    email = StringField('Email', validators=[DataRequired(), Email()])
+    submit = SubmitField('Reset Password')
+
+class ResetPasswordForm(FlaskForm):
+    password = PasswordField('New Password', validators=[DataRequired(), Length(min=8)])
+    password2 = PasswordField('Repeat Password', validators=[DataRequired(), EqualTo('password')])
+    submit = SubmitField('Reset Password')

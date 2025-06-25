@@ -29,7 +29,7 @@
                 {% if not current_user.is_authenticated %}
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle me-2"></i>
-                    Log in or create an account to save this trade.
+                    You can fill out the trade details now. Your information will be saved temporarily and can be permanently saved after you log in or create an account.
                 </div>
                 {% endif %}
                 <form method="POST" enctype="multipart/form-data">
@@ -605,6 +605,8 @@
     </div>
 </div>
 
+{% endblock %}
+
 {% block scripts %}
 <script>
 // Comprehensive list of 500+ popular stocks with options (same as options calculator)
@@ -1033,4 +1035,3 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endblock %}
-{% endblock %} 

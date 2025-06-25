@@ -1,0 +1,42 @@
+# Deployment Commands
+# Run these commands on your VPS after uploading files
+
+# 1. Navigate to app directory
+cd /home/tradingapp/trading-analysis
+
+# 2. Create production environment file
+cp env_production_template.txt .env
+# Edit .env file with your actual values
+nano .env
+
+# 3. Set up Python environment
+python3 -m venv venv
+source venv/bin/activate
+
+# 4. Install dependencies
+pip install --upgrade pip
+pip install -r requirements.txt
+
+# 5. Initialize database
+python init_db.py
+flask db upgrade
+
+# 6. Create static directories
+mkdir -p static/uploads
+mkdir -p static/css
+mkdir -p static/js
+mkdir -p static/images
+chmod 755 static/uploads
+
+# 7. Test application
+python -c "from app import app; print('App import successful')"
+
+# 8. Run deployment script
+chmod +x deploy.sh
+./deploy.sh
+
+# 9. Check service status
+sudo systemctl status trading-analysis
+
+# 10. Test the application
+curl http://localhost:8000 

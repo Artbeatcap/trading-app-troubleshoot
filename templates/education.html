@@ -1,38 +1,447 @@
 {% extends "base.html" %}
-{% block title %}Educational Resources - Options Plunge{% endblock %}
+
+{% block title %}Education - Options Trading Learning Center{% endblock %}
 
 {% block content %}
-<div class="container py-3">
-    <h1 class="mb-4"><i class="fas fa-graduation-cap text-info me-2"></i>Educational Resources</h1>
-    <p class="text-muted">Browse articles and tutorials to sharpen your options trading skills.</p>
-    <div class="row">
-        <div class="col-md-4 mb-3">
-            <div class="card h-100">
-                <div class="card-body">
-                    <h5 class="card-title"><i class="fas fa-book text-primary me-2"></i>Options Basics</h5>
-                    <p class="card-text small text-muted">Learn the fundamentals of options trading, including calls, puts and common strategies.</p>
-                    <a href="https://www.investopedia.com/options-basics-tutorial-4583012" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener">Read Guide</a>
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h1 class="display-4 mb-3">
+                        <i class="fas fa-graduation-cap text-primary me-3"></i>
+                        Options Trading Education Center
+                    </h1>
+                    <p class="lead text-muted">
+                        Master the fundamentals and advanced strategies of options trading through comprehensive learning resources
+                    </p>
+                    <div class="row mt-4">
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <i class="fas fa-book fa-2x text-primary mb-2"></i>
+                                <h5>Basics</h5>
+                                <small class="text-muted">Core Concepts</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <i class="fas fa-chess fa-2x text-success mb-2"></i>
+                                <h5>Strategies</h5>
+                                <small class="text-muted">Trading Methods</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <i class="fas fa-shield-alt fa-2x text-warning mb-2"></i>
+                                <h5>Risk Management</h5>
+                                <small class="text-muted">Protect Capital</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <i class="fas fa-chart-line fa-2x text-info mb-2"></i>
+                                <h5>Advanced</h5>
+                                <small class="text-muted">Expert Techniques</small>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-4 mb-3">
-            <div class="card h-100">
-                <div class="card-body">
-                    <h5 class="card-title"><i class="fas fa-calculator text-warning me-2"></i>Greeks Explained</h5>
-                    <p class="card-text small text-muted">Understand Delta, Gamma, Theta and Vega and how they influence option pricing.</p>
-                    <a href="https://www.investopedia.com/options-greeks-4689745" class="btn btn-sm btn-outline-warning" target="_blank" rel="noopener">Learn More</a>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <ul class="nav nav-tabs" id="educationTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="basics-tab" data-bs-toggle="tab" data-bs-target="#basics" type="button" role="tab">
+                        <i class="fas fa-book me-2"></i>Basics
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="strategies-tab" data-bs-toggle="tab" data-bs-target="#strategies" type="button" role="tab">
+                        <i class="fas fa-chess me-2"></i>Strategies
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="risk-tab" data-bs-toggle="tab" data-bs-target="#risk" type="button" role="tab">
+                        <i class="fas fa-shield-alt me-2"></i>Risk Management
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="advanced-tab" data-bs-toggle="tab" data-bs-target="#advanced" type="button" role="tab">
+                        <i class="fas fa-chart-line me-2"></i>Advanced
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="resources-tab" data-bs-toggle="tab" data-bs-target="#resources" type="button" role="tab">
+                        <i class="fas fa-external-link-alt me-2"></i>Resources
+                    </button>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Tab Content -->
+    <div class="tab-content" id="educationTabContent">
+        <!-- Basics Tab -->
+        <div class="tab-pane fade show active" id="basics" role="tabpanel">
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h4><i class="fas fa-info-circle text-primary me-2"></i>What Are Options?</h4>
+                        </div>
+                        <div class="card-body">
+                            <p>Options are financial contracts that give the buyer the right, but not the obligation, to buy or sell an underlying asset at a specified price (strike price) on or before a specified date (expiration date).</p>
+                            
+                            <h5 class="mt-4">Key Components:</h5>
+                            <ul>
+                                <li><strong>Call Options:</strong> Give you the right to buy the underlying asset</li>
+                                <li><strong>Put Options:</strong> Give you the right to sell the underlying asset</li>
+                                <li><strong>Strike Price:</strong> The price at which you can buy/sell the asset</li>
+                                <li><strong>Expiration Date:</strong> The last day you can exercise the option</li>
+                                <li><strong>Premium:</strong> The price you pay for the option contract</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h4><i class="fas fa-calculator text-warning me-2"></i>Understanding the Greeks</h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6><i class="fas fa-arrow-up text-success me-2"></i>Delta</h6>
+                                    <p class="small">Measures how much the option price changes for every $1 move in the underlying stock.</p>
+                                    <ul class="small">
+                                        <li>Call options: 0 to +1</li>
+                                        <li>Put options: -1 to 0</li>
+                                        <li>ATM options: ~0.5 for calls, ~-0.5 for puts</li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6><i class="fas fa-arrow-down text-danger me-2"></i>Gamma</h6>
+                                    <p class="small">Measures how much Delta changes for every $1 move in the underlying stock.</p>
+                                    <ul class="small">
+                                        <li>Highest for ATM options</li>
+                                        <li>Decreases as options move ITM/OTM</li>
+                                        <li>Always positive for both calls and puts</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-md-6">
+                                    <h6><i class="fas fa-clock text-warning me-2"></i>Theta</h6>
+                                    <p class="small">Measures how much the option price decreases each day due to time decay.</p>
+                                    <ul class="small">
+                                        <li>Always negative (time decay)</li>
+                                        <li>Accelerates as expiration approaches</li>
+                                        <li>ATM options have highest theta</li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6><i class="fas fa-wind text-info me-2"></i>Vega</h6>
+                                    <p class="small">Measures how much the option price changes for every 1% change in implied volatility.</p>
+                                    <ul class="small">
+                                        <li>Always positive for both calls and puts</li>
+                                        <li>Highest for ATM options</li>
+                                        <li>Decreases as expiration approaches</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5><i class="fas fa-lightbulb text-warning me-2"></i>Quick Tips</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="alert alert-info">
+                                <strong>In-the-Money (ITM):</strong> Option has intrinsic value
+                            </div>
+                            <div class="alert alert-warning">
+                                <strong>At-the-Money (ATM):</strong> Strike price equals current stock price
+                            </div>
+                            <div class="alert alert-danger">
+                                <strong>Out-of-the-Money (OTM):</strong> Option has no intrinsic value
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-external-link-alt text-primary me-2"></i>External Resources</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="list-group list-group-flush">
+                                <a href="https://www.investopedia.com/options-basics-tutorial-4583012" class="list-group-item list-group-item-action" target="_blank">
+                                    <i class="fas fa-book text-primary me-2"></i>Options Basics Tutorial
+                                </a>
+                                <a href="https://www.investopedia.com/options-greeks-4689745" class="list-group-item list-group-item-action" target="_blank">
+                                    <i class="fas fa-calculator text-warning me-2"></i>Understanding the Greeks
+                                </a>
+                                <a href="https://www.cboe.com/learncenter/" class="list-group-item list-group-item-action" target="_blank">
+                                    <i class="fas fa-graduation-cap text-success me-2"></i>CBOE Learning Center
+                                </a>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-4 mb-3">
-            <div class="card h-100">
-                <div class="card-body">
-                    <h5 class="card-title"><i class="fas fa-shield-alt text-success me-2"></i>Risk Management</h5>
-                    <p class="card-text small text-muted">Master position sizing, stop losses and overall portfolio risk techniques.</p>
-                    <a href="https://www.investopedia.com/articles/trading/09/risk-management.htm" class="btn btn-sm btn-outline-success" target="_blank" rel="noopener">Explore</a>
+
+        <!-- Strategies Tab -->
+        <div class="tab-pane fade" id="strategies" role="tabpanel">
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h4><i class="fas fa-chess text-success me-2"></i>Basic Options Strategies</h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h5><i class="fas fa-arrow-up text-success me-2"></i>Long Call</h5>
+                                    <p class="small">Buy a call option when you expect the stock to rise significantly.</p>
+                                    <ul class="small">
+                                        <li><strong>Risk:</strong> Limited to premium paid</li>
+                                        <li><strong>Reward:</strong> Unlimited upside</li>
+                                        <li><strong>Best for:</strong> Bullish outlook</li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <h5><i class="fas fa-arrow-down text-danger me-2"></i>Long Put</h5>
+                                    <p class="small">Buy a put option when you expect the stock to fall significantly.</p>
+                                    <ul class="small">
+                                        <li><strong>Risk:</strong> Limited to premium paid</li>
+                                        <li><strong>Reward:</strong> Limited to stock price</li>
+                                        <li><strong>Best for:</strong> Bearish outlook</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h4><i class="fas fa-chart-line text-info me-2"></i>Income Strategies</h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h5><i class="fas fa-arrow-down text-warning me-2"></i>Covered Call</h5>
+                                    <p class="small">Sell call options against stock you own to generate income.</p>
+                                    <ul class="small">
+                                        <li><strong>Risk:</strong> Limited upside potential</li>
+                                        <li><strong>Reward:</strong> Premium income</li>
+                                        <li><strong>Best for:</strong> Neutral to slightly bullish</li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <h5><i class="fas fa-arrow-up text-warning me-2"></i>Cash Secured Put</h5>
+                                    <p class="small">Sell put options with cash to back the obligation.</p>
+                                    <ul class="small">
+                                        <li><strong>Risk:</strong> Stock price decline</li>
+                                        <li><strong>Reward:</strong> Premium income</li>
+                                        <li><strong>Best for:</strong> Neutral to slightly bullish</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-external-link-alt text-primary me-2"></i>Strategy Resources</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="list-group list-group-flush">
+                                <a href="https://www.investopedia.com/options-strategies-4689745" class="list-group-item list-group-item-action" target="_blank">
+                                    <i class="fas fa-chess text-success me-2"></i>Options Strategies Guide
+                                </a>
+                                <a href="https://www.cboe.com/strategies/" class="list-group-item list-group-item-action" target="_blank">
+                                    <i class="fas fa-chart-line text-info me-2"></i>CBOE Strategy Hub
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Risk Management Tab -->
+        <div class="tab-pane fade" id="risk" role="tabpanel">
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h4><i class="fas fa-shield-alt text-warning me-2"></i>Risk Management Principles</h4>
+                        </div>
+                        <div class="card-body">
+                            <h5>1. Position Sizing</h5>
+                            <p>Never risk more than 1-2% of your total capital on any single trade.</p>
+                            
+                            <h5>2. Stop Losses</h5>
+                            <p>Always have a predetermined exit point to limit potential losses.</p>
+                            
+                            <h5>3. Diversification</h5>
+                            <p>Spread your risk across different strategies and underlying assets.</p>
+                            
+                            <h5>4. Time Decay Awareness</h5>
+                            <p>Understand that options lose value over time, especially as expiration approaches.</p>
+                        </div>
+                    </div>
+
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h4><i class="fas fa-exclamation-triangle text-danger me-2"></i>Common Mistakes to Avoid</h4>
+                        </div>
+                        <div class="card-body">
+                            <ul>
+                                <li><strong>Over-leveraging:</strong> Using too much margin or buying too many contracts</li>
+                                <li><strong>Ignoring volatility:</strong> Not considering implied volatility in pricing</li>
+                                <li><strong>Holding to expiration:</strong> Not managing positions before expiration</li>
+                                <li><strong>Emotional trading:</strong> Making decisions based on fear or greed</li>
+                                <li><strong>Lack of plan:</strong> Not having a clear entry and exit strategy</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-external-link-alt text-primary me-2"></i>Risk Management Resources</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="list-group list-group-flush">
+                                <a href="https://www.investopedia.com/articles/trading/09/risk-management.htm" class="list-group-item list-group-item-action" target="_blank">
+                                    <i class="fas fa-shield-alt text-warning me-2"></i>Risk Management Guide
+                                </a>
+                                <a href="https://www.investopedia.com/options/position-sizing-options-trading/" class="list-group-item list-group-item-action" target="_blank">
+                                    <i class="fas fa-balance-scale text-info me-2"></i>Position Sizing for Options
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Advanced Tab -->
+        <div class="tab-pane fade" id="advanced" role="tabpanel">
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h4><i class="fas fa-chart-line text-info me-2"></i>Advanced Options Concepts</h4>
+                        </div>
+                        <div class="card-body">
+                            <h5>Implied Volatility</h5>
+                            <p>The market's expectation of future volatility, calculated from option prices.</p>
+                            
+                            <h5>Volatility Skew</h5>
+                            <p>The difference in implied volatility between different strike prices.</p>
+                            
+                            <h5>Options Chains</h5>
+                            <p>Understanding how to read and analyze options chains for trading decisions.</p>
+                            
+                            <h5>Options Expiration</h5>
+                            <p>Managing positions as expiration approaches and understanding assignment risk.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-external-link-alt text-primary me-2"></i>Advanced Resources</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="list-group list-group-flush">
+                                <a href="https://www.investopedia.com/implied-volatility-4689745" class="list-group-item list-group-item-action" target="_blank">
+                                    <i class="fas fa-chart-line text-info me-2"></i>Implied Volatility Guide
+                                </a>
+                                <a href="https://www.cboe.com/education/advanced/" class="list-group-item list-group-item-action" target="_blank">
+                                    <i class="fas fa-graduation-cap text-success me-2"></i>Advanced Options Education
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Resources Tab -->
+        <div class="tab-pane fade" id="resources" role="tabpanel">
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h4><i class="fas fa-external-link-alt text-primary me-2"></i>Additional Learning Resources</h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h5><i class="fas fa-book text-primary me-2"></i>Books</h5>
+                                    <ul>
+                                        <li>"Options as a Strategic Investment" by Lawrence G. McMillan</li>
+                                        <li>"The Options Playbook" by Brian Overby</li>
+                                        <li>"Understanding Options" by Michael Sincere</li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <h5><i class="fas fa-video text-success me-2"></i>Online Courses</h5>
+                                    <ul>
+                                        <li>CBOE Options Institute</li>
+                                        <li>TD Ameritrade Education</li>
+                                        <li>Investopedia Academy</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            
+                            <div class="row mt-4">
+                                <div class="col-md-6">
+                                    <h5><i class="fas fa-newspaper text-warning me-2"></i>Websites</h5>
+                                    <ul>
+                                        <li><a href="https://www.investopedia.com" target="_blank">Investopedia</a></li>
+                                        <li><a href="https://www.cboe.com" target="_blank">CBOE</a></li>
+                                        <li><a href="https://www.tastytrade.com" target="_blank">TastyTrade</a></li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <h5><i class="fas fa-podcast text-info me-2"></i>Podcasts</h5>
+                                    <ul>
+                                        <li>"Options Insider Radio"</li>
+                                        <li>"The Options Playbook"</li>
+                                        <li>"TastyTrade"</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+// Initialize Bootstrap tabs
+document.addEventListener('DOMContentLoaded', function() {
+    var triggerTabList = [].slice.call(document.querySelectorAll('#educationTabs button'))
+    triggerTabList.forEach(function (triggerEl) {
+        var tabTrigger = new bootstrap.Tab(triggerEl)
+    })
+});
+</script>
 {% endblock %}
