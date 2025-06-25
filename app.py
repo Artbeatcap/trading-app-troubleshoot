@@ -1090,6 +1090,12 @@ def tools():
     return render_template("tools/index.html")
 
 
+@app.route("/education")
+def education():
+    """Display curated educational resources."""
+    return render_template("education.html")
+
+
 @app.route("/tools/options-calculator", methods=["GET", "POST"])
 def options_calculator():
     """Options calculator with Tradier data only"""

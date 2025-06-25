@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Educational Resources - Options Plunge{% endblock %}
+
+{% block content %}
+<div class="container py-3">
+    <h1 class="mb-4"><i class="fas fa-graduation-cap text-info me-2"></i>Educational Resources</h1>
+    <p class="text-muted">Browse articles and tutorials to sharpen your options trading skills.</p>
+    <div class="row">
+        <div class="col-md-4 mb-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="fas fa-book text-primary me-2"></i>Options Basics</h5>
+                    <p class="card-text small text-muted">Learn the fundamentals of options trading, including calls, puts and common strategies.</p>
+                    <a href="https://www.investopedia.com/options-basics-tutorial-4583012" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener">Read Guide</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="fas fa-calculator text-warning me-2"></i>Greeks Explained</h5>
+                    <p class="card-text small text-muted">Understand Delta, Gamma, Theta and Vega and how they influence option pricing.</p>
+                    <a href="https://www.investopedia.com/options-greeks-4689745" class="btn btn-sm btn-outline-warning" target="_blank" rel="noopener">Learn More</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="fas fa-shield-alt text-success me-2"></i>Risk Management</h5>
+                    <p class="card-text small text-muted">Master position sizing, stop losses and overall portfolio risk techniques.</p>
+                    <a href="https://www.investopedia.com/articles/trading/09/risk-management.htm" class="btn btn-sm btn-outline-success" target="_blank" rel="noopener">Explore</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
