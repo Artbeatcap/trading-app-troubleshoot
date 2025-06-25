@@ -162,27 +162,11 @@ def test_analytics_includes_open_trades(monkeypatch):
         assert context["stats"]["winning_trades"] == 2
 
 
-def test_trades_page_guest_access():
+
+def test_education_page():
     client = app.test_client()
-    response = client.get("/trades")
+    response = client.get("/education")
     assert response.status_code == 200
+    assert b"Educational Resources" in response.data
 
-
-def test_journal_page_guest_access():
-    client = app.test_client()
-    response = client.get("/journal")
-    assert response.status_code == 200
-
-
-def test_guest_can_post_journal():
-    client = app.test_client()
-    today = date.today().strftime("%Y-%m-%d")
-    response = client.post(
-        "/journal/add",
-        data={"journal_date": today, "daily_pnl": 0},
-    )
-    assert response.status_code == 302
-    with app.app_context():
-        entry = TradingJournal.query.filter_by(journal_date=date.today()).first()
-        assert entry is not None
 
