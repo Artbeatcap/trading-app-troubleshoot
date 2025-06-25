@@ -1,0 +1,69 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Deploy to VPS
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.VPS_HOST }}
+        username: ${{ secrets.VPS_USERNAME }}
+        key: ${{ secrets.VPS_SSH_KEY }}
+        port: ${{ secrets.VPS_PORT }}
+        script: |
+          # Navigate to app directory
+          cd /home/tradingapp/trading-analysis
+          
+          # Create backup before update
+          echo "Creating backup..."
+          tar -czf /home/tradingapp/backups/pre_deploy_backup_$(date +%Y%m%d_%H%M%S).tar.gz .
+          
+          # Pull latest changes
+          echo "Pulling latest changes from GitHub..."
+          git fetch origin
+          git reset --hard origin/main
+          
+          # Activate virtual environment
+          source venv/bin/activate
+          
+          # Install/update dependencies
+          echo "Installing dependencies..."
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          
+          # Run database migrations
+          echo "Running database migrations..."
+          flask db upgrade
+          
+          # Restart the application
+          echo "Restarting application..."
+          sudo systemctl restart trading-analysis
+          
+          # Wait for service to start
+          sleep 5
+          
+          # Check if service is running
+          if sudo systemctl is-active --quiet trading-analysis; then
+            echo "✅ Deployment successful! Application is running."
+          else
+            echo "❌ Deployment failed! Application is not running."
+            sudo systemctl status trading-analysis
+            exit 1
+          fi
+          
+          # Clean up old backups (keep last 5)
+          echo "Cleaning up old backups..."
+          cd /home/tradingapp/backups
+          ls -t *.tar.gz | tail -n +6 | xargs -r rm
+          
+          echo "🎉 Deployment completed successfully!" 

@@ -1,0 +1,49 @@
+# Production .gitignore - excludes test and development files
+
+# Test files
+tests/
+test_*.py
+*_test.py
+test-*.py
+
+# Development files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+env/
+.env
+
+# Flask
+instance/
+.webassets-cache
+
+# IDE
+.vscode/
+.idea/
+
+# Database
+*.db
+*.sqlite3
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Migration scripts (keep migrations folder)
+migrate_*.py
+fix_*.py
+
+# Backup files
+*.bak
+*.tmp
+
+# Git
+.git/
+.github/ 
