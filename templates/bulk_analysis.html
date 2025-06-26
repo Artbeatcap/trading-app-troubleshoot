@@ -5,6 +5,20 @@
 
 {% block content %}
 <div class="container py-5">
+    {% if show_login_prompt %}
+        <div class="alert alert-info alert-dismissible fade show" role="alert">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-info-circle me-3 fa-lg"></i>
+                <div class="flex-grow-1">
+                    <strong>Demo Mode:</strong> You're viewing sample AI analysis. 
+                    <a href="{{ url_for('login', next=request.path) }}" class="alert-link">Sign in</a> or 
+                    <a href="{{ url_for('register') }}" class="alert-link">create an account</a> to analyze your own trades!
+                </div>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    {% endif %}
+
     <div class="text-center mb-5">
         <h1 class="display-5 fw-bold">
             <i class="fas fa-robot text-success me-2"></i>

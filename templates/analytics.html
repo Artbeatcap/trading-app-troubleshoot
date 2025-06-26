@@ -5,6 +5,20 @@
 <div class="container py-4">
     <h1 class="h3 mb-3">Analytics</h1>
 
+    {% if show_login_prompt %}
+        <div class="alert alert-info alert-dismissible fade show" role="alert">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-info-circle me-3 fa-lg"></i>
+                <div class="flex-grow-1">
+                    <strong>Demo Mode:</strong> You're viewing sample analytics data. 
+                    <a href="{{ url_for('login', next=request.path) }}" class="alert-link">Sign in</a> or 
+                    <a href="{{ url_for('register') }}" class="alert-link">create an account</a> to track your own trading performance!
+                </div>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    {% endif %}
+
     {% if no_data %}
         <div class="text-center py-5 text-muted">
             <i class="fas fa-chart-bar fa-3x mb-3"></i>

@@ -875,7 +875,7 @@ def analyze_trade(id):
 
 @app.route("/journal")
 def journal():
-    """Display journal entries. Guests see all recent entries."""
+    """Display journal entries. Guests see sample entries."""
     page = request.args.get("page", 1, type=int)
     if current_user.is_authenticated:
         journals = (
@@ -883,12 +883,63 @@ def journal():
             .order_by(TradingJournal.journal_date.desc())
             .paginate(page=page, per_page=20, error_out=False)
         )
+        return render_template("journal.html", journals=journals, show_login_prompt=False)
     else:
-        journals = (
-            TradingJournal.query.order_by(TradingJournal.journal_date.desc())
-            .paginate(page=page, per_page=20, error_out=False)
-        )
-    return render_template("journal.html", journals=journals)
+        # Show sample journal entries for anonymous users
+        from datetime import datetime, timedelta
+        
+        sample_journals = [
+            {
+                'journal_date': datetime.now() - timedelta(days=1),
+                'market_notes': 'Market showing strong momentum in tech sector. AAPL and TSLA leading the charge with earnings catalysts. VIX remains low indicating complacency.',
+                'trading_notes': 'Executed 3 trades today: AAPL breakout (winner), TSLA momentum (winner), SPY reversal (loser). Overall P&L: +$450. Stuck to my plan and managed risk well.',
+                'emotions': 'Felt confident and focused. No FOMO or revenge trading urges. Stayed disciplined with position sizing.',
+                'lessons_learned': 'Breakout trades work best with volume confirmation. Need to be more patient with reversal setups.',
+                'tomorrow_plan': 'Focus on high-probability setups only. Watch for continuation patterns in tech. Keep position sizes consistent.',
+                'daily_pnl': 450.00,
+                'daily_score': 8.5,
+                'ai_daily_feedback': 'Excellent discipline today! Your risk management was spot-on and you stuck to your trading plan. Consider adding volume analysis to your reversal setups.'
+            },
+            {
+                'journal_date': datetime.now() - timedelta(days=2),
+                'market_notes': 'Market choppy with mixed signals. Fed minutes caused some volatility. Sector rotation into defensive names.',
+                'trading_notes': 'Only 1 trade: QQQ put spread (small loss). Market conditions weren\'t ideal for my setups. Better to sit out than force trades.',
+                'emotions': 'Frustrated with the choppy market but stayed patient. Proud that I didn\'t chase bad setups.',
+                'lessons_learned': 'Sometimes the best trade is no trade. Market conditions matter more than individual setups.',
+                'tomorrow_plan': 'Wait for clearer market direction. Focus on quality over quantity.',
+                'daily_pnl': -75.00,
+                'daily_score': 7.0,
+                'ai_daily_feedback': 'Great job staying patient in difficult market conditions. Your discipline to avoid forcing trades shows maturity. Consider adding market condition filters to your strategy.'
+            },
+            {
+                'journal_date': datetime.now() - timedelta(days=3),
+                'market_notes': 'Strong bullish day with clear trend. All major indices up 1%+. Volume confirming the move.',
+                'trading_notes': '2 trades: SPY call (winner), IWM breakout (winner). Both trades followed the trend and had clear setups.',
+                'emotions': 'Excited about the clear market direction. Felt in sync with the market rhythm.',
+                'lessons_learned': 'Trend following works best in strong trending markets. Don\'t fight the trend.',
+                'tomorrow_plan': 'Look for continuation patterns. Consider adding to winning positions if trend continues.',
+                'daily_pnl': 325.00,
+                'daily_score': 9.0,
+                'ai_daily_feedback': 'Outstanding performance! You perfectly aligned with market conditions and executed flawlessly. Your trend-following approach was textbook.'
+            }
+        ]
+        
+        # Create a mock pagination object for the sample data
+        class MockPagination:
+            def __init__(self, items, page, per_page):
+                self.items = items
+                self.page = page
+                self.per_page = per_page
+                self.total = len(items)
+                self.pages = 1
+                self.has_prev = False
+                self.has_next = False
+                self.prev_num = None
+                self.next_num = None
+                self.iter_pages = lambda: [1]
+        
+        journals = MockPagination(sample_journals, page, 20)
+        return render_template("journal.html", journals=journals, show_login_prompt=True)
 
 
 @app.route("/journal/add", methods=["GET", "POST"])
@@ -996,61 +1047,110 @@ def add_edit_journal(journal_date=None):
 @app.route("/analytics")
 def analytics():
     """Show performance analytics for both open and closed trades."""
-    trades = Trade.query.filter_by(user_id=current_user.id).all()
+    if current_user.is_authenticated:
+        # Show real data for authenticated users
+        trades = Trade.query.filter_by(user_id=current_user.id).all()
 
-    if not trades:
-        return render_template(
-            "analytics.html", no_data=True, charts_json=None, stats=None, show_login_prompt=False
+        if not trades:
+            return render_template(
+                "analytics.html", no_data=True, charts_json=None, stats=None, show_login_prompt=False
+            )
+
+        for trade in trades:
+            if trade.is_open_position():
+                # Update unrealized P&L so open trades are included accurately
+                trade.calculate_pnl()
+
+        df = pd.DataFrame(
+            [
+                {
+                    "date": trade.exit_date or trade.entry_date,
+                    "symbol": trade.symbol,
+                    "pnl": trade.profit_loss or 0,
+                    "pnl_percent": trade.profit_loss_percent or 0,
+                    "setup_type": trade.setup_type,
+                    "timeframe": trade.timeframe,
+                    "is_winner": trade.is_winner(),
+                }
+                for trade in trades
+            ]
         )
 
-    for trade in trades:
-        if trade.is_open_position():
-            # Update unrealized P&L so open trades are included accurately
-            trade.calculate_pnl()
+        stats = {
+            "total_trades": len(trades),
+            "winning_trades": len([t for t in trades if t.is_winner()]),
+            "losing_trades": len(
+                [t for t in trades if t.profit_loss is not None and t.profit_loss < 0]
+            ),
+            "win_rate": len([t for t in trades if t.is_winner()]) / len(trades) * 100,
+            "total_pnl": sum(t.profit_loss or 0 for t in trades),
+            "avg_win": df[df["pnl"] > 0]["pnl"].mean() if len(df[df["pnl"] > 0]) > 0 else 0,
+            "avg_loss": (
+                df[df["pnl"] < 0]["pnl"].mean() if len(df[df["pnl"] < 0]) > 0 else 0
+            ),
+            "largest_win": df["pnl"].max(),
+            "largest_loss": df["pnl"].min(),
+            "profit_factor": (
+                abs(df[df["pnl"] > 0]["pnl"].sum() / df[df["pnl"] < 0]["pnl"].sum())
+                if df[df["pnl"] < 0]["pnl"].sum() != 0
+                else 0
+            ),
+        }
 
-    df = pd.DataFrame(
-        [
-            {
-                "date": trade.exit_date or trade.entry_date,
-                "symbol": trade.symbol,
-                "pnl": trade.profit_loss or 0,
-                "pnl_percent": trade.profit_loss_percent or 0,
-                "setup_type": trade.setup_type,
-                "timeframe": trade.timeframe,
-                "is_winner": trade.is_winner(),
-            }
-            for trade in trades
+        # Create charts
+        charts = create_analytics_charts(df)
+        charts_json = json.dumps(charts, cls=plotly.utils.PlotlyJSONEncoder)
+
+        return render_template(
+            "analytics.html", charts_json=charts_json, stats=stats, no_data=False, show_login_prompt=False
+        )
+    else:
+        # Show example data for anonymous users
+        from datetime import datetime, timedelta
+        
+        # Create sample data for demonstration
+        sample_dates = [
+            datetime.now() - timedelta(days=30),
+            datetime.now() - timedelta(days=25),
+            datetime.now() - timedelta(days=20),
+            datetime.now() - timedelta(days=15),
+            datetime.now() - timedelta(days=10),
+            datetime.now() - timedelta(days=5),
+            datetime.now() - timedelta(days=1)
         ]
-    )
+        
+        sample_data = [
+            {"date": sample_dates[0], "pnl": 250, "is_winner": True, "setup_type": "breakout"},
+            {"date": sample_dates[1], "pnl": -150, "is_winner": False, "setup_type": "reversal"},
+            {"date": sample_dates[2], "pnl": 400, "is_winner": True, "setup_type": "breakout"},
+            {"date": sample_dates[3], "pnl": 175, "is_winner": True, "setup_type": "momentum"},
+            {"date": sample_dates[4], "pnl": -200, "is_winner": False, "setup_type": "reversal"},
+            {"date": sample_dates[5], "pnl": 300, "is_winner": True, "setup_type": "breakout"},
+            {"date": sample_dates[6], "pnl": 125, "is_winner": True, "setup_type": "momentum"}
+        ]
+        
+        df = pd.DataFrame(sample_data)
+        
+        stats = {
+            "total_trades": 7,
+            "winning_trades": 5,
+            "losing_trades": 2,
+            "win_rate": 71.4,
+            "total_pnl": 900,
+            "avg_win": 250,
+            "avg_loss": -175,
+            "largest_win": 400,
+            "largest_loss": -200,
+            "profit_factor": 3.57,
+        }
 
-    stats = {
-        "total_trades": len(trades),
-        "winning_trades": len([t for t in trades if t.is_winner()]),
-        "losing_trades": len(
-            [t for t in trades if t.profit_loss is not None and t.profit_loss < 0]
-        ),
-        "win_rate": len([t for t in trades if t.is_winner()]) / len(trades) * 100,
-        "total_pnl": sum(t.profit_loss or 0 for t in trades),
-        "avg_win": df[df["pnl"] > 0]["pnl"].mean() if len(df[df["pnl"] > 0]) > 0 else 0,
-        "avg_loss": (
-            df[df["pnl"] < 0]["pnl"].mean() if len(df[df["pnl"] < 0]) > 0 else 0
-        ),
-        "largest_win": df["pnl"].max(),
-        "largest_loss": df["pnl"].min(),
-        "profit_factor": (
-            abs(df[df["pnl"] > 0]["pnl"].sum() / df[df["pnl"] < 0]["pnl"].sum())
-            if df[df["pnl"] < 0]["pnl"].sum() != 0
-            else 0
-        ),
-    }
+        # Create charts with sample data
+        charts = create_analytics_charts(df)
+        charts_json = json.dumps(charts, cls=plotly.utils.PlotlyJSONEncoder)
 
-    # Create charts
-    charts = create_analytics_charts(df)
-    charts_json = json.dumps(charts, cls=plotly.utils.PlotlyJSONEncoder)
-
-    return render_template(
-        "analytics.html", charts_json=charts_json, stats=stats, no_data=False, show_login_prompt=False
-    )
+        return render_template(
+            "analytics.html", charts_json=charts_json, stats=stats, no_data=False, show_login_prompt=True
+        )
 
 
 def create_analytics_charts(df):
@@ -1154,19 +1254,8 @@ def settings():
 def bulk_analysis():
     form = BulkAnalysisForm()
 
-    # Populate trade choices for individual analysis
-    trades = (
-        Trade.query.filter_by(user_id=current_user.id)
-        .order_by(Trade.entry_date.desc())
-        .all()
-    )
-    form.trade_id.choices = [
-        (0, "Select a trade...")
-    ] + [
-        (t.id, f"{t.symbol} - {t.entry_date.strftime('%Y-%m-%d')}") for t in trades
-    ]
-
     if current_user.is_authenticated:
+        # Populate trade choices for individual analysis
         trades = (
             Trade.query.filter_by(user_id=current_user.id)
             .filter(Trade.exit_price.isnot(None))
@@ -1229,29 +1318,86 @@ def bulk_analysis():
             )
             return redirect(url_for("trades"))
 
-    # Get counts for display
-    unanalyzed_count = (
-        Trade.query.filter_by(user_id=current_user.id, is_analyzed=False)
-        .filter(Trade.exit_price.isnot(None))
-        .count()
-    )
+        # Get counts for display
+        unanalyzed_count = (
+            Trade.query.filter_by(user_id=current_user.id, is_analyzed=False)
+            .filter(Trade.exit_price.isnot(None))
+            .count()
+        )
 
-    thirty_days_ago = datetime.now() - timedelta(days=30)
-    recent_count = (
-        Trade.query.filter_by(user_id=current_user.id)
-        .filter(Trade.entry_date >= thirty_days_ago)
-        .filter(Trade.exit_price.isnot(None))
-        .count()
-    )
+        thirty_days_ago = datetime.now() - timedelta(days=30)
+        recent_count = (
+            Trade.query.filter_by(user_id=current_user.id)
+            .filter(Trade.entry_date >= thirty_days_ago)
+            .filter(Trade.exit_price.isnot(None))
+            .count()
+        )
 
-    return render_template(
-        "bulk_analysis.html",
-        form=form,
-        unanalyzed_count=unanalyzed_count,
-        recent_count=recent_count,
-        sample_trade=None,
-        sample_analysis=None
-    )
+        return render_template(
+            "bulk_analysis.html",
+            form=form,
+            unanalyzed_count=unanalyzed_count,
+            recent_count=recent_count,
+            sample_trade=None,
+            sample_analysis=None,
+            show_login_prompt=False
+        )
+    else:
+        # Show example data for anonymous users
+        sample_trade = {
+            'symbol': 'AAPL',
+            'trade_type': 'stock',
+            'entry_date': datetime.now() - timedelta(days=5),
+            'entry_price': 150.25,
+            'exit_date': datetime.now() - timedelta(days=2),
+            'exit_price': 155.75,
+            'quantity': 100,
+            'profit_loss': 550.00,
+            'setup_type': 'breakout',
+            'timeframe': 'daily',
+            'market_condition': 'bullish',
+            'entry_reason': 'Breakout above resistance with high volume',
+            'exit_reason': 'Target reached'
+        }
+        
+        sample_analysis = {
+            'overall_score': 8.5,
+            'entry_analysis': 'Strong breakout above resistance with high volume. Good risk/reward ratio.',
+            'exit_analysis': 'Target reached at 155.75. Trade executed according to plan.',
+            'risk_management': 'Stop loss was properly placed below support. Position sizing was appropriate.',
+            'lessons_learned': 'Breakout trades work well in trending markets. Volume confirmation is key.',
+            'improvement_suggestions': 'Consider trailing stops for longer-term breakouts.',
+            'strengths': [
+                'Excellent entry timing with volume confirmation',
+                'Proper risk management with defined stop loss',
+                'Clear exit strategy executed as planned'
+            ],
+            'weaknesses': [
+                'Could have used trailing stops for more profit',
+                'Position size could have been larger given the setup'
+            ],
+            'key_lessons': [
+                'Volume confirmation is crucial for breakout trades',
+                'Having a clear exit plan prevents emotional decisions'
+            ],
+            'recommendations': [
+                'Continue focusing on high-probability setups',
+                'Consider implementing trailing stops for winning trades',
+                'Review position sizing for similar setups'
+            ],
+            'risk_analysis': 'Risk was well-managed with proper position sizing and stop loss placement.',
+            'market_context': 'Market was in a bullish trend with strong sector rotation into technology stocks.'
+        }
+        
+        return render_template(
+            "bulk_analysis.html",
+            form=form,
+            unanalyzed_count=0,
+            recent_count=0,
+            sample_trade=sample_trade,
+            sample_analysis=sample_analysis,
+            show_login_prompt=True
+        )
 
 
 @app.route("/api/quick_trade", methods=["POST"])
