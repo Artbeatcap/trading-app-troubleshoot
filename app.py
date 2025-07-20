@@ -156,6 +156,20 @@ def market_brief():
     return render_template("market_brief.html", form=form, subscribed=subscribed)
 
 
+@app.route("/admin/send_brief", methods=["POST"])
+@login_required
+def send_brief():
+    """Admin route to manually trigger market brief sending"""
+    try:
+        from market_brief_generator import send_market_brief_to_subscribers
+        success_count = send_market_brief_to_subscribers()
+        flash(f"Market brief sent to {success_count} subscribers!", "success")
+    except Exception as e:
+        flash(f"Error sending market brief: {str(e)}", "danger")
+    
+    return redirect(url_for("market_brief"))
+
+
 def get_tradier_headers():
     """Get headers for Tradier API requests"""
     if not TRADIER_API_TOKEN:
