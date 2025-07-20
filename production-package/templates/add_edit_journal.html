@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit' if journal else 'Add' }} Journal Entry - Options Plunge{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-book text-primary me-2"></i>
+        {{ 'Edit' if journal else 'Add' }} Journal Entry
+    </h1>
+</div>
+
+{% if not is_authenticated %}
+<div class="alert alert-info">
+    <i class="fas fa-info-circle me-2"></i>
+    You can fill out the journal entry now. Your information will be saved temporarily and can be permanently saved after you log in or create an account.
+    <div class="mt-2">
+        <a href="{{ url_for('login') }}" class="btn btn-outline-primary btn-sm me-2">Log In</a>
+        <a href="{{ url_for('register') }}" class="btn btn-outline-success btn-sm">Create Account</a>
+    </div>
+</div>
+{% endif %}
+
+<form method="POST" class="needs-validation" novalidate>
+    {{ form.hidden_tag() }}
+    
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-calendar-day me-2"></i>
+                        Daily Trading Journal
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- Date -->
+                    <div class="mb-3">
+                        {{ form.journal_date.label(class="form-label fw-bold") }}
+                        {{ form.journal_date(class="form-control", type="date") }}
+                        {% if form.journal_date.errors %}
+                            <div class="text-danger small">
+                                {% for error in form.journal_date.errors %}
+                                    <div>{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Market Notes -->
+                    <div class="mb-3">
+                        {{ form.market_notes.label(class="form-label fw-bold") }}
+                        {{ form.market_notes(class="form-control", rows=4, placeholder="Market conditions, key levels, catalysts, etc.") }}
+                        {% if form.market_notes.errors %}
+                            <div class="text-danger small">
+                                {% for error in form.market_notes.errors %}
+                                    <div>{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Trading Notes -->
+                    <div class="mb-3">
+                        {{ form.trading_notes.label(class="form-label fw-bold") }}
+                        {{ form.trading_notes(class="form-control", rows=4, placeholder="Trades taken, decisions made, execution quality, etc.") }}
+                        {% if form.trading_notes.errors %}
+                            <div class="text-danger small">
+                                {% for error in form.trading_notes.errors %}
+                                    <div>{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Emotions -->
+                    <div class="mb-3">
+                        {{ form.emotions.label(class="form-label fw-bold") }}
+                        {{ form.emotions(class="form-control", rows=3, placeholder="How you felt during trading, emotional state, etc.") }}
+                        {% if form.emotions.errors %}
+                            <div class="text-danger small">
+                                {% for error in form.emotions.errors %}
+                                    <div>{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Lessons Learned -->
+                    <div class="mb-3">
+                        {{ form.lessons_learned.label(class="form-label fw-bold") }}
+                        {{ form.lessons_learned(class="form-control", rows=3, placeholder="What you learned today, mistakes to avoid, etc.") }}
+                        {% if form.lessons_learned.errors %}
+                            <div class="text-danger small">
+                                {% for error in form.lessons_learned.errors %}
+                                    <div>{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Tomorrow's Plan -->
+                    <div class="mb-3">
+                        {{ form.tomorrow_plan.label(class="form-label fw-bold") }}
+                        {{ form.tomorrow_plan(class="form-control", rows=3, placeholder="Plans for tomorrow, setups to watch, etc.") }}
+                        {% if form.tomorrow_plan.errors %}
+                            <div class="text-danger small">
+                                {% for error in form.tomorrow_plan.errors %}
+                                    <div>{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-line me-2"></i>
+                        Performance Metrics
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- Daily P&L -->
+                    <div class="mb-3">
+                        {{ form.daily_pnl.label(class="form-label fw-bold") }}
+                        {{ form.daily_pnl(class="form-control", type="number", step="0.01", placeholder="0.00") }}
+                        {% if form.daily_pnl.errors %}
+                            <div class="text-danger small">
+                                {% for error in form.daily_pnl.errors %}
+                                    <div>{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Daily Score -->
+                    <div class="mb-3">
+                        {{ form.daily_score.label(class="form-label fw-bold") }}
+                        {{ form.daily_score(class="form-control", type="number", min="1", max="10", placeholder="1-10") }}
+                        <small class="text-muted">Rate your trading performance today (1-10)</small>
+                        {% if form.daily_score.errors %}
+                            <div class="text-danger small">
+                                {% for error in form.daily_score.errors %}
+                                    <div>{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-2"></i>
+                            {% if is_authenticated %}
+                                {{ 'Update' if journal else 'Save' }} Journal Entry
+                            {% else %}
+                                Save Temporarily
+                            {% endif %}
+                        </button>
+                        <a href="{{ url_for('journal') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>
+                            Back to Journal
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Day's Trades Context -->
+            {% if day_trades %}
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-exchange-alt me-2"></i>
+                        Today's Trades
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="list-group list-group-flush">
+                        {% for trade in day_trades %}
+                        <div class="list-group-item">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">{{ trade.symbol }}</h6>
+                                <small class="{% if trade.profit_loss and trade.profit_loss > 0 %}text-success{% elif trade.profit_loss %}text-danger{% endif %}">
+                                    {% if trade.profit_loss %}
+                                        ${{ "%.2f"|format(trade.profit_loss) }}
+                                    {% else %}
+                                        Open
+                                    {% endif %}
+                                </small>
+                            </div>
+                            <p class="mb-1">{{ trade.setup_type }} - {{ trade.trade_type.replace('_', ' ').title() }}</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</form>
+{% endblock %}
