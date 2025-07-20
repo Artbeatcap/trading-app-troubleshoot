@@ -860,3 +860,14 @@ class UserSettings(db.Model):
 
     def __repr__(self):
         return f"<UserSettings for User {self.user_id}>"
+
+
+class MarketBriefSubscriber(db.Model):
+    """Subscribers for the daily market brief"""
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    email = db.Column(db.String(200), unique=True, nullable=False)
+    subscribed_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<MarketBriefSubscriber {self.email}>"
