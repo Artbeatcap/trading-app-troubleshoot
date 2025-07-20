@@ -2,7 +2,7 @@
 # Copy this to .env on your VPS and replace with your actual values
 
 # Database Configuration (PostgreSQL)
-DATABASE_URL=postgresql://tradingapp:your-secure-password-here@localhost/trading_journal
+DATABASE_URL=postgresql://trading_user:Hvjband12345@localhost/trading_analysis
 
 # Security - Generate a strong secret key
 SECRET_KEY=your-super-secret-production-key-change-this-immediately
