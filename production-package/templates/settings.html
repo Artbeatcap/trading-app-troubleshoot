@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Settings - Options Plunge{% endblock %}
+{% block content %}
+<div class="container py-4">
+  <h1 class="h3 mb-4">User Settings</h1>
+
+  <form method="POST">
+    {{ form.hidden_tag() }}
+
+    <h5 class="mb-3">Account</h5>
+    <div class="row">
+      <div class="col-md-6 mb-3">
+        {{ form.account_size.label(class="form-label") }}
+        {{ form.account_size(class="form-control") }}
+        {% if form.account_size.errors %}
+          <div class="text-danger small">
+            {% for error in form.account_size.errors %}
+              <div>{{ error }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+      <div class="col-md-6 mb-3">
+        {{ form.default_risk_percent.label(class="form-label") }}
+        {{ form.default_risk_percent(class="form-control") }}
+        {% if form.default_risk_percent.errors %}
+          <div class="text-danger small">
+            {% for error in form.default_risk_percent.errors %}
+              <div>{{ error }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <h5 class="mt-4 mb-3">Analysis Preferences</h5>
+    <div class="form-check mb-3">
+      {{ form.auto_analyze_trades(class="form-check-input") }}
+      {{ form.auto_analyze_trades.label(class="form-check-label") }}
+    </div>
+    <div class="mb-3">
+      {{ form.analysis_detail_level.label(class="form-label") }}
+      {{ form.analysis_detail_level(class="form-select") }}
+      {% if form.analysis_detail_level.errors %}
+        <div class="text-danger small">
+          {% for error in form.analysis_detail_level.errors %}
+            <div>{{ error }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+
+    <h5 class="mt-4 mb-3">Risk Management</h5>
+    <div class="row">
+      <div class="col-md-6 mb-3">
+        {{ form.max_daily_loss.label(class="form-label") }}
+        {{ form.max_daily_loss(class="form-control") }}
+        {% if form.max_daily_loss.errors %}
+          <div class="text-danger small">
+            {% for error in form.max_daily_loss.errors %}
+              <div>{{ error }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+      <div class="col-md-6 mb-3">
+        {{ form.max_position_size.label(class="form-label") }}
+        {{ form.max_position_size(class="form-control") }}
+        {% if form.max_position_size.errors %}
+          <div class="text-danger small">
+            {% for error in form.max_position_size.errors %}
+              <div>{{ error }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <h5 class="mt-4 mb-3">Display</h5>
+    <div class="mb-3">
+      {{ form.trades_per_page.label(class="form-label") }}
+      {{ form.trades_per_page(class="form-select") }}
+      {% if form.trades_per_page.errors %}
+        <div class="text-danger small">
+          {% for error in form.trades_per_page.errors %}
+            <div>{{ error }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="d-grid mt-4">
+      {{ form.submit(class="btn btn-primary btn-lg") }}
+    </div>
+  </form>
+</div>
+{% endblock %}

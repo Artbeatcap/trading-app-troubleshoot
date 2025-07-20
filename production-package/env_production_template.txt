@@ -1,0 +1,26 @@
+# Production Environment Configuration
+# Copy this to .env on your VPS and replace with your actual values
+
+# Database Configuration (PostgreSQL)
+DATABASE_URL=postgresql://tradingapp:your-secure-password-here@localhost/trading_journal
+
+# Security - Generate a strong secret key
+SECRET_KEY=your-super-secret-production-key-change-this-immediately
+
+# OpenAI Configuration
+OPENAI_API_KEY=your-openai-api-key-here
+
+# Tradier Configuration
+TRADIER_API_TOKEN=your-tradier-token-here
+
+# Email Configuration (Gmail example)
+MAIL_SERVER=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USE_TLS=true
+MAIL_USERNAME=your-email@gmail.com
+MAIL_PASSWORD=your-gmail-app-password
+MAIL_DEFAULT_SENDER=your-email@gmail.com
+
+# App Configuration
+FLASK_ENV=production
+FLASK_DEBUG=false 

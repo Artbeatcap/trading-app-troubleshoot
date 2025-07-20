@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block title %}Trades - Options Plunge{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-chart-line text-primary me-2"></i>
+        {% if is_authenticated %}My Trades{% else %}Sample Trades{% endif %}
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{{ url_for('add_trade') }}" class="btn btn-primary">
+            <i class="fas fa-plus me-1"></i>
+            Add Trade
+        </a>
+    </div>
+</div>
+
+{% if show_login_prompt %}
+<div class="alert alert-info">
+    <i class="fas fa-info-circle me-2"></i>
+    {% if is_authenticated %}
+        You can view and manage your trades after logging in or creating an account.
+    {% else %}
+        This is sample data to demonstrate the trading journal features. <strong>Log in or create an account</strong> to track your own trades and get personalized analytics.
+    {% endif %}
+    <div class="mt-2">
+        <a href="{{ url_for('login') }}" class="btn btn-outline-primary btn-sm me-2">Log In</a>
+        <a href="{{ url_for('register') }}" class="btn btn-outline-success btn-sm">Create Account</a>
+    </div>
+</div>
+{% endif %}
+
+{% if trades %}
+    <div class="container py-4">
+        <h1 class="h3 mb-3">{% if is_authenticated %}Your Trades{% else %}Sample Trades{% endif %}</h1>
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Symbol</th>
+                        <th>Type</th>
+                        <th>Setup</th>
+                        <th>Entry</th>
+                        <th>Exit</th>
+                        <th>P&L</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if is_authenticated %}
+                        {% for trade in trades.items %}
+                            <tr class="trade-row {% if trade.exit_price and trade.exit_price > trade.entry_price %}profit{% elif trade.exit_price %}loss{% endif %}">
+                                <td>{{ trade.entry_date.strftime('%Y-%m-%d') if trade.entry_date is not string else trade.entry_date }}</td>
+                                <td>{{ trade.symbol }}</td>
+                                <td>{{ trade.trade_type.replace('_', ' ').title() }}</td>
+                                <td>{{ trade.setup_type }}</td>
+                                <td>${{ "%.2f"|format(trade.entry_price) }}</td>
+                                <td>
+                                    {% if trade.exit_price %}
+                                        ${{ "%.2f"|format(trade.exit_price) }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if trade.profit_loss %}
+                                        <span class="{% if trade.profit_loss > 0 %}text-success{% else %}text-danger{% endif %}">
+                                            ${{ "%.2f"|format(trade.profit_loss) }}
+                                        </span>
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('view_trade', id=trade.id) }}" class="btn btn-sm btn-info">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    {% else %}
+                        {% for trade in trades %}
+                            <tr class="trade-row {% if trade.profit_loss and trade.profit_loss > 0 %}profit{% elif trade.profit_loss %}loss{% endif %}">
+                                <td>{{ trade.entry_date.strftime('%Y-%m-%d') if trade.entry_date is not string else trade.entry_date }}</td>
+                                <td>{{ trade.symbol }}</td>
+                                <td>{{ trade.trade_type.replace('_', ' ').title() }}</td>
+                                <td>{{ trade.setup_type }}</td>
+                                <td>${{ "%.2f"|format(trade.entry_price) }}</td>
+                                <td>
+                                    {% if trade.exit_price %}
+                                        ${{ "%.2f"|format(trade.exit_price) }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if trade.profit_loss %}
+                                        <span class="{% if trade.profit_loss > 0 %}text-success{% else %}text-danger{% endif %}">
+                                            ${{ "%.2f"|format(trade.profit_loss) }}
+                                        </span>
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-info" disabled title="Please log in to view trade details">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Pagination - only for authenticated users -->
+    {% if is_authenticated and trades.pages > 1 %}
+    <nav aria-label="Page navigation">
+        <ul class="pagination justify-content-center">
+            {% if trades.has_prev %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for('trades', page=trades.prev_num) }}">Previous</a>
+            </li>
+            {% endif %}
+            
+            {% for page_num in trades.iter_pages() %}
+                {% if page_num %}
+                    <li class="page-item {% if page_num == trades.page %}active{% endif %}">
+                        <a class="page-link" href="{{ url_for('trades', page=page_num) }}">{{ page_num }}</a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">...</span>
+                    </li>
+                {% endif %}
+            {% endfor %}
+            
+            {% if trades.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for('trades', page=trades.next_num) }}">Next</a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+{% else %}
+    <div class="text-center py-5 text-muted">
+        <i class="fas fa-exchange-alt fa-3x mb-3"></i>
+        <h5 class="mb-3">No trades recorded yet</h5>
+        <a href="{{ url_for('add_trade') }}" class="btn btn-primary">
+            <i class="fas fa-plus me-2"></i>Add Your First Trade
+        </a>
+    </div>
+{% endif %}
+{% endblock %}

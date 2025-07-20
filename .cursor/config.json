@@ -1,0 +1,6 @@
+"remote": {
+  "sshArgs": [
+    "-o", "ServerAliveInterval=30",
+    "-o", "ServerAliveCountMax=3"
+  ]
+}

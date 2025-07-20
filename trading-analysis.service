@@ -1,0 +1,17 @@
+[Unit]
+Description=Trading Analysis Flask App
+After=network.target
+
+[Service]
+User=tradingapp
+Group=tradingapp
+WorkingDirectory=/home/tradingapp/trading-analysis
+Environment="PATH=/home/tradingapp/trading-analysis/venv/bin"
+ExecStart=/home/tradingapp/trading-analysis/venv/bin/gunicorn --config gunicorn.conf.py wsgi:app
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=always
+StandardOutput=append:/var/log/trading-analysis/app.log
+StandardError=append:/var/log/trading-analysis/error.log
+
+[Install]
+WantedBy=multi-user.target 

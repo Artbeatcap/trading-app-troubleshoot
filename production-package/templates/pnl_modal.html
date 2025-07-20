@@ -1,0 +1,67 @@
+<div class="modal fade" id="pnlModal" tabindex="-1" aria-labelledby="pnlModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-fullscreen-sm-down">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="pnlModalLabel">Profit &amp; Loss Analysis</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <strong>Type:</strong> <span id="optionType"></span>
+                        &nbsp;|&nbsp;
+                        <strong>Strike:</strong> $<span id="strikePrice"></span>
+                        &nbsp;|&nbsp;
+                        <strong>Current Price:</strong> $<span id="currentPrice"></span>
+                        &nbsp;|&nbsp;
+                        <strong>Premium:</strong> $<span id="premium"></span>
+                        &nbsp;|&nbsp;
+                        <strong>Days to Exp:</strong> <span id="daysToExp"></span>
+                    </div>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button id="showDollars" type="button" class="btn btn-primary active">Dollars</button>
+                        <button id="showPercent" type="button" class="btn btn-outline-secondary">Percent</button>
+                    </div>
+                </div>
+                <ul class="nav nav-tabs mb-3" id="pnlTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="table-tab" data-bs-toggle="tab" data-bs-target="#tablePane" type="button" role="tab">Table</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="chart-tab" data-bs-toggle="tab" data-bs-target="#chartPane" type="button" role="tab">Chart</button>
+                    </li>
+                </ul>
+                <div class="tab-content">
+                    <div class="tab-pane fade show active" id="tablePane" role="tabpanel">
+                        <div class="table-responsive">
+                            <table class="table table-sm" id="pnlDataTable">
+                                <thead class="table-primary">
+                                    <tr>
+                                        <th>Stock Price</th>
+                                        <th id="timeHeader0">At Expiry</th>
+                                        <th id="timeHeader1">Days Left</th>
+                                        <th id="timeHeader2">Days Left</th>
+                                        <th id="timeHeader3">Days Left</th>
+                                        <th id="timeHeader4">Days Left</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="pnlTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="tab-pane fade" id="chartPane" role="tabpanel">
+                        <div class="chart-container mb-3" style="position: relative; height: 400px;">
+                            <canvas id="pnlChart"></canvas>
+                        </div>
+                        <div id="zoomControls" class="mb-3">
+                            <button id="zoomIn" class="btn btn-sm btn-outline-primary">Zoom In</button>
+                            <button id="zoomOut" class="btn btn-sm btn-outline-primary">Zoom Out</button>
+                            <button id="resetZoom" class="btn btn-sm btn-outline-secondary">Reset Zoom</button>
+                            <span class="text-muted ms-3"><small>Use mouse wheel to zoom, Ctrl+drag to pan</small></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block title %}{{ journal.title }} - AI Trading Analysis{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        {% if journal.entry_type == 'trade_analysis' %}
+            <i class="fas fa-chart-line text-success me-2"></i>
+        {% elif journal.entry_type == 'market_notes' %}
+            <i class="fas fa-globe text-info me-2"></i>
+        {% elif journal.entry_type == 'strategy_ideas' %}
+            <i class="fas fa-lightbulb text-warning me-2"></i>
+        {% else %}
+            <i class="fas fa-book text-primary me-2"></i>
+        {% endif %}
+        {{ journal.title }}
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <a href="{{ url_for('add_edit_journal', id=journal.id) }}" class="btn btn-outline-primary">
+                <i class="fas fa-edit me-1"></i>
+                Edit
+            </a>
+        </div>
+        <a href="{{ url_for('journal') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>
+            Back to Journal
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <!-- Main Content -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <span class="badge bg-secondary">{{ journal.entry_type.replace('_', ' ').title() }}</span>
+                    </h5>
+                    <small class="text-muted">{{ journal.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="journal-content mb-4">
+                    {{ journal.content|nl2br }}
+                </div>
+
+                {% if journal.lessons_learned %}
+                <div class="mb-4">
+                    <h6 class="text-primary">Lessons Learned</h6>
+                    <p>{{ journal.lessons_learned|nl2br }}</p>
+                </div>
+                {% endif %}
+
+                {% if journal.areas_for_improvement %}
+                <div class="mb-4">
+                    <h6 class="text-warning">Areas for Improvement</h6>
+                    <p>{{ journal.areas_for_improvement|nl2br }}</p>
+                </div>
+                {% endif %}
+
+                {% if journal.next_steps %}
+                <div class="mb-4">
+                    <h6 class="text-success">Next Steps</h6>
+                    <p>{{ journal.next_steps|nl2br }}</p>
+                </div>
+                {% endif %}
+
+                {% if journal.tags %}
+                <div class="mt-4">
+                    {% for tag in journal.tags.split(',') %}
+                        <span class="badge bg-light text-dark me-1">{{ tag.strip() }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- AI Analysis -->
+        {% if journal.ai_feedback %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-robot text-success me-2"></i>
+                    AI Analysis
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if journal.ai_score %}
+                <div class="text-center mb-4">
+                    <div class="analysis-score {% if journal.ai_score >= 8 %}score-excellent{% elif journal.ai_score >= 6 %}score-good{% elif journal.ai_score >= 4 %}score-average{% else %}score-poor{% endif %}">
+                        {{ journal.ai_score }}
+                    </div>
+                    <small class="text-muted d-block mt-2">AI Score</small>
+                </div>
+                {% endif %}
+                <p>{{ journal.ai_feedback|nl2br }}</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Sidebar -->
+    <div class="col-lg-4">
+        <!-- Mood Card -->
+        {% if journal.mood %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-smile me-2"></i>
+                    Trading Mood
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="text-center">
+                    <div class="h4 mb-0">{{ journal.mood.title() }}</div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Metadata -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Entry Details
+                </h6>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm table-borderless">
+                    <tr>
+                        <td class="text-muted">Created:</td>
+                        <td>{{ journal.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                    </tr>
+                    {% if journal.updated_at != journal.created_at %}
+                    <tr>
+                        <td class="text-muted">Last Updated:</td>
+                        <td>{{ journal.updated_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                    </tr>
+                    {% endif %}
+                    <tr>
+                        <td class="text-muted">Type:</td>
+                        <td>{{ journal.entry_type.replace('_', ' ').title() }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 
