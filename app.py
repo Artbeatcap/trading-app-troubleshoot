@@ -8,7 +8,16 @@ from flask_login import (
 )
 from flask_migrate import Migrate
 from config import Config
-from models import db, User, Trade, TradeAnalysis, TradingJournal, UserSettings
+# Import MarketBriefSubscriber
+from models import (
+    db,
+    User,
+    Trade,
+    TradeAnalysis,
+    TradingJournal,
+    UserSettings,
+    MarketBriefSubscriber,
+)
 from forms import (
     LoginForm,
     RegistrationForm,
@@ -20,6 +29,7 @@ from forms import (
     BulkAnalysisForm,
     ResetPasswordRequestForm,
     ResetPasswordForm,
+    MarketBriefSignupForm,
 )
 from ai_analysis import TradingAIAnalyzer
 from datetime import datetime, timedelta, date
@@ -93,6 +103,57 @@ print(f"Tradier token configured: {'Yes' if TRADIER_API_TOKEN else 'No'}")
 
 if not TRADIER_API_TOKEN:
     print("Warning: TRADIER_API_TOKEN environment variable not set")
+
+
+# ──────────────────────────────────────────────────
+# MARKET BRIEF ROUTE
+# ──────────────────────────────────────────────────
+
+
+@app.route("/market_brief", methods=["GET", "POST"])
+def market_brief():
+    """Landing page for the free morning market brief"""
+    form = MarketBriefSignupForm()
+    subscribed = False
+
+    if form.validate_on_submit():
+        # Create subscriber record
+        subscriber = MarketBriefSubscriber(
+            name=form.name.data, email=form.email.data.strip().lower()
+        )
+        db.session.add(subscriber)
+        db.session.commit()
+
+        # Notify admin (your inbox)
+        admin_email = app.config.get("MAIL_DEFAULT_SENDER")
+        if admin_email:
+            try:
+                msg = Message(
+                    "New Market Brief Subscriber",
+                    recipients=[admin_email],
+                )
+                msg.body = f"Name: {subscriber.name}\nEmail: {subscriber.email}"
+                mail.send(msg)
+            except Exception as e:
+                print(f"Error sending admin notification: {e}")
+
+        # Send welcome message to subscriber
+        try:
+            welcome = Message(
+                "Welcome to the Morning Market Brief",
+                recipients=[subscriber.email],
+            )
+            welcome.body = (
+                "Thanks for subscribing! You'll receive your first brief soon."
+            )
+            mail.send(welcome)
+        except Exception as e:
+            print(f"Error sending welcome email: {e}")
+
+        flash("Thanks for subscribing! Check your inbox for a welcome email.", "success")
+        subscribed = True
+
+    return render_template("market_brief.html", form=form, subscribed=subscribed)
 
 
 def get_tradier_headers():

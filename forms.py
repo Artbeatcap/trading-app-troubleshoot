@@ -380,3 +380,14 @@ class ResetPasswordForm(FlaskForm):
     password = PasswordField('New Password', validators=[DataRequired(), Length(min=8)])
     password2 = PasswordField('Repeat Password', validators=[DataRequired(), EqualTo('password')])
     submit = SubmitField('Reset Password')
+
+class MarketBriefSignupForm(FlaskForm):
+    """Signup form for the free morning market brief"""
+    name = StringField('Name', validators=[DataRequired(), Length(max=120)])
+    email = StringField('Email', validators=[DataRequired(), Email()])
+    submit = SubmitField('Get My Free Brief')
+
+    def validate_email(self, email):
+        from models import MarketBriefSubscriber
+        if MarketBriefSubscriber.query.filter_by(email=email.data).first():
+            raise ValidationError('This email is already subscribed.')
