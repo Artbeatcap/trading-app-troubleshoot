@@ -103,7 +103,8 @@ MAIL_PORT=587
 MAIL_USE_TLS=true
 MAIL_USERNAME=your-email@gmail.com
 MAIL_PASSWORD=your-app-password
-MAIL_DEFAULT_SENDER=your-email@gmail.com
+MAIL_DEFAULT_SENDER_NAME=Options Plunge Support
+MAIL_DEFAULT_SENDER_EMAIL=support@optionsplunge.com
 EOF
     print_warning "Please copy .env.example to .env and update with your actual values"
     exit 1

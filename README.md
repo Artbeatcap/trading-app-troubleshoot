@@ -97,7 +97,9 @@ MAIL_PORT=587
 MAIL_USE_TLS=True
 MAIL_USERNAME=your-email@gmail.com
 MAIL_PASSWORD=your-app-password
-MAIL_DEFAULT_SENDER=your-email@gmail.com
+# Mail sender configuration
+MAIL_DEFAULT_SENDER_NAME=Options Plunge Support
+MAIL_DEFAULT_SENDER_EMAIL=support@optionsplunge.com
 
 # File Upload Settings
 UPLOAD_FOLDER=static/uploads

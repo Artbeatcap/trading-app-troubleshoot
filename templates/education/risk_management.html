@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Risk Management Guide - Options Education{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <h1 class="display-5 mb-3"><i class="fas fa-shield-alt text-warning me-2"></i>Risk Management Guide</h1>
+                    <p class="lead">Effective risk management preserves capital and keeps you in the game.</p>
+                    <hr>
+                    <h3>1. Position Sizing</h3>
+                    <p>Risk only a small, predetermined fraction of your account on each trade (e.g., 1–2%).</p>
+                    <h3>2. Stop Losses</h3>
+                    <p>Define exit levels <em>before</em> entering a trade to cap downside.</p>
+                    <h3>3. Diversification</h3>
+                    <p>Avoid concentration by spreading trades across tickers, sectors and strategies.</p>
+                    <h3>4. Time Decay Awareness</h3>
+                    <p>Option value erodes daily; monitor theta and avoid holding long premium into rapid decay.</p>
+                    <h3>Common Mistakes</h3>
+                    <ul>
+                        <li>Over-leveraging with margin.</li>
+                        <li>Ignoring implied volatility shifts.</li>
+                        <li>Letting losers run <em>and</em> cutting winners short.</li>
+                        <li>Trading without a written plan.</li>
+                    </ul>
+                    <hr>
+                    <h4>Risk Management Tips</h4>
+                    <ul>
+                        <li>Use alerts to stay disciplined.</li>
+                        <li>Keep a trading journal to review decisions.</li>
+                        <li>Size positions based on <strong>delta-adjusted</strong> exposure.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

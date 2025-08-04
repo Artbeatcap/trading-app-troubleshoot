@@ -24,6 +24,13 @@ class User(UserMixin, db.Model):
     # User preferences
     default_risk_percent = db.Column(db.Float, default=2.0)  # Default risk per trade
     account_size = db.Column(db.Float)  # For position sizing calculations
+    
+    # New settings fields
+    display_name = db.Column(db.String(64))
+    dark_mode = db.Column(db.Boolean, default=False)
+    daily_brief_email = db.Column(db.Boolean, default=True)
+    timezone = db.Column(db.String(64), default='UTC')
+    api_key = db.Column(db.String(64))  # optional for future API features
 
     # Email verification fields
     email_verified = db.Column(db.Boolean, default=False)
@@ -867,7 +874,27 @@ class MarketBriefSubscriber(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
     email = db.Column(db.String(200), unique=True, nullable=False)
+    confirmed = db.Column(db.Boolean, default=False)
+    token = db.Column(db.String(64), unique=True)  # for double-opt-in
     subscribed_at = db.Column(db.DateTime, default=datetime.utcnow)
+    confirmed_at = db.Column(db.DateTime)
+    last_brief_sent = db.Column(db.DateTime)  # track when last brief was sent
+    is_active = db.Column(db.Boolean, default=True)  # for soft unsubscribes
 
     def __repr__(self):
         return f"<MarketBriefSubscriber {self.email}>"
+    
+    def generate_confirmation_token(self):
+        """Generate a new confirmation token"""
+        self.token = secrets.token_urlsafe(32)
+        return self.token
+    
+    def confirm_subscription(self):
+        """Confirm the subscription"""
+        self.confirmed = True
+        self.confirmed_at = datetime.utcnow()
+        self.token = None  # Clear the token after confirmation
+    
+    def unsubscribe(self):
+        """Soft unsubscribe - mark as inactive"""
+        self.is_active = False

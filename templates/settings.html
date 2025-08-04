@@ -1,97 +1,206 @@
 {% extends "base.html" %}
-{% block title %}Settings - Options Plunge{% endblock %}
+{% block title %}Account Settings - Options Plunge{% endblock %}
+
 {% block content %}
 <div class="container py-4">
-  <h1 class="h3 mb-4">User Settings</h1>
-
-  <form method="POST">
-    {{ form.hidden_tag() }}
-
-    <h5 class="mb-3">Account</h5>
     <div class="row">
-      <div class="col-md-6 mb-3">
-        {{ form.account_size.label(class="form-label") }}
-        {{ form.account_size(class="form-control") }}
-        {% if form.account_size.errors %}
-          <div class="text-danger small">
-            {% for error in form.account_size.errors %}
-              <div>{{ error }}</div>
-            {% endfor %}
-          </div>
-        {% endif %}
-      </div>
-      <div class="col-md-6 mb-3">
-        {{ form.default_risk_percent.label(class="form-label") }}
-        {{ form.default_risk_percent(class="form-control") }}
-        {% if form.default_risk_percent.errors %}
-          <div class="text-danger small">
-            {% for error in form.default_risk_percent.errors %}
-              <div>{{ error }}</div>
-            {% endfor %}
-          </div>
-        {% endif %}
-      </div>
-    </div>
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h2 class="h4 mb-0">
+                        <i class="fas fa-cog me-2"></i>Account Settings
+                    </h2>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        {{ form.hidden_tag() }}
 
-    <h5 class="mt-4 mb-3">Analysis Preferences</h5>
-    <div class="form-check mb-3">
-      {{ form.auto_analyze_trades(class="form-check-input") }}
-      {{ form.auto_analyze_trades.label(class="form-check-label") }}
-    </div>
-    <div class="mb-3">
-      {{ form.analysis_detail_level.label(class="form-label") }}
-      {{ form.analysis_detail_level(class="form-select") }}
-      {% if form.analysis_detail_level.errors %}
-        <div class="text-danger small">
-          {% for error in form.analysis_detail_level.errors %}
-            <div>{{ error }}</div>
-          {% endfor %}
+                        <!-- Account & Display Section -->
+                        <div class="mb-4">
+                            <h5 class="text-primary mb-3">
+                                <i class="fas fa-user me-2"></i>Account & Display
+                            </h5>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    {{ form.display_name.label(class="form-label fw-bold") }}
+                                    {{ form.display_name(class="form-control") }}
+                                    {% if form.display_name.errors %}
+                                        <div class="text-danger small">
+                                            {% for error in form.display_name.errors %}
+                                                <div>{{ error }}</div>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6">
+                                    {{ form.timezone.label(class="form-label fw-bold") }}
+                                    {{ form.timezone(class="form-select") }}
+                                    {% if form.timezone.errors %}
+                                        <div class="text-danger small">
+                                            {% for error in form.timezone.errors %}
+                                                <div>{{ error }}</div>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="row mt-3">
+                                <div class="col-12">
+                                    <div class="form-check">
+                                        {{ form.dark_mode(class="form-check-input") }}
+                                        {{ form.dark_mode.label(class="form-check-label") }}
+                                        <small class="text-muted d-block">Enable dark mode for better viewing in low light</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Account Settings Section -->
+                        <div class="mb-4">
+                            <h5 class="text-primary mb-3">
+                                <i class="fas fa-chart-line me-2"></i>Trading Account
+                            </h5>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    {{ form.account_size.label(class="form-label fw-bold") }}
+                                    {{ form.account_size(class="form-control") }}
+                                    {% if form.account_size.errors %}
+                                        <div class="text-danger small">
+                                            {% for error in form.account_size.errors %}
+                                                <div>{{ error }}</div>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6">
+                                    {{ form.default_risk_percent.label(class="form-label fw-bold") }}
+                                    {{ form.default_risk_percent(class="form-control") }}
+                                    {% if form.default_risk_percent.errors %}
+                                        <div class="text-danger small">
+                                            {% for error in form.default_risk_percent.errors %}
+                                                <div>{{ error }}</div>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Analysis Preferences Section -->
+                        <div class="mb-4">
+                            <h5 class="text-primary mb-3">
+                                <i class="fas fa-robot me-2"></i>AI Analysis Preferences
+                            </h5>
+                            <div class="form-check mb-3">
+                                {{ form.auto_analyze_trades(class="form-check-input") }}
+                                {{ form.auto_analyze_trades.label(class="form-check-label") }}
+                                <small class="text-muted d-block">Automatically analyze trades when they are closed</small>
+                            </div>
+                            <div class="mb-3">
+                                {{ form.analysis_detail_level.label(class="form-label fw-bold") }}
+                                {{ form.analysis_detail_level(class="form-select") }}
+                                {% if form.analysis_detail_level.errors %}
+                                    <div class="text-danger small">
+                                        {% for error in form.analysis_detail_level.errors %}
+                                            <div>{{ error }}</div>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Risk Management Section -->
+                        <div class="mb-4">
+                            <h5 class="text-primary mb-3">
+                                <i class="fas fa-shield-alt me-2"></i>Risk Management
+                            </h5>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    {{ form.max_daily_loss.label(class="form-label fw-bold") }}
+                                    {{ form.max_daily_loss(class="form-control") }}
+                                    {% if form.max_daily_loss.errors %}
+                                        <div class="text-danger small">
+                                            {% for error in form.max_daily_loss.errors %}
+                                                <div>{{ error }}</div>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6">
+                                    {{ form.max_position_size.label(class="form-label fw-bold") }}
+                                    {{ form.max_position_size(class="form-control") }}
+                                    {% if form.max_position_size.errors %}
+                                        <div class="text-danger small">
+                                            {% for error in form.max_position_size.errors %}
+                                                <div>{{ error }}</div>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Display Preferences Section -->
+                        <div class="mb-4">
+                            <h5 class="text-primary mb-3">
+                                <i class="fas fa-desktop me-2"></i>Display Preferences
+                            </h5>
+                            <div class="mb-3">
+                                {{ form.trades_per_page.label(class="form-label fw-bold") }}
+                                {{ form.trades_per_page(class="form-select") }}
+                                {% if form.trades_per_page.errors %}
+                                    <div class="text-danger small">
+                                        {% for error in form.trades_per_page.errors %}
+                                            <div>{{ error }}</div>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Notifications Section -->
+                        <div class="mb-4">
+                            <h5 class="text-primary mb-3">
+                                <i class="fas fa-bell me-2"></i>Notifications
+                            </h5>
+                            <div class="form-check">
+                                {{ form.daily_brief_email(class="form-check-input") }}
+                                {{ form.daily_brief_email.label(class="form-check-label") }}
+                                <small class="text-muted d-block">Receive daily market brief emails with analysis and insights</small>
+                            </div>
+                        </div>
+
+                        <!-- API Settings Section -->
+                        <div class="mb-4">
+                            <h5 class="text-primary mb-3">
+                                <i class="fas fa-key me-2"></i>API Settings
+                            </h5>
+                            <div class="mb-3">
+                                {{ form.api_key.label(class="form-label fw-bold") }}
+                                {{ form.api_key(class="form-control") }}
+                                <small class="text-muted">Optional—used for future API integrations and advanced features</small>
+                                {% if form.api_key.errors %}
+                                    <div class="text-danger small">
+                                        {% for error in form.api_key.errors %}
+                                            <div>{{ error }}</div>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary me-md-2">
+                                <i class="fas fa-times me-1"></i>Cancel
+                            </a>
+                            {{ form.submit(class="btn btn-primary btn-lg") }}
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
-      {% endif %}
     </div>
-
-    <h5 class="mt-4 mb-3">Risk Management</h5>
-    <div class="row">
-      <div class="col-md-6 mb-3">
-        {{ form.max_daily_loss.label(class="form-label") }}
-        {{ form.max_daily_loss(class="form-control") }}
-        {% if form.max_daily_loss.errors %}
-          <div class="text-danger small">
-            {% for error in form.max_daily_loss.errors %}
-              <div>{{ error }}</div>
-            {% endfor %}
-          </div>
-        {% endif %}
-      </div>
-      <div class="col-md-6 mb-3">
-        {{ form.max_position_size.label(class="form-label") }}
-        {{ form.max_position_size(class="form-control") }}
-        {% if form.max_position_size.errors %}
-          <div class="text-danger small">
-            {% for error in form.max_position_size.errors %}
-              <div>{{ error }}</div>
-            {% endfor %}
-          </div>
-        {% endif %}
-      </div>
-    </div>
-
-    <h5 class="mt-4 mb-3">Display</h5>
-    <div class="mb-3">
-      {{ form.trades_per_page.label(class="form-label") }}
-      {{ form.trades_per_page(class="form-select") }}
-      {% if form.trades_per_page.errors %}
-        <div class="text-danger small">
-          {% for error in form.trades_per_page.errors %}
-            <div>{{ error }}</div>
-          {% endfor %}
-        </div>
-      {% endif %}
-    </div>
-
-    <div class="d-grid mt-4">
-      {{ form.submit(class="btn btn-primary btn-lg") }}
-    </div>
-  </form>
 </div>
 {% endblock %}

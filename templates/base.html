@@ -189,12 +189,32 @@
         }
     </style>
     
-    {% block head %}{% endblock %}
+    {% block head %}
+    {% if hide_sidebar %}
+    <style>
+        .sidebar { display: none !important; }
+        .main-content { 
+            margin-left: 0 !important; 
+            width: 100% !important; 
+            max-width: 100% !important;
+        }
+        .container-fluid .row {
+            margin-left: 0 !important;
+            margin-right: 0 !important;
+        }
+        .col-md-9.ms-sm-auto.col-lg-10.px-md-4.main-content {
+            flex: 0 0 100% !important;
+            max-width: 100% !important;
+        }
+    </style>
+    {% endif %}
+    {% endblock %}
 </head>
 <body>
     <div class="container-fluid">
         <div class="row">
             <!-- Sidebar -->
+            {% if not hide_sidebar %}
             <nav class="col-md-3 col-lg-2 d-md-block sidebar collapse {% if current_user.is_authenticated or show_logged_in %}show{% endif %}">
                 <div class="position-sticky">
                     <div class="text-center py-3">
@@ -210,61 +230,61 @@
                     
                     <ul class="nav flex-column">
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('dashboard') }}">
+                            <a class="nav-link {% if request.endpoint in ['dashboard'] %}active{% endif %}" href="{{ url_for('dashboard') }}">
                                 <i class="fas fa-tachometer-alt me-2"></i>
                                 Dashboard
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('options_calculator') }}">
+                            <a class="nav-link {% if request.endpoint in ['options_calculator'] %}active{% endif %}" href="{{ url_for('options_calculator') }}">
                                 <i class="fas fa-calculator me-2"></i>
                                 Options Calculator
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('trades') }}">
+                            <a class="nav-link {% if request.endpoint in ['trades', 'view_trade', 'edit_trade'] %}active{% endif %}" href="{{ url_for('trades') }}">
                                 <i class="fas fa-exchange-alt me-2"></i>
                                 Trades
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('add_trade') }}">
+                            <a class="nav-link {% if request.endpoint == 'add_trade' %}active{% endif %}" href="{{ url_for('add_trade') }}">
                                 <i class="fas fa-plus me-2"></i>
                                 Add Trade
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('journal') }}">
+                            <a class="nav-link {% if request.endpoint in ['journal', 'add_edit_journal'] %}active{% endif %}" href="{{ url_for('journal') }}">
                                 <i class="fas fa-book me-2"></i>
                                 Journal
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('analytics') }}">
+                            <a class="nav-link {% if request.endpoint == 'analytics' %}active{% endif %}" href="{{ url_for('analytics') }}">
                                 <i class="fas fa-chart-bar me-2"></i>
                                 Analytics
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('bulk_analysis') }}">
+                            <a class="nav-link {% if request.endpoint == 'bulk_analysis' %}active{% endif %}" href="{{ url_for('bulk_analysis') }}">
                                 <i class="fas fa-robot me-2"></i>
                                 AI Analysis
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('market_brief') }}">
+                            <a class="nav-link {% if request.endpoint == 'market_brief' %}active{% endif %}" href="{{ url_for('market_brief') }}">
                                 <i class="fas fa-newspaper me-2"></i>
                                 Market Brief
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('education') }}">
+                            <a class="nav-link {% if request.endpoint and request.endpoint.startswith('education') %}active{% endif %}" href="{{ url_for('education') }}">
                                 <i class="fas fa-graduation-cap me-2"></i>
                                 Education
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('settings') }}">
+                            <a href="{{ url_for('settings') }}" class="nav-link {% if request.endpoint == 'settings' %}active{% endif %} {% if not current_user.is_authenticated %}disabled{% endif %}" {% if not current_user.is_authenticated %}data-bs-toggle="tooltip" title="Please sign in"{% endif %}>
                                 <i class="fas fa-cog me-2"></i>
                                 Settings
                             </a>
@@ -293,15 +313,18 @@
                     </ul>
                 </div>
             </nav>
+            {% endif %}
             
             <!-- Main content -->
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
+            <main class="{% if hide_sidebar %}col-12{% else %}col-md-9 ms-sm-auto col-lg-10{% endif %} px-md-4 main-content">
                 <!-- Mobile menu button -->
+                {% if not hide_sidebar %}
                 <div class="d-md-none mb-3">
                     <button class="btn btn-outline-secondary" type="button" id="sidebarToggle">
                         <i class="fas fa-bars"></i>
                     </button>
                 </div>
+                {% endif %}
                 
                 <!-- Flash messages -->
                 {% with messages = get_flashed_messages(with_categories=true) %}
@@ -344,4 +367,12 @@
     
     {% block scripts %}{% endblock %}
 </body>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.forEach(function (el) {
+            new bootstrap.Tooltip(el);
+        });
+    });
+</script>
 </html> 

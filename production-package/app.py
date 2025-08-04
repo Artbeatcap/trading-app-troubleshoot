@@ -1466,6 +1466,7 @@ def options_calculator():
         "stock_name": None,
         "calls": None,
         "puts": None,
+        "error_message": None,  # Add error_message field
     }
 
     if request.method == "POST":
@@ -1473,7 +1474,9 @@ def options_calculator():
         expiration_date = request.form.get("expiration_date")
         context["symbol"] = symbol
 
-        if symbol:
+        if not symbol:
+            context["error_message"] = "Please enter a stock symbol."
+        else:
             try:
                 # Get current price from Tradier
                 current_price, description = get_stock_price_tradier(symbol)
@@ -1481,59 +1484,50 @@ def options_calculator():
 
                 if not current_price:
                     print(f"Could not get current price for {symbol} from Tradier")
-                    flash(
-                        f"Error: Could not get current price for {symbol}. Please check your Tradier API token.",
-                        "danger",
-                    )
-                    return render_template(
-                        "tools/options_calculator.html", context=context
-                    )
-
-                context["stock_name"] = stock_name
-                context["current_price"] = current_price
-
-                # Always fetch available expiration dates first
-                expirations = get_expiration_dates_tradier(symbol)
-                if expirations:
-                    context["expiration_dates"] = expirations
-
-                if expiration_date:
-                    # If user selected a date, fetch chain for that date
-                    calls, puts, price, _ = get_options_chain_tradier(
-                        symbol, expiration_date
-                    )
-
-                    if (
-                        calls is not None
-                        and puts is not None
-                        and not calls.empty
-                        and not puts.empty
-                    ):
-                        # Sort by strike to ensure correct ordering
-                        calls_sorted = calls.sort_values("strike")
-                        puts_sorted = puts.sort_values("strike")
-
-                        context["calls"] = calls_sorted.to_dict("records")
-                        context["puts"] = puts_sorted.to_dict("records")
-                        context["selected_date"] = expiration_date
-
-                        # Combine calls and puts so template can iterate safely even if lengths differ
-                        options_rows = []
-                        for c, p in zip_longest(context["calls"], context["puts"]):
-                            options_rows.append({"call": c, "put": p})
-                        context["options_rows"] = options_rows
-                    else:
-                        flash(
-                            "Error: Could not get options data from Tradier. Please check your API token.",
-                            "danger",
-                        )
+                    context["error_message"] = f"Could not get current price for {symbol}. Please check the symbol and try again."
                 else:
-                    # If no date selected yet, don't populate chain
-                    context["selected_date"] = None
+                    context["stock_name"] = stock_name
+                    context["current_price"] = current_price
+
+                    # Always fetch available expiration dates first
+                    expirations = get_expiration_dates_tradier(symbol)
+                    if expirations:
+                        context["expiration_dates"] = expirations
+
+                    # Require user to choose expiration before fetching chain
+                    if context["expiration_dates"] and not expiration_date:
+                        context["error_message"] = "Please select an expiration date before retrieving the options chain."
+                    elif expiration_date:
+                        # If user selected a date, fetch chain for that date
+                        calls, puts, price, _ = get_options_chain_tradier(
+                            symbol, expiration_date
+                        )
+
+                        if (
+                            calls is not None
+                            and puts is not None
+                            and not calls.empty
+                            and not puts.empty
+                        ):
+                            # Sort by strike to ensure correct ordering
+                            calls_sorted = calls.sort_values("strike")
+                            puts_sorted = puts.sort_values("strike")
+
+                            context["calls"] = calls_sorted.to_dict("records")
+                            context["puts"] = puts_sorted.to_dict("records")
+                            context["selected_date"] = expiration_date
+
+                            # Combine calls and puts so template can iterate safely even if lengths differ
+                            options_rows = []
+                            for c, p in zip_longest(context["calls"], context["puts"]):
+                                options_rows.append({"call": c, "put": p})
+                            context["options_rows"] = options_rows
+                        else:
+                            context["error_message"] = f"No options data available for {symbol}. Please check the symbol and try again."
 
             except Exception as e:
                 print(f"Error in options calculator: {e}")
-                flash(f"Error: {str(e)}", "danger")
+                context["error_message"] = f"Error: {str(e)}"
 
     return render_template("tools/options_calculator.html", context=context)
 

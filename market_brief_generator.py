@@ -331,31 +331,14 @@ def send_market_brief_to_subscribers():
         expected_range = calculate_expected_range(stock_prices)
         summary = summarize_news(filtered_headlines, expected_range)
         
-        # Generate email content
-        html_content = generate_email_content(summary, filtered_headlines, expected_range)
+        # Generate email content (just the brief content, not the full email)
+        brief_content = generate_email_content(summary, filtered_headlines, expected_range)
         
-        # Get all subscribers
-        subscribers = MarketBriefSubscriber.query.all()
-        logger.info(f"Sending brief to {len(subscribers)} subscribers")
+        # Use the new email system to send to confirmed subscribers
+        from emails import send_daily_brief_to_subscribers
+        success_count = send_daily_brief_to_subscribers(brief_content)
         
-        # Send to each subscriber
-        from app import mail  # Import here to avoid circular imports
-        
-        success_count = 0
-        for subscriber in subscribers:
-            try:
-                msg = Message(
-                    f"Morning Market Brief - {datetime.now().strftime('%Y-%m-%d')}",
-                    recipients=[subscriber.email],
-                    html=html_content
-                )
-                mail.send(msg)
-                success_count += 1
-                logger.info(f"Sent brief to {subscriber.email}")
-            except Exception as e:
-                logger.error(f"Failed to send to {subscriber.email}: {str(e)}")
-        
-        logger.info(f"Market brief sent successfully to {success_count}/{len(subscribers)} subscribers")
+        logger.info(f"Market brief sent successfully to {success_count} confirmed subscribers")
         return success_count
         
     except Exception as e:

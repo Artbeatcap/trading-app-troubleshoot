@@ -75,11 +75,6 @@
                         <i class="fas fa-chart-line me-2"></i>Advanced
                     </button>
                 </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="resources-tab" data-bs-toggle="tab" data-bs-target="#resources" type="button" role="tab">
-                        <i class="fas fa-external-link-alt me-2"></i>Resources
-                    </button>
-                </li>
             </ul>
         </div>
     </div>
@@ -175,24 +170,7 @@
                         </div>
                     </div>
 
-                    <div class="card">
-                        <div class="card-header">
-                            <h5><i class="fas fa-external-link-alt text-primary me-2"></i>External Resources</h5>
-                        </div>
-                        <div class="card-body">
-                            <div class="list-group list-group-flush">
-                                <a href="https://www.investopedia.com/options-basics-tutorial-4583012" class="list-group-item list-group-item-action" target="_blank">
-                                    <i class="fas fa-book text-primary me-2"></i>Options Basics Tutorial
-                                </a>
-                                <a href="https://www.investopedia.com/options-greeks-4689745" class="list-group-item list-group-item-action" target="_blank">
-                                    <i class="fas fa-calculator text-warning me-2"></i>Understanding the Greeks
-                                </a>
-                                <a href="https://www.cboe.com/learncenter/" class="list-group-item list-group-item-action" target="_blank">
-                                    <i class="fas fa-graduation-cap text-success me-2"></i>CBOE Learning Center
-                                </a>
-                            </div>
-                        </div>
-                    </div>
+
                 </div>
             </div>
         </div>
@@ -258,23 +236,7 @@
                     </div>
                 </div>
 
-                <div class="col-lg-4">
-                    <div class="card">
-                        <div class="card-header">
-                            <h5><i class="fas fa-external-link-alt text-primary me-2"></i>Strategy Resources</h5>
-                        </div>
-                        <div class="card-body">
-                            <div class="list-group list-group-flush">
-                                <a href="https://www.investopedia.com/options-strategies-4689745" class="list-group-item list-group-item-action" target="_blank">
-                                    <i class="fas fa-chess text-success me-2"></i>Options Strategies Guide
-                                </a>
-                                <a href="https://www.cboe.com/strategies/" class="list-group-item list-group-item-action" target="_blank">
-                                    <i class="fas fa-chart-line text-info me-2"></i>CBOE Strategy Hub
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+
             </div>
         </div>
 
@@ -324,10 +286,10 @@
                         </div>
                         <div class="card-body">
                             <div class="list-group list-group-flush">
-                                <a href="https://www.investopedia.com/articles/trading/09/risk-management.htm" class="list-group-item list-group-item-action" target="_blank">
+                                <a href="{{ url_for('education_risk_management') }}" class="list-group-item list-group-item-action">
                                     <i class="fas fa-shield-alt text-warning me-2"></i>Risk Management Guide
                                 </a>
-                                <a href="https://www.investopedia.com/options/position-sizing-options-trading/" class="list-group-item list-group-item-action" target="_blank">
+                                <a href="{{ url_for('education_position_sizing') }}" class="list-group-item list-group-item-action">
                                     <i class="fas fa-balance-scale text-info me-2"></i>Position Sizing for Options
                                 </a>
                             </div>
@@ -346,90 +308,64 @@
                             <h4><i class="fas fa-chart-line text-info me-2"></i>Advanced Options Concepts</h4>
                         </div>
                         <div class="card-body">
-                            <h5>Implied Volatility</h5>
-                            <p>The market's expectation of future volatility, calculated from option prices.</p>
+                            <h4 class="text-xl font-semibold mt-6 mb-2">Implied Volatility (IV)</h4>
+                            <p class="mb-4">Implied Volatility is the market's expectation of future price volatility, derived from current option prices. Unlike historical volatility which looks backward, IV represents the market's forward-looking estimate of how much the underlying asset will move.</p>
                             
-                            <h5>Volatility Skew</h5>
-                            <p>The difference in implied volatility between different strike prices.</p>
+                            <p class="mb-4">IV is calculated by working backwards from the Black-Scholes option pricing model. When you input the current option price, strike price, time to expiration, risk-free rate, and underlying price, the implied volatility is the volatility parameter that makes the model's theoretical price match the actual market price.</p>
                             
-                            <h5>Options Chains</h5>
-                            <p>Understanding how to read and analyze options chains for trading decisions.</p>
+                            <div class="bg-gray-100 rounded p-4 text-sm font-mono mb-4">
+                                <strong>Formula:</strong> σ<sub>imp</sub> is solved from Black-Scholes equation:<br>
+                                C = S<sub>0</sub>N(d<sub>1</sub>) - Ke<sup>-rT</sup>N(d<sub>2</sub>)<br>
+                                where d<sub>1</sub> = [ln(S<sub>0</sub>/K) + (r + σ²/2)T] / (σ√T)<br>
+                                and d<sub>2</sub> = d<sub>1</sub> - σ√T
+                            </div>
                             
-                            <h5>Options Expiration</h5>
-                            <p>Managing positions as expiration approaches and understanding assignment risk.</p>
+                            <p class="mb-4"><strong>Practical Applications:</strong> IV rank and percentile help traders understand whether current volatility is high or low relative to historical levels. During earnings announcements, IV typically increases dramatically (earnings crush), making options more expensive. Traders can choose strategies based on their volatility outlook - long vega strategies profit from IV increases, while short vega strategies benefit from IV decreases.</p>
+
+                            <h4 class="text-xl font-semibold mt-6 mb-2">Volatility Skew / Smile</h4>
+                            <p class="mb-4">Volatility skew describes the pattern where out-of-the-money (OTM) put options trade at higher implied volatility than OTM call options at the same distance from the current stock price. This creates an asymmetric "skew" in the volatility curve when plotted against strike prices.</p>
+                            
+                            <p class="mb-4">The skew exists because investors are willing to pay more for downside protection (puts) than upside speculation (calls). This reflects the market's greater fear of large downward moves than upward moves. The skew is typically steeper for shorter-term options and varies significantly across different asset classes.</p>
+                            
+                            <p class="mb-4"><strong>Trading Implications:</strong> The skew creates opportunities for risk-reversal trades, where traders sell OTM calls and buy OTM puts at the same distance from the money. These trades can be profitable when the skew normalizes. The skew also affects option pricing and strategy selection - deep OTM puts are often overpriced relative to their theoretical value.</p>
+
+                            <h4 class="text-xl font-semibold mt-6 mb-2">Reading Options Chains</h4>
+                            <p class="mb-4">Options chains display all available options for a particular underlying asset, organized by expiration date and strike price. Understanding how to read these chains is crucial for making informed trading decisions.</p>
+                            
+                            <p class="mb-4"><strong>Key Columns:</strong></p>
+                            <ul class="mb-4">
+                                <li><strong>Bid/Ask:</strong> The highest price buyers are willing to pay (bid) and lowest price sellers are willing to accept (ask)</li>
+                                <li><strong>Open Interest:</strong> Number of outstanding contracts, indicating liquidity and market activity</li>
+                                <li><strong>Volume:</strong> Number of contracts traded today, showing current market activity</li>
+                                <li><strong>Delta:</strong> Sensitivity of option price to underlying price changes</li>
+                                <li><strong>Implied Volatility:</strong> Market's expectation of future volatility</li>
+                                <li><strong>Theoretical Value:</strong> Fair value based on pricing models</li>
+                            </ul>
+                            
+                            <p class="mb-4"><strong>Liquidity Assessment:</strong> Look for options with high open interest and volume, tight bid-ask spreads, and regular trading activity. Liquid options are easier to enter and exit without significant slippage. Generally, at-the-money options and those near expiration have the highest liquidity.</p>
+
+                            <h4 class="text-xl font-semibold mt-6 mb-2">Expiration & Assignment Mechanics</h4>
+                            <p class="mb-4">Options expiration occurs at 4:00 PM Eastern Time on the third Friday of the expiration month. For American-style options, the holder can exercise at any time before expiration, while European-style options can only be exercised at expiration.</p>
+                            
+                            <p class="mb-4"><strong>Cash vs. Physical Settlement:</strong> Most equity options are physically settled, meaning the underlying shares are delivered upon exercise. Index options and some ETFs are cash-settled, with cash equal to the intrinsic value being exchanged.</p>
+                            
+                            <p class="mb-4"><strong>Early Assignment Risk:</strong> Short options can be assigned early, particularly when they're deep in-the-money or when the underlying pays a dividend. For calls, early assignment often occurs just before ex-dividend dates when the dividend exceeds the time value remaining in the option.</p>
+                            
+                            <p class="mb-4"><strong>Managing Expiration Risk:</strong> As expiration approaches, gamma risk increases dramatically, making positions highly sensitive to underlying price movements. Traders should consider closing or rolling positions before expiration to avoid last-minute assignment surprises and to capture remaining time value.</p>
+
+                            <h4 class="text-xl font-semibold mt-6 mb-2">Greeks Interplay at Expiry</h4>
+                            <p class="mb-4">In the final week before expiration, the Greeks undergo dramatic changes that significantly impact option pricing and risk management.</p>
+                            
+                            <p class="mb-4"><strong>Gamma Explosion:</strong> Gamma, which measures the rate of change in delta, increases exponentially as expiration approaches. This means that small movements in the underlying asset can cause large changes in option prices and position deltas. At-the-money options experience the most dramatic gamma increases.</p>
+                            
+                            <p class="mb-4"><strong>Theta Acceleration:</strong> Time decay accelerates rapidly in the final days, particularly for at-the-money options. This creates a "gamma-theta trade-off" where the potential for large gains (gamma) comes with the cost of rapid time decay (theta).</p>
+                            
+                            <p class="mb-4"><strong>Practical Adjustments:</strong> Traders often need to adjust positions more frequently as expiration approaches. This might involve rolling positions to later expirations, closing positions to capture remaining value, or hedging with the underlying asset to manage delta risk. The key is balancing the desire to capture gamma profits against the cost of theta decay.</p>
                         </div>
                     </div>
                 </div>
 
-                <div class="col-lg-4">
-                    <div class="card">
-                        <div class="card-header">
-                            <h5><i class="fas fa-external-link-alt text-primary me-2"></i>Advanced Resources</h5>
-                        </div>
-                        <div class="card-body">
-                            <div class="list-group list-group-flush">
-                                <a href="https://www.investopedia.com/implied-volatility-4689745" class="list-group-item list-group-item-action" target="_blank">
-                                    <i class="fas fa-chart-line text-info me-2"></i>Implied Volatility Guide
-                                </a>
-                                <a href="https://www.cboe.com/education/advanced/" class="list-group-item list-group-item-action" target="_blank">
-                                    <i class="fas fa-graduation-cap text-success me-2"></i>Advanced Options Education
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
 
-        <!-- Resources Tab -->
-        <div class="tab-pane fade" id="resources" role="tabpanel">
-            <div class="row">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-header">
-                            <h4><i class="fas fa-external-link-alt text-primary me-2"></i>Additional Learning Resources</h4>
-                        </div>
-                        <div class="card-body">
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <h5><i class="fas fa-book text-primary me-2"></i>Books</h5>
-                                    <ul>
-                                        <li>"Options as a Strategic Investment" by Lawrence G. McMillan</li>
-                                        <li>"The Options Playbook" by Brian Overby</li>
-                                        <li>"Understanding Options" by Michael Sincere</li>
-                                    </ul>
-                                </div>
-                                <div class="col-md-6">
-                                    <h5><i class="fas fa-video text-success me-2"></i>Online Courses</h5>
-                                    <ul>
-                                        <li>CBOE Options Institute</li>
-                                        <li>TD Ameritrade Education</li>
-                                        <li>Investopedia Academy</li>
-                                    </ul>
-                                </div>
-                            </div>
-                            
-                            <div class="row mt-4">
-                                <div class="col-md-6">
-                                    <h5><i class="fas fa-newspaper text-warning me-2"></i>Websites</h5>
-                                    <ul>
-                                        <li><a href="https://www.investopedia.com" target="_blank">Investopedia</a></li>
-                                        <li><a href="https://www.cboe.com" target="_blank">CBOE</a></li>
-                                        <li><a href="https://www.tastytrade.com" target="_blank">TastyTrade</a></li>
-                                    </ul>
-                                </div>
-                                <div class="col-md-6">
-                                    <h5><i class="fas fa-podcast text-info me-2"></i>Podcasts</h5>
-                                    <ul>
-                                        <li>"Options Insider Radio"</li>
-                                        <li>"The Options Playbook"</li>
-                                        <li>"TastyTrade"</li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
     </div>

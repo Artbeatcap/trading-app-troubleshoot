@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Implied Volatility Guide - Options Education{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <h1 class="display-5 mb-3"><i class="fas fa-chart-line text-primary me-2"></i>Implied Volatility Guide</h1>
+                    <p class="lead">Understand market expectations of future movement and how it impacts option prices.</p>
+                    <hr>
+                    <h3>What Is Implied Volatility (IV)?</h3>
+                    <p>IV represents the market's forecast of a stock's annualized volatility derived from option prices.</p>
+                    <h3>Volatility Skew</h3>
+                    <p>Difference in IV across strikes or expirations; often higher IV for OTM puts than calls in equities ("smirk").</p>
+                    <h3>Reading an Option Chain</h3>
+                    <ul>
+                        <li>Compare IV across expirations to spot term structure.</li>
+                        <li>Look for unusually high IV relative to historical IV (IV rank / percentile).</li>
+                    </ul>
+                    <h3>Trading With IV</h3>
+                    <p>When IV is high, option premiums are rich, favoring selling strategies. When IV is low, buying premium is cheaper.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

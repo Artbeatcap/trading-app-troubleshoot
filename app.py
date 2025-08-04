@@ -25,6 +25,7 @@ from forms import (
     QuickTradeForm,
     JournalForm,
     EditTradeForm,
+    SettingsForm,
     UserSettingsForm,
     BulkAnalysisForm,
     ResetPasswordRequestForm,
@@ -47,6 +48,7 @@ import math
 from itertools import zip_longest
 from werkzeug.utils import secure_filename
 from flask_mail import Mail, Message
+from flask_dance.contrib.google import make_google_blueprint, google
 
 # Load environment variables from .env file
 try:
@@ -63,19 +65,10 @@ except Exception as e:
 
 app = Flask(__name__)
 app.config.from_object(Config)
-app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev")
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
-    "DATABASE_URL", "sqlite:///trading_journal.db"
-)
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-# Email configuration
-app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
-app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
-app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS', True)
-app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
-app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
-app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER')
+# Override SERVER_NAME for local development
+if os.environ.get('FLASK_ENV') != 'production':
+    app.config['SERVER_NAME'] = None
 
 mail = Mail(app)
 
@@ -85,6 +78,56 @@ migrate = Migrate(app, db)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
+
+# ───────── Google OAuth Setup ─────────
+GOOGLE_OAUTH_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID")
+GOOGLE_OAUTH_CLIENT_SECRET = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET")
+
+# Add to app config for template access
+app.config['GOOGLE_OAUTH_CLIENT_ID'] = GOOGLE_OAUTH_CLIENT_ID
+
+if GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET:
+    google_bp = make_google_blueprint(
+        client_id=GOOGLE_OAUTH_CLIENT_ID,
+        client_secret=GOOGLE_OAUTH_CLIENT_SECRET,
+        scope=["profile", "email"],
+        redirect_url="/google_login",
+    )
+    app.register_blueprint(google_bp, url_prefix="/login")
+else:
+    print("⚠️  Google OAuth not configured. Set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET env vars.")
+
+# ───────── Google Login Route ─────────
+@app.route("/google_login")
+def google_login():
+    if not google.authorized:
+        return redirect(url_for("google.login"))
+
+    resp = google.get("/oauth2/v2/userinfo")
+    if not resp.ok:
+        flash("Failed to fetch user info from Google.", "danger")
+        return redirect(url_for("login"))
+
+    info = resp.json()
+    email = info.get("email")
+    username = email.split("@")[0] if email else None
+
+    if not email:
+        flash("Google account has no email address", "danger")
+        return redirect(url_for("login"))
+
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        # Auto-create user account
+        user = User(username=username, email=email)
+        # Set a random password
+        user.set_password(secrets.token_urlsafe(16))
+        db.session.add(user)
+        db.session.commit()
+
+    login_user(user)
+    flash("Logged in successfully via Google", "success")
+    return redirect(url_for("dashboard"))
 
 
 @login_manager.user_loader
@@ -117,49 +160,89 @@ def market_brief():
     subscribed = False
 
     if form.validate_on_submit():
-        # Create subscriber record
-        subscriber = MarketBriefSubscriber(
-            name=form.name.data, email=form.email.data.strip().lower()
-        )
-        db.session.add(subscriber)
-        db.session.commit()
-
-        # Notify admin (your inbox)
-        admin_email = app.config.get("MAIL_DEFAULT_SENDER")
-        if admin_email:
-            try:
-                msg = Message(
-                    "New Market Brief Subscriber",
-                    recipients=[admin_email],
-                )
-                msg.body = f"Name: {subscriber.name}\nEmail: {subscriber.email}"
-                mail.send(msg)
-            except Exception as e:
-                print(f"Error sending admin notification: {e}")
-
-        # Send welcome message to subscriber
-        try:
-            welcome = Message(
-                "Welcome to the Morning Market Brief",
-                recipients=[subscriber.email],
+        name = form.name.data.strip()
+        email = form.email.data.strip().lower()
+        
+        # Check if already subscribed
+        existing_subscriber = MarketBriefSubscriber.query.filter_by(email=email).first()
+        
+        if existing_subscriber:
+            if existing_subscriber.confirmed:
+                flash('You\'re already subscribed and confirmed! Check your inbox for the latest brief.', 'info')
+            else:
+                # Resend confirmation email
+                from emails import send_confirmation_email
+                if send_confirmation_email(existing_subscriber):
+                    flash('Confirmation email resent! Please check your inbox and click the confirmation link.', 'info')
+                else:
+                    flash('Error sending confirmation email. Please try again or contact support.', 'danger')
+        else:
+            # Create new subscriber
+            subscriber = MarketBriefSubscriber(
+                name=name, 
+                email=email,
+                confirmed=False
             )
-            welcome.body = (
-                "Thanks for subscribing! You'll receive your first brief soon."
-            )
-            mail.send(welcome)
-        except Exception as e:
-            print(f"Error sending welcome email: {e}")
+            db.session.add(subscriber)
+            db.session.commit()
 
-        flash("Thanks for subscribing! Check your inbox for a welcome email.", "success")
-        subscribed = True
+            # Send confirmation email
+            from emails import send_confirmation_email, send_admin_notification
+            if send_confirmation_email(subscriber):
+                send_admin_notification(subscriber)  # Notify admin
+                flash('Check your email to confirm your subscription!', 'success')
+            else:
+                flash('Error sending confirmation email. Please try again.', 'danger')
 
     return render_template("market_brief.html", form=form, subscribed=subscribed)
 
+
+@app.route("/confirm/<token>")
+def confirm_subscription(token):
+    """Confirm newsletter subscription with token"""
+    subscriber = MarketBriefSubscriber.query.filter_by(token=token).first()
+    
+    if not subscriber:
+        flash('Invalid or expired confirmation link.', 'danger')
+        return redirect(url_for('market_brief'))
+    
+    if subscriber.confirmed:
+        # Already confirmed - show success page anyway
+        return render_template('brief_confirmed.html', name=subscriber.name)
+    else:
+        subscriber.confirm_subscription()
+        db.session.commit()
+        
+        # Send welcome email
+        from emails import send_welcome_email
+        send_welcome_email(subscriber)
+        
+        # Render success page instead of redirecting
+        return render_template('brief_confirmed.html', name=subscriber.name)
+
+@app.route("/unsubscribe/<email>")
+def unsubscribe(email):
+    """Unsubscribe from newsletter"""
+    subscriber = MarketBriefSubscriber.query.filter_by(email=email).first()
+    
+    if subscriber:
+        subscriber.unsubscribe()
+        db.session.commit()
+        flash('You have been unsubscribed from the Morning Market Brief.', 'info')
+    else:
+        flash('Email not found in our subscriber list.', 'warning')
+    
+    return redirect(url_for('market_brief'))
 
 @app.route("/admin/send_brief", methods=["POST"])
 @login_required
 def send_brief():
     """Admin route to manually trigger market brief sending"""
+    # Add admin check
+    if current_user.email != 'support@optionsplunge.com':
+        flash("Access denied. Admin privileges required.", "danger")
+        return redirect(url_for("market_brief"))
+    
     try:
         from market_brief_generator import send_market_brief_to_subscribers
         success_count = send_market_brief_to_subscribers()
@@ -512,7 +595,7 @@ def save_uploaded_file(file, prefix="chart"):
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", hide_sidebar=True)
 
 
 @app.route("/home")
@@ -540,7 +623,7 @@ def login():
             return redirect(next_page or url_for("index"))
         flash("Invalid username or password", "danger")
 
-    return render_template("login.html", form=form)
+    return render_template("login.html", form=form, hide_sidebar=True)
 
 
 @app.route("/register", methods=["GET", "POST"])
@@ -563,7 +646,7 @@ def register():
             
         return redirect(url_for("dashboard"))
 
-    return render_template("register.html", form=form)
+    return render_template("register.html", form=form, hide_sidebar=True)
 
 
 @app.route("/logout")
@@ -1311,26 +1394,45 @@ def create_analytics_charts(df):
 @app.route("/settings", methods=["GET", "POST"])
 @login_required
 def settings():
+    # Get or create user settings
     user_settings = current_user.settings
     if not user_settings:
         user_settings = UserSettings(user_id=current_user.id)
         db.session.add(user_settings)
         db.session.commit()
 
-    form = UserSettingsForm(obj=user_settings)
+    # Create form with current user data
+    form = SettingsForm(obj=current_user)
+    
+    # Pre-populate user settings fields
+    if user_settings:
+        form.auto_analyze_trades.data = user_settings.auto_analyze_trades
+        form.analysis_detail_level.data = user_settings.analysis_detail_level
+        form.max_daily_loss.data = user_settings.max_daily_loss
+        form.max_position_size.data = user_settings.max_position_size
+        form.trades_per_page.data = user_settings.trades_per_page
 
     if form.validate_on_submit():
-        form.populate_obj(user_settings)
+        # Update current_user fields from the form
+        current_user.display_name = form.display_name.data
+        current_user.dark_mode = form.dark_mode.data
+        current_user.daily_brief_email = form.daily_brief_email.data
+        current_user.timezone = form.timezone.data
+        current_user.api_key = form.api_key.data
+        current_user.account_size = form.account_size.data
+        current_user.default_risk_percent = form.default_risk_percent.data
 
-        # Also update user account size if provided
-        if form.account_size.data:
-            current_user.account_size = form.account_size.data
-        if form.default_risk_percent.data:
-            current_user.default_risk_percent = form.default_risk_percent.data
+        # Update user settings
+        if user_settings:
+            user_settings.auto_analyze_trades = form.auto_analyze_trades.data
+            user_settings.analysis_detail_level = form.analysis_detail_level.data
+            user_settings.max_daily_loss = form.max_daily_loss.data
+            user_settings.max_position_size = form.max_position_size.data
+            user_settings.trades_per_page = form.trades_per_page.data
 
         db.session.commit()
-        flash("Settings updated successfully!", "success")
-        return redirect(url_for("settings"))
+        flash('Settings updated successfully!', 'success')
+        return redirect(url_for('settings'))
 
     return render_template("settings.html", form=form)
 
@@ -1541,6 +1643,7 @@ def options_calculator():
         "stock_name": None,
         "calls": None,
         "puts": None,
+        "error_message": None,  # Add error_message field
     }
 
     if request.method == "POST":
@@ -1548,7 +1651,9 @@ def options_calculator():
         expiration_date = request.form.get("expiration_date")
         context["symbol"] = symbol
 
-        if symbol:
+        if not symbol:
+            context["error_message"] = "Please enter a stock symbol."
+        else:
             try:
                 # Get current price from Tradier
                 current_price, description = get_stock_price_tradier(symbol)
@@ -1556,59 +1661,50 @@ def options_calculator():
 
                 if not current_price:
                     print(f"Could not get current price for {symbol} from Tradier")
-                    flash(
-                        f"Error: Could not get current price for {symbol}. Please check your Tradier API token.",
-                        "danger",
-                    )
-                    return render_template(
-                        "tools/options_calculator.html", context=context
-                    )
-
-                context["stock_name"] = stock_name
-                context["current_price"] = current_price
-
-                # Always fetch available expiration dates first
-                expirations = get_expiration_dates_tradier(symbol)
-                if expirations:
-                    context["expiration_dates"] = expirations
-
-                if expiration_date:
-                    # If user selected a date, fetch chain for that date
-                    calls, puts, price, _ = get_options_chain_tradier(
-                        symbol, expiration_date
-                    )
-
-                    if (
-                        calls is not None
-                        and puts is not None
-                        and not calls.empty
-                        and not puts.empty
-                    ):
-                        # Sort by strike to ensure correct ordering
-                        calls_sorted = calls.sort_values("strike")
-                        puts_sorted = puts.sort_values("strike")
-
-                        context["calls"] = calls_sorted.to_dict("records")
-                        context["puts"] = puts_sorted.to_dict("records")
-                        context["selected_date"] = expiration_date
-
-                        # Combine calls and puts so template can iterate safely even if lengths differ
-                        options_rows = []
-                        for c, p in zip_longest(context["calls"], context["puts"]):
-                            options_rows.append({"call": c, "put": p})
-                        context["options_rows"] = options_rows
-                    else:
-                        flash(
-                            "Error: Could not get options data from Tradier. Please check your API token.",
-                            "danger",
-                        )
+                    context["error_message"] = f"Could not get current price for {symbol}. Please check the symbol and try again."
                 else:
-                    # If no date selected yet, don't populate chain
-                    context["selected_date"] = None
+                    context["stock_name"] = stock_name
+                    context["current_price"] = current_price
+
+                    # Always fetch available expiration dates first
+                    expirations = get_expiration_dates_tradier(symbol)
+                    if expirations:
+                        context["expiration_dates"] = expirations
+
+                    # Require user to choose expiration before fetching chain
+                    if context["expiration_dates"] and not expiration_date:
+                        context["error_message"] = "Please select an expiration date before retrieving the options chain."
+                    elif expiration_date:
+                        # If user selected a date, fetch chain for that date
+                        calls, puts, price, _ = get_options_chain_tradier(
+                            symbol, expiration_date
+                        )
+
+                        if (
+                            calls is not None
+                            and puts is not None
+                            and not calls.empty
+                            and not puts.empty
+                        ):
+                            # Sort by strike to ensure correct ordering
+                            calls_sorted = calls.sort_values("strike")
+                            puts_sorted = puts.sort_values("strike")
+
+                            context["calls"] = calls_sorted.to_dict("records")
+                            context["puts"] = puts_sorted.to_dict("records")
+                            context["selected_date"] = expiration_date
+
+                            # Combine calls and puts so template can iterate safely even if lengths differ
+                            options_rows = []
+                            for c, p in zip_longest(context["calls"], context["puts"]):
+                                options_rows.append({"call": c, "put": p})
+                            context["options_rows"] = options_rows
+                        else:
+                            context["error_message"] = f"No options data available for {symbol}. Please check the symbol and try again."
 
             except Exception as e:
                 print(f"Error in options calculator: {e}")
-                flash(f"Error: {str(e)}", "danger")
+                context["error_message"] = f"Error: {str(e)}"
 
     return render_template("tools/options_calculator.html", context=context)
 
@@ -1973,7 +2069,7 @@ def reset_password_request():
             send_password_reset_email(user)
         flash("If an account exists with that email, you will receive password reset instructions.", "info")
         return redirect(url_for("login"))
-    return render_template("reset_password_request.html", form=form)
+    return render_template("reset_password_request.html", form=form, hide_sidebar=True)
 
 @app.route("/reset_password/<token>", methods=["GET", "POST"])
 def reset_password(token):
@@ -1994,7 +2090,7 @@ def reset_password(token):
         flash("Your password has been reset.", "success")
         return redirect(url_for("login"))
     
-    return render_template("reset_password.html", form=form)
+    return render_template("reset_password.html", form=form, hide_sidebar=True)
 
 
 # Error handlers
@@ -2008,6 +2104,37 @@ def internal_error(error):
     db.session.rollback()
     return render_template("500.html"), 500
 
+
+# ───────── In-House Education Routes ─────────
+@app.route("/education/greeks")
+def education_greeks():
+    """Understanding the Greeks page"""
+    return render_template("education/greeks.html")
+
+@app.route("/education/strategies")
+def education_strategies():
+    """Options Strategies Guide page"""
+    return render_template("education/strategies.html")
+
+@app.route("/education/risk-management")
+def education_risk_management():
+    """Risk Management Guide page"""
+    return render_template("education/risk_management.html")
+
+@app.route("/education/position-sizing")
+def education_position_sizing():
+    """Position Sizing for Options page"""
+    return render_template("education/position_sizing.html")
+
+@app.route("/education/implied-volatility")
+def education_implied_volatility():
+    """Implied Volatility Guide page"""
+    return render_template("education/implied_volatility.html")
+
+@app.route("/education/advanced-options")
+def education_advanced_options():
+    """Advanced Options Education page"""
+    return render_template("education/advanced_options.html")
 
 if __name__ == "__main__":
     app.run(debug=True)

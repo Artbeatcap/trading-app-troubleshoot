@@ -49,6 +49,15 @@
                         <div class="d-grid">
                             {{ form.submit(class="btn btn-primary btn-lg") }}
                         </div>
+
+                        <!-- Google Login Button -->
+                        {% if config.get('GOOGLE_OAUTH_CLIENT_ID') %}
+                        <div class="text-center my-3">
+                            <a href="{{ url_for('google.login') }}" class="btn btn-outline-danger w-100">
+                                <i class="fab fa-google me-2"></i>Sign in with Google
+                            </a>
+                        </div>
+                        {% endif %}
                     </form>
                     
                     <div class="text-center mt-4">

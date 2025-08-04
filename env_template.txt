@@ -1,7 +1,5 @@
-# Example environment variables
-
 # Flask Configuration
-SECRET_KEY=your-secret-key-here
+SECRET_KEY=your-secret-key-here-change-this
 FLASK_ENV=development
 
 # Database (PostgreSQL recommended for production)
@@ -14,8 +12,9 @@ OPENAI_API_KEY=your-openai-api-key
 TRADIER_API_TOKEN=your-tradier-token
 
 # Google OAuth Configuration
-GOOGLE_OAUTH_CLIENT_ID=your-google-client-id
-GOOGLE_OAUTH_CLIENT_SECRET=your-google-client-secret
+# Get these from: https://console.cloud.google.com/apis/credentials
+GOOGLE_OAUTH_CLIENT_ID=your-google-client-id-here
+GOOGLE_OAUTH_CLIENT_SECRET=your-google-client-secret-here
 
 # Email Configuration (optional)
 MAIL_SERVER=smtp.gmail.com
@@ -31,3 +30,9 @@ MAIL_DEFAULT_SENDER_EMAIL=support@optionsplunge.com
 UPLOAD_FOLDER=static/uploads
 MAX_CONTENT_LENGTH=16777216  # 16MB
 ALLOWED_EXTENSIONS=png,jpg,jpeg,gif,pdf
+
+# URL Configuration (for email links)
+# For production: SERVER_NAME=optionsplunge.com
+# For development: leave SERVER_NAME unset to allow all hosts
+SERVER_NAME=
+PREFERRED_URL_SCHEME=https 
