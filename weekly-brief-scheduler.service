@@ -1,0 +1,21 @@
+[Unit]
+Description=Options Plunge Weekly Market Brief Scheduler
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/srv/optionsplunge
+Environment=PATH=/srv/optionsplunge/venv/bin
+Environment=DATABASE_URL=postgresql://optionsplunge:password@localhost/optionsplunge
+Environment=SENDGRID_API_KEY=your_sendgrid_key_here
+Environment=EMAIL_FROM_NAME=Options Plunge
+Environment=EMAIL_FROM=support@optionsplunge.com
+Environment=WEEKLY_BRIEF_SOURCE=/srv/optionsplunge/weekly_brief_sample.json
+ExecStart=/srv/optionsplunge/venv/bin/python /srv/optionsplunge/weekly_brief_scheduler.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

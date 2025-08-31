@@ -1,0 +1,14 @@
+
+#GOOGLE OAuth
+GOOGLE_OAUTH_CLIENT_ID=1099314625362-iirbr59gmf1tp5aen4j2h0k21aorh5lh.apps.googleusercontent.com
+GOOGLE_OAUTH_CLIENT_SECRET=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
+
+# Admin Configuration
+ADMIN_EMAIL=support@optionsplunge.com
+
+# URL Configuration (for email links)
+SERVER_NAME=optionsplunge.com
+PREFERRED_URL_SCHEME=https
+
+# News API (for market brief content)
+FINNHUB_TOKEN=D1irrf1r01qhbuvrtc2gd1irrf1r01qhbuvrtc30

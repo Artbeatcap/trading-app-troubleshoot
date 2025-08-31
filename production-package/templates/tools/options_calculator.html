@@ -153,6 +153,7 @@ body {
 {% endblock %}
 
 {% block content %}
+{% include "_pro_upsell.html" %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2">
         <i class="fas fa-chart-line text-primary me-2"></i>
@@ -193,14 +194,23 @@ body {
         </h5>
     </div>
     <div class="card-body">
-        <form method="POST" class="row g-3">
+        <form method="POST" class="row g-3" {% if show_demo_data %}disabled{% endif %}>
+            {% if show_demo_data %}
+            <div class="col-12">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Demo Mode:</strong> This form is disabled in preview mode. Upgrade to Pro to search for real-time options data.
+                </div>
+            </div>
+            {% endif %}
             <div class="col-md-6">
                 <label for="symbol" class="form-label">Stock Symbol</label>
                 <div class="input-group symbol-input-container">
                     <input type="text" class="form-control" id="symbol-input" name="symbol" 
                            value="{{ context.symbol if context.symbol else '' }}" 
-                           placeholder="Enter stock symbol (e.g., AAPL)" required autocomplete="off">
-                    <button type="submit" class="btn btn-primary">
+                           placeholder="Enter stock symbol (e.g., AAPL)" required autocomplete="off"
+                           {% if show_demo_data %}disabled{% endif %}>
+                    <button type="submit" class="btn btn-primary" {% if show_demo_data %}disabled{% endif %}>
                         <i class="fas fa-search me-1"></i>
                         {% if context.expiration_dates %}
                             Get Options Chain
@@ -213,7 +223,7 @@ body {
             {% if context.expiration_dates %}
             <div class="col-md-6">
                 <label for="expiration_date" class="form-label">Expiration Date</label>
-                <select class="form-select" id="expiration_date" name="expiration_date">
+                <select class="form-select" id="expiration_date" name="expiration_date" {% if show_demo_data %}disabled{% endif %}>
                     {% for date in context.expiration_dates %}
                     <option value="{{ date }}" {% if date == context.selected_date %}selected{% endif %}>
                         {{ date }}
@@ -262,6 +272,9 @@ body {
         <h5 class="mb-0">
             <i class="fas fa-table me-2"></i>
             Options Chain
+            {% if show_demo_data %}
+            <span class="badge bg-warning text-dark ms-2">Demo Data</span>
+            {% endif %}
         </h5>
     </div>
     <div class="card-body">

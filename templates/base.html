@@ -2,8 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>{% block title %}Options Plunge - AI Trading Analysis{% endblock %}</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32x32.png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon-16x16.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
     
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -27,6 +33,9 @@
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: #f8f9fa;
+            /* Prevent horizontal scrolling on mobile */
+            overflow-x: hidden;
+            width: 100%;
         }
         
         .navbar-brand {
@@ -38,6 +47,138 @@
             min-height: 100vh;
             background: linear-gradient(135deg, var(--primary-color) 0%, var(--dark-color) 100%);
             padding-top: 20px;
+        }
+        
+        /* Mobile sidebar behavior */
+        @media (max-width: 767.98px) {
+            .sidebar {
+                position: fixed;
+                top: 0;
+                left: -100%;
+                z-index: 1050;
+                width: 280px;
+                transition: left 0.3s ease;
+                height: 100vh;
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+                scrollbar-width: thin; /* Firefox */
+                scrollbar-color: rgba(255, 255, 255, 0.3) transparent; /* Firefox */
+                /* Ensure sidebar is hidden by default */
+                transform: translateX(-100%);
+            }
+            
+            /* Custom scrollbar for webkit browsers */
+            .sidebar::-webkit-scrollbar {
+                width: 4px;
+            }
+            
+            .sidebar::-webkit-scrollbar-track {
+                background: transparent;
+            }
+            
+            .sidebar::-webkit-scrollbar-thumb {
+                background: rgba(255, 255, 255, 0.3);
+                border-radius: 2px;
+            }
+            
+            .sidebar::-webkit-scrollbar-thumb:hover {
+                background: rgba(255, 255, 255, 0.5);
+            }
+            
+            .sidebar.show {
+                left: 0;
+                transform: translateX(0);
+            }
+            
+            /* Improved sidebar structure for better scrolling */
+            .sidebar .position-sticky {
+                height: 100vh;
+                display: flex;
+                flex-direction: column;
+            }
+            
+            .sidebar .sidebar-header {
+                flex-shrink: 0;
+                background: linear-gradient(135deg, var(--primary-color) 0%, var(--dark-color) 100%);
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                padding-top: 60px; /* Space for close button */
+                position: relative;
+            }
+            
+            .sidebar .sidebar-content {
+                flex: 1;
+                overflow-y: auto;
+                padding-top: 10px;
+                padding-bottom: 20px;
+                -webkit-overflow-scrolling: touch;
+            }
+            
+            .sidebar-content .nav {
+                padding-bottom: 20px;
+            }
+            
+            .sidebar-backdrop {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                z-index: 1040;
+                display: none;
+            }
+            
+            .sidebar-backdrop.show {
+                display: block;
+            }
+            
+            /* Force mobile layout */
+            .main-content {
+                margin-left: 0 !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                padding: 15px !important;
+                padding-top: 80px !important;
+            }
+            
+            /* Ensure proper mobile viewport */
+            html, body {
+                width: 100% !important;
+                max-width: 100% !important;
+                overflow-x: hidden !important;
+                position: relative;
+            }
+        }
+        
+        /* Desktop sidebar behavior */
+        @media (min-width: 768px) {
+            .sidebar {
+                position: relative;
+                left: 0 !important;
+            }
+            
+            .sidebar-backdrop {
+                display: none !important;
+            }
+        }
+        
+        /* Mobile menu button styling */
+        .mobile-menu-btn {
+            position: fixed;
+            top: 15px;
+            left: 15px;
+            z-index: 1060;
+            background: var(--primary-color);
+            border: none;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 5px;
+            font-size: 1.2rem;
+        }
+        
+        .mobile-menu-btn:hover {
+            background: var(--dark-color);
+            color: white;
         }
         
         .sidebar .nav-link {
@@ -168,15 +309,74 @@
             font-weight: 500;
         }
         
+        /* Custom Google Login Button Styling */
+        .btn-google {
+            background-color: white;
+            color: #333;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-google:hover {
+            background-color: #f8f9fa;
+            color: #000;
+            border-color: #ccc;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        .btn-google:active {
+            background-color: #e9ecef;
+            transform: translateY(0);
+        }
+        
+        /* Divider Styling */
+        .divider {
+            position: relative;
+            text-align: center;
+            margin: 20px 0;
+            display: flex;
+            align-items: center;
+        }
+        
+        .divider::before,
+        .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background-color: #dee2e6;
+        }
+        
+        .divider-text {
+            padding: 0 15px;
+            color: #6c757d;
+            font-size: 14px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+        
         @media (max-width: 768px) {
+            /* Force mobile viewport */
+            html, body {
+                width: 100% !important;
+                max-width: 100% !important;
+                overflow-x: hidden !important;
+                position: relative;
+            }
+            
             .sidebar {
                 position: fixed;
                 top: 0;
-                left: -250px;
-                width: 250px;
+                left: -280px;
+                width: 280px;
                 height: 100vh;
-                z-index: 1000;
+                z-index: 1050;
                 transition: left 0.3s ease;
+                box-shadow: 2px 0 10px rgba(0, 0, 0, 0.3);
             }
             
             .sidebar.show {
@@ -185,8 +385,208 @@
             
             .main-content {
                 margin-left: 0;
+                width: 100%;
+                padding: 15px;
+                padding-top: 80px;
+            }
+            
+            /* Mobile menu button styling */
+            .mobile-menu-btn {
+                position: fixed;
+                top: 15px;
+                left: 15px;
+                z-index: 1060;
+                background: linear-gradient(135deg, var(--secondary-color), var(--info-color));
+                border: none;
+                border-radius: 50%;
+                width: 50px;
+                height: 50px;
+                color: white;
+                font-size: 1.2rem;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+                transition: all 0.3s ease;
+            }
+            
+            .mobile-menu-btn:hover {
+                transform: scale(1.1);
+                box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+            }
+            
+            /* Sidebar backdrop */
+            .sidebar-backdrop {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(0, 0, 0, 0.5);
+                z-index: 1040;
+                opacity: 0;
+                visibility: hidden;
+                transition: all 0.3s ease;
+            }
+            
+            .sidebar-backdrop.show {
+                opacity: 1;
+                visibility: visible;
+            }
+            
+            /* Adjust main content when sidebar is open */
+            .main-content.sidebar-open {
+                transform: translateX(280px);
+                transition: transform 0.3s ease;
+            }
+            
+            /* Mobile-specific sidebar styling */
+            .sidebar .nav-link {
+                padding: 15px 20px;
+                margin: 2px 10px;
+                font-size: 1rem;
+                border-radius: 10px;
+            }
+            
+            .sidebar .nav-link i {
+                width: 20px;
+                text-align: center;
+            }
+            
+            /* Close button for sidebar */
+            .sidebar-close {
+                position: absolute;
+                top: 15px;
+                right: 15px;
+                background: rgba(255, 255, 255, 0.2);
+                border: none;
+                border-radius: 50%;
+                width: 35px;
+                height: 35px;
+                color: white;
+                font-size: 1rem;
+                transition: all 0.3s ease;
+                z-index: 1060;
+            }
+            
+            .sidebar-close:hover {
+                background: rgba(255, 255, 255, 0.3);
+                transform: scale(1.1);
+            }
+            
+            /* Make cards more mobile-friendly */
+            .card {
+                margin-bottom: 20px;
+            }
+            
+            .card-body {
+                padding: 15px;
+            }
+            
+            /* Improve table responsiveness */
+            .table-responsive {
+                font-size: 0.9rem;
+            }
+            
+            /* Better button sizing on mobile */
+            .btn {
+                padding: 10px 20px;
+                font-size: 1rem;
+            }
+            
+            /* Improve form controls on mobile */
+            .form-control {
+                font-size: 16px; /* Prevents zoom on iOS */
+                padding: 12px 15px;
+            }
+            
+            /* Better mobile navigation */
+            .sidebar .nav-link {
+                min-height: 50px;
+                display: flex;
+                align-items: center;
+            }
+            
+            /* Improve mobile table display */
+            .table {
+                font-size: 0.85rem;
+            }
+            
+            .table td, .table th {
+                padding: 8px 4px;
+            }
+            
+            /* Better mobile card spacing */
+            .row > [class*="col-"] {
+                margin-bottom: 15px;
+            }
+            
+            /* Improve mobile button groups */
+            .btn-group .btn {
+                padding: 8px 12px;
+                font-size: 0.9rem;
+            }
+            
+            /* Better mobile modal handling */
+            .modal-dialog {
+                margin: 10px;
+            }
+            
+            /* Improve mobile dropdown menus */
+            .dropdown-menu {
+                font-size: 0.9rem;
+            }
+            
+            /* Better mobile form spacing */
+            .form-group {
+                margin-bottom: 15px;
+            }
+            
+            /* Improve mobile text sizing */
+            h1 { font-size: 1.8rem; }
+            h2 { font-size: 1.5rem; }
+            h3 { font-size: 1.3rem; }
+            h4 { font-size: 1.1rem; }
+            h5 { font-size: 1rem; }
+            h6 { font-size: 0.9rem; }
+            
+            /* Fix for OAuth redirect issues on mobile */
+            .oauth-redirect-fix {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: #f8f9fa;
+                z-index: 9999;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                opacity: 0;
+                visibility: hidden;
+                transition: all 0.3s ease;
+            }
+            
+            .oauth-redirect-fix.show {
+                opacity: 1;
+                visibility: visible;
             }
         }
+        /* Dark mode overrides */
+        body.dark-mode {
+            background-color: #121212;
+            color: #e0e0e0;
+        }
+        body.dark-mode .card,
+        body.dark-mode .modal-content,
+        body.dark-mode .navbar,
+        body.dark-mode .dropdown-menu {
+            background-color: #1e1e1e;
+            color: #e0e0e0;
+        }
+        body.dark-mode .sidebar {
+            background: linear-gradient(135deg, #1e1e1e 0%, #000000 100%);
+        }
+        body.dark-mode a { color: #58a6ff; }
+        body.dark-mode .btn-primary { background-color: #2563eb; border-color: #2563eb; }
+        body.dark-mode .btn-outline-secondary { color: #e0e0e0; border-color: #e0e0e0; }
     </style>
     
     {% block head %}
@@ -210,14 +610,31 @@
     {% endif %}
     {% endblock %}
 </head>
-<body>
+<body{% if current_user.is_authenticated and current_user.dark_mode %} class="dark-mode"{% endif %}{% if current_user.is_authenticated %} data-user-authenticated="true"{% endif %}>
+    <!-- OAuth redirect fix overlay for mobile -->
+    <div class="oauth-redirect-fix" id="oauthRedirectFix">
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-3">Completing login...</p>
+            <p class="mt-2 text-muted small">Click to dismiss if stuck</p>
+        </div>
+    </div>
+
     <div class="container-fluid">
         <div class="row">
             <!-- Sidebar -->
             {% if not hide_sidebar %}
-            <nav class="col-md-3 col-lg-2 d-md-block sidebar collapse {% if current_user.is_authenticated or show_logged_in %}show{% endif %}">
+            <nav class="col-md-3 col-lg-2 d-md-block sidebar">
                 <div class="position-sticky">
-                    <div class="text-center py-3">
+                    <!-- Mobile close button -->
+                    <button class="sidebar-close d-md-none" type="button" id="sidebarClose">
+                        <i class="fas fa-times"></i>
+                    </button>
+                    
+                    <!-- Header section - fixed at top -->
+                    <div class="sidebar-header text-center py-3">
                         <a href="{{ url_for('index') }}" class="text-decoration-none brand-link">
                             <h5 class="text-white mb-0">
                                 <i class="fas fa-chart-line me-2"></i>
@@ -228,17 +645,14 @@
                         <small class="text-light">Welcome, {{ current_user.username if current_user.is_authenticated else 'Guest' }}</small>
                     </div>
                     
+                    <!-- Scrollable navigation content -->
+                    <div class="sidebar-content">
+                    
                     <ul class="nav flex-column">
                         <li class="nav-item">
                             <a class="nav-link {% if request.endpoint in ['dashboard'] %}active{% endif %}" href="{{ url_for('dashboard') }}">
                                 <i class="fas fa-tachometer-alt me-2"></i>
                                 Dashboard
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.endpoint in ['options_calculator'] %}active{% endif %}" href="{{ url_for('options_calculator') }}">
-                                <i class="fas fa-calculator me-2"></i>
-                                Options Calculator
                             </a>
                         </li>
                         <li class="nav-item">
@@ -269,12 +683,27 @@
                             <a class="nav-link {% if request.endpoint == 'bulk_analysis' %}active{% endif %}" href="{{ url_for('bulk_analysis') }}">
                                 <i class="fas fa-robot me-2"></i>
                                 AI Analysis
+                                {% if not current_user.is_authenticated or not current_user.has_pro_access() %}
+                                <i class="fas fa-lock text-warning ms-1" style="font-size: 0.8em;"></i>
+                                {% endif %}
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link {% if request.endpoint == 'market_brief' %}active{% endif %}" href="{{ url_for('market_brief') }}">
                                 <i class="fas fa-newspaper me-2"></i>
                                 Market Brief
+                                {% if not current_user.is_authenticated or not current_user.has_pro_access() %}
+                                <i class="fas fa-lock text-warning ms-1" style="font-size: 0.8em;"></i>
+                                {% endif %}
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'options_calculator' %}active{% endif %}" href="{{ url_for('options_calculator') }}">
+                                <i class="fas fa-calculator me-2"></i>
+                                Options Calculator
+                                {% if not current_user.is_authenticated or not current_user.has_pro_access() %}
+                                <i class="fas fa-lock text-warning ms-1" style="font-size: 0.8em;"></i>
+                                {% endif %}
                             </a>
                         </li>
                         <li class="nav-item">
@@ -287,6 +716,12 @@
                             <a href="{{ url_for('settings') }}" class="nav-link {% if request.endpoint == 'settings' %}active{% endif %} {% if not current_user.is_authenticated %}disabled{% endif %}" {% if not current_user.is_authenticated %}data-bs-toggle="tooltip" title="Please sign in"{% endif %}>
                                 <i class="fas fa-cog me-2"></i>
                                 Settings
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'pricing' %}active{% endif %}" href="{{ url_for('pricing') }}">
+                                <i class="fas fa-crown me-2"></i>
+                                Pricing
                             </a>
                         </li>
                         {% if current_user.is_authenticated %}
@@ -311,19 +746,25 @@
                         </li>
                         {% endif %}
                     </ul>
+                    </div>
                 </div>
             </nav>
             {% endif %}
+            
+            <!-- Sidebar backdrop for mobile -->
+            {% if not hide_sidebar %}
+            <div class="sidebar-backdrop d-md-none" id="sidebarBackdrop"></div>
+            {% endif %}
+            
+
             
             <!-- Main content -->
             <main class="{% if hide_sidebar %}col-12{% else %}col-md-9 ms-sm-auto col-lg-10{% endif %} px-md-4 main-content">
                 <!-- Mobile menu button -->
                 {% if not hide_sidebar %}
-                <div class="d-md-none mb-3">
-                    <button class="btn btn-outline-secondary" type="button" id="sidebarToggle">
-                        <i class="fas fa-bars"></i>
-                    </button>
-                </div>
+                <button class="mobile-menu-btn d-md-none" type="button" id="sidebarToggle">
+                    <i class="fas fa-bars"></i>
+                </button>
                 {% endif %}
                 
                 <!-- Flash messages -->
@@ -342,22 +783,403 @@
                 {% block content %}{% endblock %}
             </main>
         </div>
+        
+        <!-- Footer -->
+        <footer class="bg-light border-top mt-5 py-4">
+            <div class="container">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p class="mb-0 text-muted">&copy; 2025 Options Plunge. All rights reserved.</p>
+                    </div>
+                    <div class="col-md-6 text-md-end">
+                        <a href="{{ url_for('privacy') }}" class="text-muted text-decoration-none me-3">Privacy Policy</a>
+                        <a href="mailto:support@optionsplunge.com" class="text-muted text-decoration-none">Contact</a>
+                    </div>
+                </div>
+            </div>
+        </footer>
     </div>
     
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     
     <script>
-        // Mobile sidebar toggle
-        document.getElementById('sidebarToggle')?.addEventListener('click', function() {
-            document.querySelector('.sidebar').classList.toggle('show');
+        // Enhanced mobile functionality with OAuth redirect handling
+        document.addEventListener('DOMContentLoaded', function() {
+            const sidebar = document.querySelector('.sidebar');
+            const sidebarToggle = document.getElementById('sidebarToggle');
+            const sidebarClose = document.getElementById('sidebarClose');
+            const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+            const mainContent = document.querySelector('.main-content');
+            const oauthRedirectFix = document.getElementById('oauthRedirectFix');
+            
+            // Ensure sidebar is hidden on page load (mobile only)
+            if (window.innerWidth <= 768) {
+                if (sidebar) {
+                    sidebar.classList.remove('show');
+                }
+                if (sidebarBackdrop) {
+                    sidebarBackdrop.classList.remove('show');
+                }
+                if (mainContent) {
+                    mainContent.classList.remove('sidebar-open');
+                }
+                document.body.style.overflow = '';
+            }
+            
+            // Function to open sidebar
+            function openSidebar() {
+                sidebar.classList.add('show');
+                sidebarBackdrop.classList.add('show');
+                mainContent.classList.add('sidebar-open');
+                document.body.style.overflow = 'hidden'; // Prevent background scrolling
+            }
+            
+            // Function to close sidebar
+            function closeSidebar() {
+                console.log('Closing sidebar...');
+                if (sidebar) {
+                    sidebar.classList.remove('show');
+                }
+                if (sidebarBackdrop) {
+                    sidebarBackdrop.classList.remove('show');
+                }
+                if (mainContent) {
+                    mainContent.classList.remove('sidebar-open');
+                }
+                document.body.style.overflow = ''; // Restore scrolling
+                console.log('Sidebar closed');
+            }
+            
+            // Event listeners
+            sidebarToggle?.addEventListener('click', openSidebar);
+            sidebarClose?.addEventListener('click', closeSidebar);
+            sidebarBackdrop?.addEventListener('click', closeSidebar);
+            
+            // Close sidebar when clicking on a nav link (mobile only)
+            function setupNavLinkListeners() {
+                const navLinks = document.querySelectorAll('.sidebar .nav-link');
+                navLinks.forEach(link => {
+                    // Remove existing listeners to prevent duplicates
+                    link.removeEventListener('click', handleNavLinkClick);
+                    link.addEventListener('click', handleNavLinkClick);
+                });
+            }
+            
+            function handleNavLinkClick(e) {
+                // Don't close if the link is disabled
+                if (this.classList.contains('disabled')) {
+                    e.preventDefault();
+                    return;
+                }
+                
+                // Check if we're on mobile
+                const isMobile = window.innerWidth <= 768 || 
+                                /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                
+                if (isMobile) {
+                    console.log('Closing sidebar on mobile navigation');
+                    closeSidebar();
+                    
+                    // Force close immediately and prevent any delay
+                    setTimeout(() => {
+                        if (sidebar) sidebar.classList.remove('show');
+                        if (sidebarBackdrop) sidebarBackdrop.classList.remove('show');
+                        if (mainContent) mainContent.classList.remove('sidebar-open');
+                        document.body.style.overflow = '';
+                    }, 10);
+                }
+            }
+            
+            // Setup initial listeners
+            setupNavLinkListeners();
+            
+            // Setup listeners after any dynamic content changes
+            const observer = new MutationObserver(function(mutations) {
+                mutations.forEach(function(mutation) {
+                    if (mutation.type === 'childList') {
+                        setupNavLinkListeners();
+                    }
+                });
+            });
+            
+            // Observe changes to the sidebar
+            if (sidebar) {
+                observer.observe(sidebar, { childList: true, subtree: true });
+            }
+            
+            // Ensure sidebar is hidden on page load and stays hidden
+            function ensureSidebarHidden() {
+                if (window.innerWidth <= 768) {
+                    if (sidebar) sidebar.classList.remove('show');
+                    if (sidebarBackdrop) sidebarBackdrop.classList.remove('show');
+                    if (mainContent) mainContent.classList.remove('sidebar-open');
+                    document.body.style.overflow = '';
+                }
+            }
+            
+            // Call on page load
+            ensureSidebarHidden();
+            
+            // Also call when window resizes
+            window.addEventListener('resize', function() {
+                if (window.innerWidth <= 768) {
+                    ensureSidebarHidden();
+                }
+            });
+            
+            // Close sidebar on window resize if switching to desktop
+            window.addEventListener('resize', function() {
+                if (window.innerWidth > 768) {
+                    closeSidebar();
+                }
+            });
+            
+            // Add touch support for better mobile experience
+            let touchStartX = 0;
+            let touchEndX = 0;
+            
+            document.addEventListener('touchstart', function(e) {
+                touchStartX = e.changedTouches[0].screenX;
+            });
+            
+            document.addEventListener('touchend', function(e) {
+                touchEndX = e.changedTouches[0].screenX;
+                handleSwipe();
+            });
+            
+            function handleSwipe() {
+                const swipeThreshold = 50;
+                const swipeDistance = touchEndX - touchStartX;
+                
+                // Swipe right to open sidebar (only if sidebar is closed)
+                if (swipeDistance > swipeThreshold && !sidebar.classList.contains('show') && touchStartX < 50) {
+                    openSidebar();
+                }
+                
+                // Swipe left to close sidebar (only if sidebar is open)
+                if (swipeDistance < -swipeThreshold && sidebar.classList.contains('show')) {
+                    closeSidebar();
+                }
+            }
+            
+            // Enhanced mobile viewport handling
+            function ensureMobileViewport() {
+                const viewport = document.querySelector('meta[name="viewport"]');
+                if (!viewport) {
+                    const meta = document.createElement('meta');
+                    meta.name = 'viewport';
+                    meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+                    document.head.appendChild(meta);
+                } else if (viewport.content !== 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no') {
+                    viewport.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+                }
+            }
+            
+            // Mobile detection and OAuth redirect handling
+            function handleMobileOAuthRedirect() {
+                const isMobile = window.innerWidth <= 768;
+                const urlParams = new URLSearchParams(window.location.search);
+                // More specific OAuth redirect detection
+                const hasOAuthCode = urlParams.has('code') && urlParams.get('code').length > 20; // OAuth codes are typically long
+                const isGoogleLoginPath = window.location.pathname.includes('/login/google/') || window.location.pathname.includes('/google_login');
+                const isOAuthRedirect = hasOAuthCode || isGoogleLoginPath;
+                const mobilePreference = sessionStorage.getItem('mobile_preference') === 'true';
+                
+                // Additional check: ensure we're not on regular login/register pages
+                const isRegularAuthPage = window.location.pathname === '/login' || window.location.pathname === '/register';
+                
+                if (isMobile || mobilePreference) {
+                    ensureMobileViewport();
+                    
+                    // Store mobile preference
+                    sessionStorage.setItem('mobile_preference', 'true');
+                    
+                    // Handle OAuth redirect on mobile - only show for actual OAuth flows
+                    // AND not on regular auth pages
+                    if (isOAuthRedirect && isMobile && (hasOAuthCode || isGoogleLoginPath) && !isRegularAuthPage) {
+                        console.log('OAuth redirect detected on mobile, showing loading overlay');
+                        if (oauthRedirectFix) {
+                            oauthRedirectFix.classList.add('show');
+                            
+                            // Hide overlay after a delay to allow page to load
+                            setTimeout(() => {
+                                oauthRedirectFix.classList.remove('show');
+                            }, 2000);
+                        }
+                    } else {
+                        // Ensure overlay is hidden if not in OAuth flow
+                        if (oauthRedirectFix && oauthRedirectFix.classList.contains('show')) {
+                            oauthRedirectFix.classList.remove('show');
+                        }
+                    }
+                } else {
+                    // Not on mobile, ensure overlay is hidden
+                    if (oauthRedirectFix && oauthRedirectFix.classList.contains('show')) {
+                        oauthRedirectFix.classList.remove('show');
+                    }
+                }
+            }
+            
+            // Check if we're on mobile and ensure proper viewport
+            if (window.innerWidth <= 768) {
+                ensureMobileViewport();
+                
+                // Force mobile layout if needed
+                if (document.body.classList.contains('desktop-only')) {
+                    document.body.classList.remove('desktop-only');
+                }
+                
+                // Store mobile preference in sessionStorage for persistence
+                sessionStorage.setItem('mobile_preference', 'true');
+            }
+            
+            // Check for mobile preference from sessionStorage
+            if (sessionStorage.getItem('mobile_preference') === 'true' && window.innerWidth <= 768) {
+                ensureMobileViewport();
+            }
+            
+            // Handle OAuth redirects
+            handleMobileOAuthRedirect();
+            
+            // Additional check: hide overlay if user is already authenticated
+            // This prevents the overlay from showing after successful login
+            const isAuthenticated = document.body.classList.contains('authenticated') || 
+                                   document.querySelector('[data-user-authenticated="true"]') !== null;
+            if (isAuthenticated && oauthRedirectFix && oauthRedirectFix.classList.contains('show')) {
+                console.log('User is authenticated, hiding OAuth overlay');
+                oauthRedirectFix.classList.remove('show');
+            }
+            
+            // Additional mobile fixes for OAuth
+            function fixMobileOAuthIssues() {
+                const isMobile = window.innerWidth <= 768;
+                
+                if (isMobile) {
+                    // Force proper mobile layout
+                    document.body.style.width = '100%';
+                    document.body.style.maxWidth = '100%';
+                    document.body.style.overflowX = 'hidden';
+                    
+                    // Ensure main content is properly positioned
+                    if (mainContent) {
+                        mainContent.style.marginLeft = '0';
+                        mainContent.style.width = '100%';
+                        mainContent.style.maxWidth = '100%';
+                    }
+                    
+                    // Fix any potential layout issues
+                    const container = document.querySelector('.container-fluid');
+                    if (container) {
+                        container.style.width = '100%';
+                        container.style.maxWidth = '100%';
+                        container.style.overflowX = 'hidden';
+                    }
+                }
+            }
+            
+            // Apply mobile fixes
+            fixMobileOAuthIssues();
+            
+            // Re-apply fixes on window resize
+            window.addEventListener('resize', function() {
+                setTimeout(fixMobileOAuthIssues, 100);
+            });
+            
+            // Handle page visibility changes (for OAuth redirects)
+            document.addEventListener('visibilitychange', function() {
+                if (!document.hidden) {
+                    // Page became visible again (likely after OAuth redirect)
+                    setTimeout(() => {
+                        handleMobileOAuthRedirect();
+                        fixMobileOAuthIssues();
+                        // Hide OAuth overlay if it's still showing
+                        if (oauthRedirectFix && oauthRedirectFix.classList.contains('show')) {
+                            oauthRedirectFix.classList.remove('show');
+                        }
+                    }, 100);
+                }
+            });
+            
+            // Add manual escape for stuck overlay (double-tap to hide)
+            let tapCount = 0;
+            let tapTimer = null;
+            document.addEventListener('click', function(e) {
+                if (oauthRedirectFix && oauthRedirectFix.classList.contains('show')) {
+                    tapCount++;
+                    if (tapCount === 1) {
+                        tapTimer = setTimeout(() => {
+                            tapCount = 0;
+                        }, 300);
+                    } else if (tapCount === 2) {
+                        clearTimeout(tapTimer);
+                        tapCount = 0;
+                        oauthRedirectFix.classList.remove('show');
+                    }
+                }
+            });
+            
+            // Additional cleanup mechanisms to prevent stuck overlay
+            // Hide overlay after page load completes
+            window.addEventListener('load', function() {
+                setTimeout(() => {
+                    if (oauthRedirectFix && oauthRedirectFix.classList.contains('show')) {
+                        console.log('Hiding OAuth overlay after page load');
+                        oauthRedirectFix.classList.remove('show');
+                    }
+                }, 3000); // Give extra time for OAuth to complete
+            });
+            
+            // Hide overlay if user navigates away from OAuth flow
+            const currentPath = window.location.pathname;
+            if (!currentPath.includes('/login/google/') && !currentPath.includes('/google_login')) {
+                // Not on OAuth pages, ensure overlay is hidden
+                if (oauthRedirectFix && oauthRedirectFix.classList.contains('show')) {
+                    console.log('Not on OAuth page, hiding overlay');
+                    oauthRedirectFix.classList.remove('show');
+                }
+            }
+            
+            // Emergency cleanup - hide overlay after 10 seconds regardless
+            setTimeout(() => {
+                if (oauthRedirectFix && oauthRedirectFix.classList.contains('show')) {
+                    console.log('Emergency cleanup: hiding OAuth overlay');
+                    oauthRedirectFix.classList.remove('show');
+                }
+            }, 10000);
+            
+            // Allow clicking on overlay to dismiss it
+            if (oauthRedirectFix) {
+                oauthRedirectFix.addEventListener('click', function() {
+                    console.log('User clicked to dismiss OAuth overlay');
+                    oauthRedirectFix.classList.remove('show');
+                });
+            }
+            
+            // Periodic check to ensure overlay doesn't get stuck
+            setInterval(() => {
+                if (oauthRedirectFix && oauthRedirectFix.classList.contains('show')) {
+                    const isMobile = window.innerWidth <= 768;
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const hasOAuthCode = urlParams.has('code') && urlParams.get('code').length > 20;
+                    const isGoogleLoginPath = window.location.pathname.includes('/login/google/') || window.location.pathname.includes('/google_login');
+                    const isRegularAuthPage = window.location.pathname === '/login' || window.location.pathname === '/register';
+                    const isAuthenticated = document.body.hasAttribute('data-user-authenticated');
+                    
+                    // Hide overlay if conditions are no longer met
+                    if (!isMobile || !hasOAuthCode || isRegularAuthPage || isAuthenticated) {
+                        console.log('Periodic check: hiding OAuth overlay due to changed conditions');
+                        oauthRedirectFix.classList.remove('show');
+                    }
+                }
+            }, 5000); // Check every 5 seconds
         });
         
         // Auto-hide alerts after 5 seconds
         setTimeout(function() {
             const alerts = document.querySelectorAll('.alert');
             alerts.forEach(alert => {
-                if (!alert.classList.contains('alert-danger')) {
+                if (!alert.classList.contains('alert-danger') && !alert.classList.contains('no-auto-hide')) {
                     const bsAlert = new bootstrap.Alert(alert);
                     bsAlert.close();
                 }

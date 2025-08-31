@@ -341,10 +341,10 @@ class SettingsForm(FlaskForm):
         ('America/Denver', 'America/Denver'),
         ('America/Los_Angeles', 'America/Los_Angeles')
     ])
-    api_key = StringField('Custom API key', validators=[Length(max=64)],
-                         render_kw={"placeholder": "Optional—used for future API integrations"})
     
-    # Account info
+    # API and account settings
+    api_key = StringField('API Key', validators=[Optional(), Length(max=64)],
+                         render_kw={"placeholder": "Optional API key for future features"})
     account_size = FloatField('Account Size ($)', validators=[Optional(), NumberRange(min=0)],
                              render_kw={"step": "0.01", "placeholder": "Optional: for position sizing"})
     default_risk_percent = FloatField('Default Risk Per Trade (%)', 

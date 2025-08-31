@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Options Plunge Weekly Brief — {{ subject_theme }} ({{ date_human }})</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 700px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 20px;
+        }
+        .logo {
+            font-size: 28px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        .date {
+            color: #7f8c8d;
+            font-size: 16px;
+        }
+        .section {
+            margin-bottom: 25px;
+        }
+        .section-title {
+            color: #2c3e50;
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            border-left: 4px solid #3498db;
+            padding-left: 10px;
+        }
+        .levels {
+            background: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.8;
+        }
+        .mover-item {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 5px;
+            margin: 8px 0;
+            border-left: 3px solid #3498db;
+        }
+        .ticker {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .playbook-item {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 12px;
+            border-radius: 5px;
+            margin: 8px 0;
+        }
+        .week-ahead-item {
+            background: #e8f5e8;
+            border: 1px solid #c8e6c9;
+            padding: 12px;
+            border-radius: 5px;
+            margin: 8px 0;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #666;
+            font-size: 14px;
+        }
+        .unsubscribe {
+            color: #95a5a6;
+            font-size: 12px;
+        }
+        .cta-button {
+            display: inline-block;
+            background: #3498db;
+            color: white;
+            padding: 12px 25px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            margin: 15px 0;
+        }
+        .cta-button:hover {
+            background: #2980b9;
+        }
+        .optional-section {
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">📈 Options Plunge</div>
+            <h1>Weekly Brief</h1>
+            <div class="date">{{ date_human }}</div>
+            <p style="color: #7f8c8d; font-size: 14px; margin-top: 10px;">{{ preheader }}</p>
+        </div>
+        
+        <!-- Last Week in 60s -->
+        <div class="section">
+            <div class="section-title">Last Week in 60s</div>
+            <p>{{ recap.index_blurb }}</p>
+        </div>
+        
+        <!-- Sector Rotations & Themes -->
+        <div class="section">
+            <div class="section-title">Sector Rotations & Themes</div>
+            <p>{{ recap.sector_blurb }}</p>
+        </div>
+        
+        <!-- Top Movers -->
+        {% if recap.movers_bullets %}
+        <div class="section">
+            <div class="section-title">Top Movers</div>
+            {% for mover in recap.movers_bullets %}
+            <div class="mover-item">
+                • {{ mover }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        
+        <!-- Options Sentiment -->
+        {% if recap.flow_blurb %}
+        <div class="section">
+            <div class="section-title">Options Sentiment</div>
+            <p>{{ recap.flow_blurb }}</p>
+        </div>
+        {% endif %}
+        
+        <!-- Levels to Watch -->
+        <div class="section">
+            <div class="section-title">Levels to Watch</div>
+            <div class="levels">
+                SPY: S1 {{ levels.spy.s1 }} | S2 {{ levels.spy.s2 }} | R1 {{ levels.spy.r1 }} | R2 {{ levels.spy.r2 }} | R3 {{ levels.spy.r3 }}
+                {% if levels.qqq %}
+                <br>QQQ: S1 {{ levels.qqq.s1 }} | S2 {{ levels.qqq.s2 }} | R1 {{ levels.qqq.r1 }} | R2 {{ levels.qqq.r2 }} | R3 {{ levels.qqq.r3 }}
+                {% endif %}
+                {% if levels.iwm %}
+                <br>IWM: S1 {{ levels.iwm.s1 }} | S2 {{ levels.iwm.s2 }} | R1 {{ levels.iwm.r1 }} | R2 {{ levels.iwm.r2 }} | R3 {{ levels.iwm.r3 }}
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Week Ahead -->
+        <div class="section">
+            <div class="section-title">Week Ahead</div>
+            
+            {% if week_ahead.macro_bullets %}
+            <h4 style="color: #2c3e50; margin-bottom: 10px;">Macro Events</h4>
+            {% for item in week_ahead.macro_bullets %}
+            <div class="week-ahead-item">
+                • {{ item }}
+            </div>
+            {% endfor %}
+            {% endif %}
+            
+            {% if week_ahead.earnings_bullets %}
+            <h4 style="color: #2c3e50; margin-bottom: 10px; margin-top: 20px;">Earnings</h4>
+            {% for item in week_ahead.earnings_bullets %}
+            <div class="week-ahead-item">
+                • {{ item }}
+            </div>
+            {% endfor %}
+            {% endif %}
+        </div>
+        
+        <!-- Swing Playbook -->
+        {% if swing_playbook_bullets %}
+        <div class="section">
+            <div class="section-title">Swing Playbook</div>
+            {% for item in swing_playbook_bullets %}
+            <div class="playbook-item">
+                • {{ item }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        
+        <div class="footer">
+            <p><strong>Powered by Options Plunge</strong></p>
+            <a href="{{ cta_url }}" class="cta-button">View Full Analysis</a>
+            <div class="unsubscribe">
+                <p>You're receiving this because you confirmed your subscription to the Weekly Market Brief.</p>
+                <p><a href="{{ unsubscribe_url }}" style="color: #95a5a6;">Unsubscribe</a> | <a href="{{ preferences_url }}" style="color: #95a5a6;">Update Preferences</a></p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

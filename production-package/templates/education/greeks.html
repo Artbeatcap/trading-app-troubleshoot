@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Understanding the Greeks - Options Education{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <h1 class="display-5 mb-3"><i class="fas fa-calculator text-warning me-2"></i>Understanding the Greeks</h1>
+                    <p class="lead">Delta, Gamma, Theta and Vega are key metrics ("Greeks") that describe option price sensitivity. Mastering them helps you evaluate risk and reward more precisely.</p>
+                    <hr>
+                    <h3>Delta</h3>
+                    <p>Delta measures the expected price change of an option for a $1 move in the underlying asset.</p>
+                    <ul>
+                        <li>Call options: 0 to +1, Put options: –1 to 0.</li>
+                        <li>At-the-money (ATM) calls typically ≈ +0.50; ATM puts ≈ –0.50.</li>
+                        <li>Key takeaway: Higher delta → position behaves more like underlying shares.</li>
+                    </ul>
+                    <h3>Gamma</h3>
+                    <p>Gamma measures how much <strong>delta</strong> changes for a $1 move in the underlying.</p>
+                    <ul>
+                        <li>Highest for ATM options; falls for deep ITM/OTM contracts.</li>
+                        <li>Always positive for both calls and puts.</li>
+                        <li>Key takeaway: Gamma risk ("delta acceleration") grows as expiration approaches.</li>
+                    </ul>
+                    <h3>Theta</h3>
+                    <p>Theta quantifies time decay – the daily option value lost as expiration nears (all else equal).</p>
+                    <ul>
+                        <li>Always negative for long options.</li>
+                        <li>Magnitude grows rapidly in the final 30 days.</li>
+                        <li>Key takeaway: Short-dated premium sellers benefit from theta; buyers fight it.</li>
+                    </ul>
+                    <h3>Vega</h3>
+                    <p>Vega measures sensitivity to a 1-percentage-point change in <em>implied volatility</em>.</p>
+                    <ul>
+                        <li>Positive for both calls and puts (long options).</li>
+                        <li>Greatest for ATM options and longer-dated expirations.</li>
+                        <li>Key takeaway: Rising IV helps long premium positions, hurts short premium.</li>
+                    </ul>
+                    <hr>
+                    <h4 class="mt-4">Practical Example</h4>
+                    <p>Suppose you buy a 45-day ATM call with delta ≈ 0.50, gamma ≈ 0.04, theta ≈ –0.07 and vega ≈ 0.12. A $1 rise in the stock adds roughly $0.50 to the option, but if the stock continues another $1 the delta could rise to ≈ 0.58 (delta + gamma). Meanwhile, each passing day erodes $0.07, and a 1 point IV increase adds $0.12.</p>
+                    <hr>
+                    <h4>Key Takeaways</h4>
+                    <ul>
+                        <li>Use delta to size directional exposure.</li>
+                        <li>Monitor gamma near expiration; risk grows quickly.</li>
+                        <li>Theta works for option sellers and against buyers.</li>
+                        <li>Volatility changes (vega) can dominate price moves in high-IV environments.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

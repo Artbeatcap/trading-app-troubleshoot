@@ -1,265 +1,876 @@
 {% extends "base.html" %}
 
-{% block title %}Options Plunge - Improve Your Trading{% endblock %}
+{% block title %}Options Plunge - AI-Powered Trading Analysis Platform{% endblock %}
+
+{% block head %}
+<style>
+    .hero-section {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 120px 0 80px;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .hero-section::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="white" opacity="0.1"/><circle cx="75" cy="75" r="1" fill="white" opacity="0.1"/><circle cx="50" cy="10" r="0.5" fill="white" opacity="0.1"/><circle cx="10" cy="60" r="0.5" fill="white" opacity="0.1"/><circle cx="90" cy="40" r="0.5" fill="white" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+        opacity: 0.3;
+    }
+    
+    .hero-content {
+        position: relative;
+        z-index: 2;
+    }
+    
+    .hero-title {
+        font-size: 3.5rem;
+        font-weight: 800;
+        margin-bottom: 1.5rem;
+        line-height: 1.2;
+    }
+    
+    .hero-subtitle {
+        font-size: 1.4rem;
+        margin-bottom: 2rem;
+        opacity: 0.9;
+        font-weight: 300;
+    }
+    
+    .cta-buttons {
+        margin-bottom: 3rem;
+    }
+    
+    .btn-hero {
+        padding: 15px 30px;
+        font-size: 1.1rem;
+        font-weight: 600;
+        border-radius: 50px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        transition: all 0.3s ease;
+        margin: 0 10px 10px 0;
+    }
+    
+    .btn-hero-primary {
+        background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+        border: none;
+        color: white;
+        box-shadow: 0 8px 25px rgba(255, 107, 107, 0.4);
+    }
+    
+    .btn-hero-primary:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 12px 35px rgba(255, 107, 107, 0.6);
+        color: white;
+    }
+    
+    .btn-hero-secondary {
+        background: transparent;
+        border: 2px solid white;
+        color: white;
+    }
+    
+    .btn-hero-secondary:hover {
+        background: white;
+        color: #667eea;
+        transform: translateY(-3px);
+    }
+    
+    .hero-stats {
+        display: flex;
+        justify-content: center;
+        gap: 3rem;
+        margin-top: 3rem;
+    }
+    
+    .stat-item {
+        text-align: center;
+    }
+    
+    .stat-number {
+        font-size: 2.5rem;
+        font-weight: 800;
+        display: block;
+    }
+    
+    .stat-label {
+        font-size: 0.9rem;
+        opacity: 0.8;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    
+    .features-section {
+        padding: 100px 0;
+        background: #f8f9fa;
+    }
+    
+    .section-title {
+        text-align: center;
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 1rem;
+        color: #2c3e50;
+    }
+    
+    .section-subtitle {
+        text-align: center;
+        font-size: 1.2rem;
+        color: #7f8c8d;
+        margin-bottom: 4rem;
+        max-width: 600px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    
+    .feature-card {
+        background: white;
+        border-radius: 20px;
+        padding: 2.5rem;
+        text-align: center;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+        border: none;
+        margin-bottom: 2rem;
+    }
+    
+    .feature-card:hover {
+        transform: translateY(-10px);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+    }
+    
+    .feature-example {
+        margin-top: 1.5rem;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    }
+    
+    .feature-example img {
+        width: 100%;
+        height: auto;
+        display: block;
+    }
+    
+    .feature-icon {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1.5rem;
+        font-size: 2rem;
+        color: white;
+    }
+    
+    .feature-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-bottom: 1rem;
+        color: #2c3e50;
+    }
+    
+    .feature-description {
+        color: #7f8c8d;
+        line-height: 1.6;
+        margin-bottom: 1.5rem;
+    }
+    
+    .feature-list {
+        list-style: none;
+        padding: 0;
+        text-align: left;
+    }
+    
+    .feature-list li {
+        padding: 0.5rem 0;
+        color: #7f8c8d;
+    }
+    
+    .feature-list li::before {
+        content: "✓";
+        color: #27ae60;
+        font-weight: bold;
+        margin-right: 0.5rem;
+    }
+    
+    .demo-section {
+        padding: 100px 0;
+        background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+        color: white;
+    }
+    
+    .demo-card {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 15px;
+        padding: 2rem;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        transition: all 0.3s ease;
+    }
+    
+    .demo-card:hover {
+        transform: translateY(-5px);
+        background: rgba(255, 255, 255, 0.15);
+    }
+    
+    .testimonials-section {
+        padding: 100px 0;
+        background: white;
+    }
+    
+    .testimonial-card {
+        background: #f8f9fa;
+        border-radius: 15px;
+        padding: 2rem;
+        text-align: center;
+        margin-bottom: 2rem;
+        border: none;
+    }
+    
+    .testimonial-avatar {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1rem;
+        color: white;
+        font-weight: bold;
+        font-size: 1.2rem;
+    }
+    
+    .pricing-section {
+        padding: 100px 0;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+    
+    .pricing-card {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 20px;
+        padding: 3rem 2rem;
+        text-align: center;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        transition: all 0.3s ease;
+        height: 100%;
+    }
+    
+    .pricing-card:hover {
+        transform: translateY(-10px);
+        background: rgba(255, 255, 255, 0.15);
+    }
+    
+    .pricing-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-bottom: 1rem;
+    }
+    
+    .pricing-price {
+        font-size: 3rem;
+        font-weight: 800;
+        margin-bottom: 1rem;
+    }
+    
+    .pricing-features {
+        list-style: none;
+        padding: 0;
+        margin-bottom: 2rem;
+    }
+    
+    .pricing-features li {
+        padding: 0.5rem 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .pricing-features li:last-child {
+        border-bottom: none;
+    }
+    
+    .final-cta {
+        padding: 100px 0;
+        background: #2c3e50;
+        color: white;
+        text-align: center;
+    }
+    
+    .final-cta h2 {
+        font-size: 3rem;
+        font-weight: 800;
+        margin-bottom: 1.5rem;
+    }
+    
+    .final-cta p {
+        font-size: 1.3rem;
+        margin-bottom: 2rem;
+        opacity: 0.9;
+    }
+    
+    .tools-container {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+    .tool-section {
+        margin-bottom: 3rem;
+        padding: 2rem;
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+        height: 100%;
+    }
+    .tool-section:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+    }
+    .tool-section:last-child {
+        margin-bottom: 2rem;
+    }
+    .tool-section .feature-card {
+        background: transparent;
+        box-shadow: none;
+        padding: 0;
+        margin-bottom: 0;
+    }
+    .tool-section .feature-card:hover {
+        transform: none;
+        box-shadow: none;
+    }
+    
+    @media (max-width: 768px) {
+        .hero-title {
+            font-size: 2.5rem;
+        }
+        
+        .hero-subtitle {
+            font-size: 1.1rem;
+        }
+        
+        .hero-stats {
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+        
+        .section-title {
+            font-size: 2rem;
+        }
+        
+        .final-cta h2 {
+            font-size: 2rem;
+        }
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="container">
-    <div class="row justify-content-center">
-        <div class="col-lg-8">
-            <!-- Hero Section -->
-            <div class="text-center py-5">
-                <h1 class="display-4 fw-bold mb-2">
-                    <i class="fas fa-robot text-primary me-3"></i>
-                    Options Plunge
+<!-- Hero Section -->
+<section class="hero-section">
+    <div class="container">
+        <div class="row hero-content">
+            <div class="col-lg-8 mx-auto text-center">
+                <h1 class="hero-title">
+                    Master Options Trading with AI-Powered Analysis
                 </h1>
-                <div class="fs-4 text-muted mb-3">AI Trading Analysis</div>
-                <p class="lead text-muted mb-4">
-                    Transform your trading with AI-powered analysis, comprehensive options calculators, and personalized feedback. 
-                    Track your trades, journal your progress, and get professional-grade tools to improve your trading performance.
+                <h2 class="hero-app-name" style="font-size: 2rem; font-weight: 600; margin-bottom: 1rem; color: rgba(255, 255, 255, 0.9);">
+                    Options Plunge
+                </h2>
+                <p class="hero-subtitle">
+                    Join thousands of traders using professional-grade options calculators, 
+                    AI trade analysis, and comprehensive tracking tools to accelerate their success
                 </p>
-                <div class="d-grid gap-2 d-md-flex justify-content-md-center">
-                    {% if current_user.is_authenticated or show_logged_in %}
-                        <a href="{{ url_for('dashboard') }}" class="btn btn-primary btn-lg px-4 me-md-2">
-                            <i class="fas fa-tachometer-alt me-2"></i>Go to Dashboard
-                        </a>
-                        <a href="{{ url_for('options_calculator') }}" class="btn btn-outline-info btn-lg px-4">
-                            <i class="fas fa-calculator me-2"></i>Options Calculator
+                
+                <div class="cta-buttons">
+                    {% if current_user.is_authenticated %}
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-hero btn-hero-primary">
+                            <i class="fas fa-rocket me-2"></i>Go to Dashboard
                         </a>
                     {% else %}
-                        <a href="{{ url_for('home') }}" class="btn btn-primary btn-lg px-4 me-md-2">
+                        <a href="{{ url_for('register') }}" class="btn btn-hero btn-hero-primary">
                             <i class="fas fa-rocket me-2"></i>Get Started
                         </a>
-                        <a href="{{ url_for('login') }}" class="btn btn-outline-secondary btn-lg px-4">
-                            <i class="fas fa-sign-in-alt me-2"></i>Login
-                        </a>
                     {% endif %}
                 </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Features Section -->
-    <div class="row g-4 py-5">
-        <div class="col-md-4">
-            <div class="card h-100 text-center">
-                <div class="card-body">
-                    <div class="mb-3">
-                        <i class="fas fa-chart-line fa-3x text-primary"></i>
+                
+                <div class="hero-stats">
+                    <div class="stat-item">
+                        <span class="stat-number">10,000+</span>
+                        <span class="stat-label">Trades Analyzed</span>
                     </div>
-                    <h5 class="card-title">Trade Tracking</h5>
-                    <p class="card-text">
-                        Log your trades with detailed entry and exit information, 
-                        including setup types, market conditions, and your reasoning.
-                    </p>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-md-4">
-            <div class="card h-100 text-center">
-                <div class="card-body">
-                    <div class="mb-3">
-                        <i class="fas fa-calculator fa-3x text-info"></i>
+                    <div class="stat-item">
+                        <span class="stat-number">95%</span>
+                        <span class="stat-label">Accuracy Rate</span>
                     </div>
-                    <h5 class="card-title">Options Calculator</h5>
-                    <p class="card-text">
-                        Real-time options chains with P&L analysis, Greeks calculation, 
-                        and comprehensive profit/loss scenarios for any option strategy.
-                    </p>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-md-4">
-            <div class="card h-100 text-center">
-                <div class="card-body">
-                    <div class="mb-3">
-                        <i class="fas fa-robot fa-3x text-success"></i>
+                    <div class="stat-item">
+                        <span class="stat-number">24/7</span>
+                        <span class="stat-label">AI Support</span>
                     </div>
-                    <h5 class="card-title">AI Analysis</h5>
-                    <p class="card-text">
-                        Get comprehensive AI-powered feedback on each trade, 
-                        including strengths, weaknesses, and actionable improvement drills.
-                    </p>
                 </div>
             </div>
         </div>
     </div>
-    
-    <!-- Trading Tools Section -->
-    <div class="row g-4 py-4">
-        <div class="col-md-6">
-            <div class="card h-100">
-                <div class="card-body">
-                    <h5 class="card-title">
-                        <i class="fas fa-search text-primary me-2"></i>
-                        Live Market Data
-                    </h5>
-                    <p class="card-text">
-                        Access real-time stock prices, options chains, and market data 
-                        for 200+ stocks with active options trading. Search by symbol 
-                        or company name with intelligent autocomplete.
-                    </p>
-                    <ul class="list-unstyled small">
-                        <li><i class="fas fa-check text-success me-2"></i>Live options chains from Yahoo Finance</li>
-                        <li><i class="fas fa-check text-success me-2"></i>ITM/OTM highlighting with current price markers</li>
-                        <li><i class="fas fa-check text-success me-2"></i>Comprehensive stock database with autocomplete</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-md-6">
-            <div class="card h-100">
-                <div class="card-body">
-                    <h5 class="card-title">
-                        <i class="fas fa-chart-area text-warning me-2"></i>
-                        P&L Analysis & Greeks
-                    </h5>
-                    <p class="card-text">
-                        Interactive profit/loss scenarios with complete Greeks analysis. 
-                        Visualize risk/reward profiles and understand how time decay, 
-                        volatility, and price movement affect your positions.
-                    </p>
-                    <ul class="list-unstyled small">
-                        <li><i class="fas fa-check text-success me-2"></i>Interactive P&L charts with Plotly</li>
-                        <li><i class="fas fa-check text-success me-2"></i>Delta, Gamma, Theta, Vega calculations</li>
-                        <li><i class="fas fa-check text-success me-2"></i>Breakeven points and risk metrics</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Additional Features -->
-    <div class="row g-4 py-4">
-        <div class="col-md-6">
-            <div class="card h-100">
-                <div class="card-body">
-                    <h5 class="card-title">
-                        <i class="fas fa-book text-info me-2"></i>
-                        Trading Journal
-                    </h5>
-                    <p class="card-text">
-                        Maintain a daily trading journal with emotional state tracking 
-                        and AI-generated daily performance feedback to improve consistency.
-                    </p>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-md-6">
-            <div class="card h-100">
-                <div class="card-body">
-                    <h5 class="card-title">
-                        <i class="fas fa-chart-bar text-warning me-2"></i>
-                        Advanced Analytics
-                    </h5>
-                    <p class="card-text">
-                        View detailed analytics of your trading performance with 
-                        interactive charts showing P&L over time, win rates, 
-                        and setup type performance.
-                    </p>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- How It Works -->
-    <div class="row justify-content-center py-5">
-        <div class="col-lg-10">
-            <h2 class="text-center mb-5">How It Works</h2>
+</section>
+
+<!-- Features Section -->
+<section id="features" class="features-section">
+    <div class="container">
+        <h2 class="section-title">Everything You Need to Succeed</h2>
+        <p class="section-subtitle">
+            Professional-grade tools that combine AI analysis with comprehensive options trading features
+        </p>
+        <div class="tools-container">
             <div class="row g-4">
-                <div class="col-md-3 text-center">
-                    <div class="mb-3">
-                        <div class="bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
-                            <span class="fw-bold">1</span>
+                <!-- Tool 1: Advanced Options Calculator -->
+                <div class="col-lg-6">
+                    <div class="tool-section">
+                        <div class="feature-card">
+                            <div class="feature-icon" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                                <i class="fas fa-calculator"></i>
+                            </div>
+                            <h3 class="feature-title">Advanced Options Calculator</h3>
+                            <p class="feature-description">
+                                Real-time options chains with live market data, P&L analysis, and Greeks calculations
+                            </p>
+                            <ul class="feature-list">
+                                <li>Live options chains from Yahoo Finance</li>
+                                <li>Interactive P&L charts with Plotly</li>
+                                <li>Delta, Gamma, Theta, Vega calculations</li>
+                                <li>Breakeven points and risk metrics</li>
+                                <li>200+ stocks with active options trading</li>
+                            </ul>
+                            <!-- Example preview -->
+                            <div class="feature-example">
+                                <div class="card border-0 shadow-sm">
+                                    <div class="card-header bg-info text-white py-2">
+                                        <small><strong>AAPL</strong> — Apple Inc • Current Price: $175.43</small>
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm mb-0">
+                                                <thead>
+                                                    <tr class="table-info">
+                                                        <th colspan="3" class="text-center">Calls</th>
+                                                        <th colspan="3" class="text-center">Puts</th>
+                                                    </tr>
+                                                    <tr class="table-light">
+                                                        <th>Strike</th>
+                                                        <th>Bid/Ask</th>
+                                                        <th>Vol</th>
+                                                        <th>Strike</th>
+                                                        <th>Bid/Ask</th>
+                                                        <th>Vol</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr>
+                                                        <td><strong>$170</strong></td>
+                                                        <td>$6.20/$6.35</td>
+                                                        <td>1,245</td>
+                                                        <td><strong>$180</strong></td>
+                                                        <td>$5.80/$5.95</td>
+                                                        <td>892</td>
+                                                    </tr>
+                                                    <tr class="table-warning">
+                                                        <td><strong>$175</strong></td>
+                                                        <td>$2.15/$2.30</td>
+                                                        <td>2,156</td>
+                                                        <td><strong>$175</strong></td>
+                                                        <td>$2.10/$2.25</td>
+                                                        <td>1,834</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><strong>$180</strong></td>
+                                                        <td>$0.45/$0.60</td>
+                                                        <td>3,421</td>
+                                                        <td><strong>$170</strong></td>
+                                                        <td>$0.35/$0.50</td>
+                                                        <td>2,567</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <h6>Analyze Options</h6>
-                    <small class="text-muted">
-                        Use our options calculator to analyze profit scenarios and Greeks for any stock with live market data.
-                    </small>
                 </div>
-                
-                <div class="col-md-3 text-center">
-                    <div class="mb-3">
-                        <div class="bg-success text-white rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
-                            <span class="fw-bold">2</span>
+                <!-- Tool 2: AI Trade Analysis -->
+                <div class="col-lg-6">
+                    <div class="tool-section">
+                        <div class="feature-card">
+                            <div class="feature-icon" style="background: linear-gradient(135deg, #f093fb, #f5576c);">
+                                <i class="fas fa-robot"></i>
+                            </div>
+                            <h3 class="feature-title">AI Trade Analysis</h3>
+                            <p class="feature-description">
+                                Get comprehensive AI-powered feedback on each trade with actionable improvement drills
+                            </p>
+                            <ul class="feature-list">
+                                <li>Detailed trade analysis and scoring</li>
+                                <li>Strengths and weaknesses identification</li>
+                                <li>Personalized improvement recommendations</li>
+                                <li>Performance tracking over time</li>
+                                <li>Pattern recognition and insights</li>
+                            </ul>
+                            <!-- Example preview -->
+                            <div class="feature-example">
+                                <div class="card border-0 shadow-sm">
+                                    <div class="card-header bg-success text-white py-2">
+                                        <small><strong>AI Trade Analysis</strong> • AAPL Call • Score: 8.2/10</small>
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <div class="row g-2">
+                                            <div class="col-6">
+                                                <div class="text-center">
+                                                    <div class="h5 text-success mb-1">8.2</div>
+                                                    <small class="text-muted">Overall Score</small>
+                                                </div>
+                                            </div>
+                                            <div class="col-6">
+                                                <div class="text-center">
+                                                    <div class="h5 text-primary mb-1">+$1,250</div>
+                                                    <small class="text-muted">P&L</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <hr class="my-2">
+                                        <div class="small">
+                                            <div class="d-flex justify-content-between mb-1">
+                                                <span>Entry Timing</span>
+                                                <span class="text-success">✓ Excellent</span>
+                                            </div>
+                                            <div class="d-flex justify-content-between mb-1">
+                                                <span>Risk Management</span>
+                                                <span class="text-warning">⚠ Good</span>
+                                            </div>
+                                            <div class="d-flex justify-content-between mb-1">
+                                                <span>Position Sizing</span>
+                                                <span class="text-success">✓ Perfect</span>
+                                            </div>
+                                            <div class="d-flex justify-content-between">
+                                                <span>Exit Strategy</span>
+                                                <span class="text-info">✓ Solid</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <h6>Track Your Trades</h6>
-                    <small class="text-muted">
-                        Record your trades with detailed information about entries, exits, and reasoning behind each position.
-                    </small>
                 </div>
-                
-                <div class="col-md-3 text-center">
-                    <div class="mb-3">
-                        <div class="bg-info text-white rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
-                            <span class="fw-bold">3</span>
+                <!-- Tool 3: Trade Tracking & Analytics -->
+                <div class="col-lg-6">
+                    <div class="tool-section">
+                        <div class="feature-card">
+                            <div class="feature-icon" style="background: linear-gradient(135deg, #4facfe, #00f2fe);">
+                                <i class="fas fa-chart-line"></i>
+                            </div>
+                            <h3 class="feature-title">Trade Tracking & Analytics</h3>
+                            <p class="feature-description">
+                                Comprehensive trade logging with detailed analytics and performance insights
+                            </p>
+                            <ul class="feature-list">
+                                <li>Detailed trade entry and exit logging</li>
+                                <li>Setup types and market conditions</li>
+                                <li>Win rate and P&L analytics</li>
+                                <li>Interactive performance charts</li>
+                                <li>Risk management tracking</li>
+                            </ul>
+                            <!-- Example preview -->
+                            <div class="feature-example">
+                                <div class="card border-0 shadow-sm">
+                                    <div class="card-header bg-primary text-white py-2">
+                                        <small><strong>Performance Analytics</strong> • Last 30 Days</small>
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <div class="row g-2 text-center">
+                                            <div class="col-4">
+                                                <div class="h6 text-success mb-0">68%</div>
+                                                <small class="text-muted">Win Rate</small>
+                                            </div>
+                                            <div class="col-4">
+                                                <div class="h6 text-primary mb-0">+$4,250</div>
+                                                <small class="text-muted">Total P&L</small>
+                                            </div>
+                                            <div class="col-4">
+                                                <div class="h6 text-info mb-0">1.8</div>
+                                                <small class="text-muted">Avg R:R</small>
+                                            </div>
+                                        </div>
+                                        <hr class="my-2">
+                                        <div class="small">
+                                            <div class="d-flex justify-content-between mb-1">
+                                                <span>Total Trades</span>
+                                                <span class="fw-bold">47</span>
+                                            </div>
+                                            <div class="d-flex justify-content-between mb-1">
+                                                <span>Winning Trades</span>
+                                                <span class="text-success">32</span>
+                                            </div>
+                                            <div class="d-flex justify-content-between mb-1">
+                                                <span>Losing Trades</span>
+                                                <span class="text-danger">15</span>
+                                            </div>
+                                            <div class="d-flex justify-content-between">
+                                                <span>Avg Hold Time</span>
+                                                <span>2.3 days</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <h6>Get AI Feedback</h6>
-                    <small class="text-muted">
-                        Our AI analyzes your trades and provides detailed feedback with specific drills to improve performance.
-                    </small>
                 </div>
-                
-                <div class="col-md-3 text-center">
-                    <div class="mb-3">
-                        <div class="bg-warning text-white rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
-                            <span class="fw-bold">4</span>
+                <!-- Tool 4: Trading Journal -->
+                <div class="col-lg-6">
+                    <div class="tool-section">
+                        <div class="feature-card">
+                            <div class="feature-icon" style="background: linear-gradient(135deg, #43e97b, #38f9d7);">
+                                <i class="fas fa-book"></i>
+                            </div>
+                            <h3 class="feature-title">Trading Journal</h3>
+                            <p class="feature-description">
+                                Maintain a daily trading journal with emotional state tracking and AI feedback
+                            </p>
+                            <ul class="feature-list">
+                                <li>Daily journal entries with mood tracking</li>
+                                <li>AI-generated performance feedback</li>
+                                <li>Emotional state correlation analysis</li>
+                                <li>Consistency improvement tracking</li>
+                                <li>Pattern recognition in behavior</li>
+                            </ul>
+                            <!-- Example preview -->
+                            <div class="feature-example">
+                                <div class="card border-0 shadow-sm">
+                                    <div class="card-header bg-warning text-dark py-2">
+                                        <small><strong>Trading Journal</strong> • Dec 15, 2024</small>
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <div class="d-flex align-items-center mb-2">
+                                            <span class="badge bg-success me-2">Mood: Confident</span>
+                                            <span class="badge bg-info">Market: Bullish</span>
+                                        </div>
+                                        <div class="small">
+                                            <p class="mb-2"><strong>Today's Focus:</strong> Tech earnings plays with proper risk management. AAPL call spread worked well - exited at 50% profit target.</p>
+                                            <div class="d-flex justify-content-between mb-1">
+                                                <span>Emotional State</span>
+                                                <span class="text-success">✓ Calm & Focused</span>
+                                            </div>
+                                            <div class="d-flex justify-content-between mb-1">
+                                                <span>Risk Management</span>
+                                                <span class="text-success">✓ Stuck to Plan</span>
+                                            </div>
+                                            <div class="d-flex justify-content-between">
+                                                <span>Learning</span>
+                                                <span class="text-info">✓ Patience Paid Off</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <h6>Improve Results</h6>
-                    <small class="text-muted">
-                        Track your progress over time and see your trading performance improve with consistent practice.
-                    </small>
+                </div>
+                <!-- Tool 5: Professional Tools -->
+                <div class="col-lg-6">
+                    <div class="tool-section">
+                        <div class="feature-card">
+                            <div class="feature-icon" style="background: linear-gradient(135deg, #fa709a, #fee140);">
+                                <i class="fas fa-tools"></i>
+                            </div>
+                            <h3 class="feature-title">Professional Tools</h3>
+                            <p class="feature-description">
+                                Access to Black-Scholes calculator, stock lookup, and advanced trading tools
+                            </p>
+                            <ul class="feature-list">
+                                <li>Black-Scholes options pricing model</li>
+                                <li>Implied volatility calculations</li>
+                                <li>Stock lookup with autocomplete</li>
+                                <li>Options strategy builder</li>
+                                <li>Risk/reward visualization</li>
+                            </ul>
+                            <!-- Example preview -->
+                            <div class="feature-example">
+                                <div class="card border-0 shadow-sm">
+                                    <div class="card-header bg-warning text-dark py-2">
+                                        <small><strong>Black-Scholes Calculator</strong> • TSLA Call</small>
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <div class="row g-2 text-center mb-2">
+                                            <div class="col-12">
+                                                <div class="alert alert-success py-1 mb-2">
+                                                    <div class="h6 mb-0">Theoretical Price: $12.45</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="row g-1">
+                                            <div class="col-6">
+                                                <div class="text-center">
+                                                    <div class="h6 text-primary mb-0">0.72</div>
+                                                    <small class="text-muted">Delta</small>
+                                                </div>
+                                            </div>
+                                            <div class="col-6">
+                                                <div class="text-center">
+                                                    <div class="h6 text-info mb-0">0.08</div>
+                                                    <small class="text-muted">Gamma</small>
+                                                </div>
+                                            </div>
+                                            <div class="col-6">
+                                                <div class="text-center">
+                                                    <div class="h6 text-danger mb-0">-0.15</div>
+                                                    <small class="text-muted">Theta</small>
+                                                </div>
+                                            </div>
+                                            <div class="col-6">
+                                                <div class="text-center">
+                                                    <div class="h6 text-warning mb-0">0.23</div>
+                                                    <small class="text-muted">Vega</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Tool 6: Education & Resources -->
+                <div class="col-lg-6">
+                    <div class="tool-section">
+                        <div class="feature-card">
+                            <div class="feature-icon" style="background: linear-gradient(135deg, #a8edea, #fed6e3);">
+                                <i class="fas fa-graduation-cap"></i>
+                            </div>
+                            <h3 class="feature-title">Education & Resources</h3>
+                            <p class="feature-description">
+                                Comprehensive educational content and resources to improve your trading skills
+                            </p>
+                            <ul class="feature-list">
+                                <li>Options trading fundamentals</li>
+                                <li>Strategy guides and tutorials</li>
+                                <li>Risk management best practices</li>
+                                <li>Market analysis techniques</li>
+                                <li>Continuous learning resources</li>
+                            </ul>
+                            <!-- Example preview -->
+                            <div class="feature-example">
+                                <div class="card border-0 shadow-sm">
+                                    <div class="card-header bg-info text-white py-2">
+                                        <small><strong>Education Hub</strong> • Understanding the Greeks</small>
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <div class="small">
+                                            <div class="mb-2">
+                                                <strong>Delta (Δ):</strong> Price sensitivity to underlying movement
+                                                <div class="text-muted">Example: Delta 0.7 = $0.70 gain per $1 stock move</div>
+                                            </div>
+                                            <div class="mb-2">
+                                                <strong>Gamma (Γ):</strong> Rate of change in delta
+                                                <div class="text-muted">Highest near-the-money, accelerates as stock moves</div>
+                                            </div>
+                                            <div class="mb-2">
+                                                <strong>Theta (Θ):</strong> Time decay
+                                                <div class="text-muted">Options lose value as expiration approaches</div>
+                                            </div>
+                                            <div>
+                                                <strong>Vega (ν):</strong> Volatility sensitivity
+                                                <div class="text-muted">Higher IV = higher option premiums</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-    
-    <!-- CTA Section -->
-    <div class="row justify-content-center py-5">
-        <div class="col-lg-8 text-center">
-            <div class="card">
-                <div class="card-body py-5">
-                    {% if current_user.is_authenticated or show_logged_in %}
-                        {% if current_user.is_authenticated %}
-                            <h3 class="mb-3">Welcome back, {{ current_user.username }}!</h3>
-                        {% else %}
-                            <h3 class="mb-3">Explore Options Plunge</h3>
-                        {% endif %}
-                        <p class="text-muted mb-4">
-                            Ready to analyze your next trade or review your performance?
-                            Access all your trading tools and AI analysis from the dashboard.
-                        </p>
-                        <div class="d-grid gap-2 d-md-flex justify-content-md-center">
-                            <a href="{{ url_for('dashboard') }}" class="btn btn-primary btn-lg me-md-2">
-                                <i class="fas fa-tachometer-alt me-2"></i>
-                                Go to Dashboard
-                            </a>
-                            <a href="{{ url_for('options_calculator') }}" class="btn btn-outline-info btn-lg">
-                                <i class="fas fa-calculator me-2"></i>
-                                Options Calculator
-                            </a>
-                        </div>
-                    {% else %}
-                        <h3 class="mb-3">Ready to Improve Your Trading?</h3>
-                        <p class="text-muted mb-4">
-                            Join traders who are using AI to analyze their performance and professional-grade
-                            options tools to accelerate their learning curve.
-                        </p>
-                        <a href="{{ url_for('register') }}" class="btn btn-primary btn-lg">
-                            <i class="fas fa-rocket me-2"></i>
-                            Start Your Free Account
-                        </a>
-                    {% endif %}
+</section>
+
+
+
+<!-- Testimonials Section -->
+<section class="testimonials-section">
+    <div class="container">
+        <h2 class="section-title">What Traders Are Saying</h2>
+        <p class="section-subtitle">
+            Join thousands of successful traders who have improved their performance
+        </p>
+        
+        <div class="row g-4">
+            <div class="col-lg-4">
+                <div class="testimonial-card">
+                    <div class="testimonial-avatar">JS</div>
+                    <h5>John Smith</h5>
+                    <p class="text-muted">Professional Trader</p>
+                    <p>"The AI analysis has completely transformed my trading. I've improved my win rate by 40% in just 3 months."</p>
+                </div>
+            </div>
+            
+            <div class="col-lg-4">
+                <div class="testimonial-card">
+                    <div class="testimonial-avatar">MJ</div>
+                    <h5>Maria Johnson</h5>
+                    <p class="text-muted">Options Trader</p>
+                    <p>"The options calculator is incredible. Real-time data and Greeks analysis help me make better decisions instantly."</p>
+                </div>
+            </div>
+            
+            <div class="col-lg-4">
+                <div class="testimonial-card">
+                    <div class="testimonial-avatar">DW</div>
+                    <h5>David Wilson</h5>
+                    <p class="text-muted">Day Trader</p>
+                    <p>"The trade tracking and analytics have given me insights I never had before. My consistency has improved dramatically."</p>
                 </div>
             </div>
         </div>
     </div>
-</div>
+</section>
+
+<!-- Final CTA Section -->
+<section class="final-cta">
+    <div class="container">
+        <h2>Ready to Level-Up Your Trading?</h2>
+        <p>Join traders who leverage AI analysis and professional-grade tools to improve performance.</p>
+        {% if current_user.is_authenticated %}
+            <a href="{{ url_for('dashboard') }}" class="btn btn-hero btn-hero-primary btn-lg">
+                <i class="fas fa-rocket me-2"></i>Go to Dashboard
+            </a>
+        {% else %}
+            <a href="{{ url_for('register') }}" class="btn btn-hero btn-hero-primary btn-lg">
+                <i class="fas fa-rocket me-2"></i>Get Started
+            </a>
+        {% endif %}
+    </div>
+</section>
+
+<!-- Financial Disclaimer Section -->
+<section class="financial-disclaimer bg-light py-4 mt-5">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="text-center">
+                    <p class="text-muted small mb-0">
+                        <strong>Financial Disclaimer:</strong> Options Plunge is a publisher. No content constitutes a recommendation that any particular investment, security, portfolio of securities, transaction or investment strategy is suitable for any specific person. Please consult with a qualified advisor before making investment decisions. Trading contains substantial risk and is not for every investor.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
 {% endblock %} 

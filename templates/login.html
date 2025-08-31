@@ -50,10 +50,17 @@
                             {{ form.submit(class="btn btn-primary btn-lg") }}
                         </div>
 
-                        <!-- Google Login Button -->
+                        <!-- Divider -->
                         {% if config.get('GOOGLE_OAUTH_CLIENT_ID') %}
                         <div class="text-center my-3">
-                            <a href="{{ url_for('google.login') }}" class="btn btn-outline-danger w-100">
+                            <div class="divider">
+                                <span class="divider-text">OR</span>
+                            </div>
+                        </div>
+
+                        <!-- Google Login Button -->
+                        <div class="text-center my-3">
+                            <a href="{{ url_for('google.login') }}" class="btn btn-google w-100">
                                 <i class="fab fa-google me-2"></i>Sign in with Google
                             </a>
                         </div>
@@ -99,5 +106,5 @@
             </div>
         </div>
     </div>
-</div>
-{% endblock %} 
+ </div>
+ {% endblock %} 

@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Subscription Confirmed - Options Plunge{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <div class="mb-4">
+                        <i class="fas fa-check-circle text-success" style="font-size: 4rem;"></i>
+                    </div>
+                    
+                    <h1 class="card-title mb-4">You're in! ✅</h1>
+                    
+                    <div class="card-text">
+                        <p class="lead mb-4">
+                            Thanks{% if name %}, {{ name }}{% endif %}! Your subscription to the
+                            <strong>Morning Market Brief</strong> is confirmed.
+                        </p>
+                        
+                        <div class="alert alert-info mb-4">
+                            <i class="fas fa-clock me-2"></i>
+                            You'll receive your first email at around 7 AM ET on the next trading day.
+                        </div>
+                        
+                        <div class="mb-4">
+                            <h5>What you'll get:</h5>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-chart-line text-primary me-2"></i>Daily market analysis and key levels</li>
+                                <li><i class="fas fa-newspaper text-primary me-2"></i>Curated financial news headlines</li>
+                                <li><i class="fas fa-bullseye text-primary me-2"></i>Trading opportunities and setups</li>
+                                <li><i class="fas fa-chart-bar text-primary me-2"></i>Technical analysis and sentiment</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-primary btn-lg me-md-2">
+                            <i class="fas fa-tachometer-alt me-2"></i>Go to Dashboard
+                        </a>
+                        <a href="{{ url_for('market_brief') }}" class="btn btn-outline-secondary btn-lg">
+                            <i class="fas fa-newspaper me-2"></i>Learn More
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

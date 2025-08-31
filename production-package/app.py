@@ -8,7 +8,16 @@ from flask_login import (
 )
 from flask_migrate import Migrate
 from config import Config
-from models import db, User, Trade, TradeAnalysis, TradingJournal, UserSettings
+# Import MarketBriefSubscriber
+from models import (
+    db,
+    User,
+    Trade,
+    TradeAnalysis,
+    TradingJournal,
+    UserSettings,
+    MarketBriefSubscriber,
+)
 from forms import (
     LoginForm,
     RegistrationForm,
@@ -16,10 +25,12 @@ from forms import (
     QuickTradeForm,
     JournalForm,
     EditTradeForm,
+    SettingsForm,
     UserSettingsForm,
     BulkAnalysisForm,
     ResetPasswordRequestForm,
     ResetPasswordForm,
+    MarketBriefSignupForm,
 )
 from ai_analysis import TradingAIAnalyzer
 from datetime import datetime, timedelta, date
@@ -38,6 +49,11 @@ from itertools import zip_longest
 from werkzeug.utils import secure_filename
 from flask_mail import Mail, Message
 
+# Allow OAuth over HTTP for local development
+if os.getenv('FLASK_ENV') == 'development' or os.getenv('OAUTHLIB_INSECURE_TRANSPORT') is None:
+    os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+from flask_dance.contrib.google import make_google_blueprint, google
+
 # Load environment variables from .env file
 try:
     from dotenv import load_dotenv
@@ -53,33 +69,193 @@ except Exception as e:
 
 app = Flask(__name__)
 app.config.from_object(Config)
-app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev")
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
-    "DATABASE_URL", "sqlite:///trading_journal.db"
-)
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-# Email configuration
-app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
-app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
-app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS', True)
-app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
-app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
-app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER')
+# Override SERVER_NAME for local development
+if os.environ.get('FLASK_ENV') != 'production':
+    app.config['SERVER_NAME'] = None
+else:
+    # In production, don't set SERVER_NAME to avoid hostname issues
+    app.config['SERVER_NAME'] = None
 
 mail = Mail(app)
 
 # Initialize extensions
 db.init_app(app)
+with app.app_context():
+    try:
+        print("DB Engine URL:", db.engine.url)
+    except Exception as e:
+        print("DB Engine check error:", str(e))
 migrate = Migrate(app, db)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
 
+# ───────── Google OAuth Setup ─────────
+GOOGLE_OAUTH_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID")
+GOOGLE_OAUTH_CLIENT_SECRET = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET")
+
+# Add to app config for template access
+app.config['GOOGLE_OAUTH_CLIENT_ID'] = GOOGLE_OAUTH_CLIENT_ID
+
+print(f"Google OAuth Client ID: {'Set' if GOOGLE_OAUTH_CLIENT_ID else 'Not set'}")
+print(f"Google OAuth Client Secret: {'Set' if GOOGLE_OAUTH_CLIENT_SECRET else 'Not set'}")
+
+if GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET:
+    google_bp = make_google_blueprint(
+        client_id=GOOGLE_OAUTH_CLIENT_ID,
+        client_secret=GOOGLE_OAUTH_CLIENT_SECRET,
+        scope=["openid", "https://www.googleapis.com/auth/userinfo.profile", "https://www.googleapis.com/auth/userinfo.email"],
+        redirect_to="google_login"  # Redirect to our custom login handler after OAuth
+    )
+    app.register_blueprint(google_bp, url_prefix="/login")
+    print("✅ Google OAuth blueprint registered successfully")
+else:
+    print("⚠️  Google OAuth not configured. Set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET env vars.")
+
+# Register billing blueprint
+try:
+    from billing import bp as billing_bp, requires_pro
+    app.register_blueprint(billing_bp)
+    print("✅ Billing blueprint registered successfully")
+except ImportError as e:
+    print(f"⚠️  Billing blueprint not available: {e}")
+    # Fallback requires_pro decorator
+    def requires_pro(f):
+        from functools import wraps
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            if not current_user.is_authenticated:
+                return jsonify({"error": "Authentication required"}), 401
+            if not current_user.has_pro_access():
+                flash("Pro subscription required for this feature. Please upgrade to Pro.", "warning")
+                return redirect(url_for("pricing"))
+            return f(*args, **kwargs)
+        return wrapper
+
+def is_pro_user():
+    """Check if current user has Pro access for page-level preview gating"""
+    return current_user.is_authenticated and current_user.has_pro_access()
+
+# ───────── Google Login Route ─────────
+@app.route("/google_login")
+def google_login():
+    try:
+        print("=== Google Login Debug ===")
+        print(f"Request URL: {request.url}")
+        print(f"Request args: {dict(request.args)}")
+        print(f"Session data: {dict(session)}")
+        
+        if not google.authorized:
+            print("Google not authorized, redirecting to login")
+            return redirect(url_for("google.login"))
+
+        print("Google is authorized, fetching user info...")
+        resp = google.get("/oauth2/v2/userinfo")
+        if not resp.ok:
+            print(f"Failed to fetch user info: {resp.status_code}")
+            flash("Failed to fetch user info from Google.", "danger")
+            return redirect(url_for("login"))
+
+        info = resp.json()
+        email = info.get("email")
+        username = email.split("@")[0] if email else None
+        
+        print(f"Google user info - Email: {email}, Username: {username}")
+
+        if not email:
+            print("No email found in Google account")
+            flash("Google account has no email address", "danger")
+            return redirect(url_for("login"))
+
+        print("Checking if user exists in database...")
+        user = User.query.filter_by(email=email).first()
+        
+        if not user:
+            print(f"User not found, creating new user with email: {email}")
+            # Check if username already exists
+            existing_username = User.query.filter_by(username=username).first()
+            if existing_username:
+                print(f"Username {username} already exists, adding random suffix")
+                username = f"{username}_{secrets.token_urlsafe(4)}"
+            
+            # Auto-create user account
+            user = User(username=username, email=email)
+            # Set a random password
+            user.set_password(secrets.token_urlsafe(16))
+            try:
+                print(f"Adding user to database: {username}")
+                db.session.add(user)
+                db.session.commit()
+                print("User created successfully")
+            except Exception as e:
+                db.session.rollback()
+                print(f"Database error creating user: {str(e)}")
+                flash("Error creating user account. Please try again.", "danger")
+                return redirect(url_for("login"))
+        else:
+            print(f"User found: {user.username}")
+
+        print("Logging in user...")
+        login_user(user)
+        print("User logged in successfully")
+        flash("Logged in successfully via Google", "success")
+        
+        # Detect mobile device and ensure proper mobile experience
+        user_agent = request.headers.get('User-Agent', '').lower()
+        is_mobile = any(device in user_agent for device in ['mobile', 'android', 'iphone', 'ipad', 'ipod'])
+        
+        if is_mobile:
+            print("Mobile device detected, ensuring mobile layout")
+            # Store mobile preference in session
+            session['mobile_preference'] = True
+            # Redirect to dashboard with mobile context
+            return redirect(url_for("dashboard", mobile=1))
+        else:
+            return redirect(url_for("dashboard"))
+        
+    except Exception as e:
+        # Log the error for debugging
+        print(f"Google login error: {str(e)}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
+        flash("An error occurred during Google login. Please try again.", "danger")
+        return redirect(url_for("login"))
+
 
 @login_manager.user_loader
 def load_user(id):
     return User.query.get(int(id))
+
+# Debug route for Google OAuth
+@app.route("/debug/google-oauth")
+def debug_google_oauth():
+    """Debug route to check Google OAuth configuration"""
+    debug_info = {
+        "google_oauth_client_id": "Set" if GOOGLE_OAUTH_CLIENT_ID else "Not set",
+        "google_oauth_client_secret": "Set" if GOOGLE_OAUTH_CLIENT_SECRET else "Not set",
+        "google_authorized": google.authorized if 'google' in globals() else "Google not initialized",
+        "expected_redirect_uri": "https://optionsplunge.com/login/google/authorized",
+        "session_secret_key": "Set" if app.config.get('SECRET_KEY') else "Not set",
+        "session_config": {
+            "session_type": type(session).__name__,
+            "session_available": hasattr(session, 'get')
+        }
+    }
+    return jsonify(debug_info)
+
+# Debug route for OAuth callback
+@app.route("/debug/oauth-callback")
+def debug_oauth_callback():
+    """Debug route to check OAuth callback state"""
+    from flask import request
+    debug_info = {
+        "request_args": dict(request.args),
+        "request_url": request.url,
+        "google_authorized": google.authorized if 'google' in globals() else "Google not initialized",
+        "session_data": dict(session) if hasattr(session, 'get') else "No session"
+    }
+    return jsonify(debug_info)
 
 
 # Initialize AI analyzer
@@ -93,6 +269,310 @@ print(f"Tradier token configured: {'Yes' if TRADIER_API_TOKEN else 'No'}")
 
 if not TRADIER_API_TOKEN:
     print("Warning: TRADIER_API_TOKEN environment variable not set")
+
+
+# ──────────────────────────────────────────────────
+# MARKET BRIEF ROUTE
+# ──────────────────────────────────────────────────
+
+
+@app.route("/market_brief", methods=["GET", "POST"])
+def market_brief():
+    """Landing page for the free morning market brief"""
+    form = MarketBriefSignupForm()
+    subscribed = False
+    
+    # Check for preview mode query param
+    preview_mode = request.args.get('preview') == '1'
+    
+    # Determine if user should see preview or full access
+    show_preview = not is_pro_user() or preview_mode
+
+    if form.validate_on_submit():
+        name = form.name.data.strip()
+        email = form.email.data.strip().lower()
+        
+        # Check if already subscribed
+        existing_subscriber = MarketBriefSubscriber.query.filter_by(email=email).first()
+        
+        if existing_subscriber:
+            if existing_subscriber.confirmed:
+                flash('You\'re already subscribed and confirmed! Check your inbox for the latest brief.', 'info')
+            else:
+                # Resend confirmation email
+                from emails import send_confirmation_email_direct
+                if send_confirmation_email_direct(existing_subscriber):
+                    flash('Confirmation email resent! Please check your inbox and click the confirmation link.', 'info')
+                else:
+                    flash('Error sending confirmation email. Please try again or contact support.', 'danger')
+        else:
+            # Create new subscriber
+            subscriber = MarketBriefSubscriber(
+                name=name, 
+                email=email,
+                confirmed=False
+            )
+            db.session.add(subscriber)
+            db.session.commit()
+
+            # Send confirmation email
+            from emails import send_confirmation_email_direct, send_admin_notification
+            if send_confirmation_email_direct(subscriber):
+                send_admin_notification(subscriber)  # Notify admin
+                flash('Check your email to confirm your subscription!', 'success')
+            else:
+                flash('Error sending confirmation email. Please try again.', 'danger')
+
+    # Load briefs from database
+    from models import MarketBrief
+    from datetime import date, timedelta
+    
+    # Get latest daily brief
+    latest_daily_brief = MarketBrief.query.filter_by(brief_type='daily').order_by(MarketBrief.date.desc()).first()
+    
+    # Get latest weekly brief
+    latest_weekly_brief = MarketBrief.query.filter_by(brief_type='weekly').order_by(MarketBrief.date.desc()).first()
+    
+    # Get historical briefs (last 14 days)
+    cutoff_date = date.today() - timedelta(days=14)
+    
+    # Historical daily briefs (Pro users only)
+    historical_daily_briefs = []
+    if current_user.is_authenticated and current_user.has_pro_access():
+        historical_daily_briefs = MarketBrief.query.filter(
+            MarketBrief.brief_type == 'daily',
+            MarketBrief.date >= cutoff_date
+        ).order_by(MarketBrief.date.desc()).limit(10).all()
+    
+    # Historical weekly briefs (all users)
+    historical_weekly_briefs = MarketBrief.query.filter(
+        MarketBrief.brief_type == 'weekly',
+        MarketBrief.date >= cutoff_date
+    ).order_by(MarketBrief.date.desc()).limit(5).all()
+
+    return render_template(
+        "market_brief.html", 
+        form=form, 
+        subscribed=subscribed, 
+        latest_daily_brief=latest_daily_brief,
+        latest_weekly_brief=latest_weekly_brief,
+        historical_daily_briefs=historical_daily_briefs,
+        historical_weekly_briefs=historical_weekly_briefs,
+        show_pro_upsell=show_preview,
+        show_demo_data=show_preview,
+        feature_name="Daily Market Brief" if show_preview else None,
+        limitations=[
+            "Sample brief only - no real-time data",
+            "Cannot access full brief archive",
+            "No email delivery"
+        ] if show_preview else None
+    )
+
+
+@app.route("/brief/<int:brief_id>")
+def view_brief(brief_id):
+    """View a specific market brief"""
+    from models import MarketBrief
+    
+    brief = MarketBrief.query.get_or_404(brief_id)
+    
+    # Check access permissions
+    if brief.brief_type == 'daily':
+        if not current_user.is_authenticated or not current_user.has_pro_access():
+            flash('Daily briefs are available to Pro users only.', 'warning')
+            return redirect(url_for('market_brief'))
+    
+    return render_template(
+        "view_brief.html",
+        brief=brief,
+        title=f"{brief.brief_type.title()} Brief - {brief.date.strftime('%B %d, %Y')}"
+    )
+
+@app.route("/confirm/<token>")
+def confirm_subscription(token):
+    """Confirm newsletter subscription with token"""
+    try:
+        # Validate token format
+        if not token or len(token) < 20:
+            flash('Invalid confirmation link format.', 'danger')
+            return redirect(url_for('market_brief'))
+        
+        subscriber = MarketBriefSubscriber.query.filter_by(token=token).first()
+        
+        if not subscriber:
+            flash('Invalid or expired confirmation link. Please check your email or request a new confirmation.', 'danger')
+            return redirect(url_for('market_brief'))
+        
+        if subscriber.confirmed:
+            # Already confirmed - show success page anyway
+            return render_template('brief_confirmed.html', name=subscriber.name)
+        else:
+            # Confirm the subscription
+            subscriber.confirm_subscription()
+            db.session.commit()
+            
+            # Send welcome email (don't let this fail the confirmation)
+            try:
+                from emails import send_welcome_email
+                send_welcome_email(subscriber)
+            except Exception as e:
+                print(f"Warning: Could not send welcome email to {subscriber.email}: {e}")
+            
+            # Render success page
+            return render_template('brief_confirmed.html', name=subscriber.name)
+            
+    except Exception as e:
+        print(f"Error in confirm_subscription: {e}")
+        flash('An error occurred while confirming your subscription. Please try again or contact support.', 'danger')
+        return redirect(url_for('market_brief'))
+
+@app.route("/unsubscribe/<email>")
+def unsubscribe(email):
+    """Unsubscribe from newsletter"""
+    subscriber = MarketBriefSubscriber.query.filter_by(email=email).first()
+    
+    if subscriber:
+        subscriber.unsubscribe()
+        db.session.commit()
+        flash('You have been unsubscribed from the Morning Market Brief.', 'info')
+    else:
+        flash('Email not found in our subscriber list.', 'warning')
+    
+    return redirect(url_for('market_brief'))
+
+@app.route("/admin/send_brief", methods=["POST"])
+@login_required
+def send_brief():
+    """Admin route to manually trigger market brief sending"""
+    # Add admin check
+    if current_user.email != 'support@optionsplunge.com':
+        flash("Access denied. Admin privileges required.", "danger")
+        return redirect(url_for("market_brief"))
+    
+    try:
+        from market_brief_generator import send_market_brief_to_subscribers
+        success_count = send_market_brief_to_subscribers()
+        flash(f"Market brief sent to {success_count} subscribers!", "success")
+    except Exception as e:
+        flash(f"Error sending market brief: {str(e)}", "danger")
+    
+    return redirect(url_for("market_brief"))
+
+@app.route("/admin/morning-brief")
+@login_required
+def admin_morning_brief():
+    """Admin page for morning brief management"""
+    # Add admin check
+    if current_user.email != 'support@optionsplunge.com':
+        flash("Access denied. Admin privileges required.", "danger")
+        return redirect(url_for("market_brief"))
+    
+    return render_template("admin/morning_brief.html")
+
+@app.route("/admin/preview/morning-brief", methods=["POST"])
+@login_required
+def preview_morning_brief():
+    """Preview morning brief with provided data"""
+    # Add admin check
+    if current_user.email != 'support@optionsplunge.com':
+        return jsonify({"error": "Access denied"}), 403
+    
+    try:
+        data = request.get_json()
+        from daily_brief_schema import MorningBrief
+        from emailer import render_morning_brief
+        
+        # Validate data with Pydantic
+        brief = MorningBrief(**data)
+        context = brief.model_dump()
+        
+        # Render templates
+        html_content, text_content = render_morning_brief(context)
+        
+        return jsonify({
+            "html": html_content,
+            "text": text_content,
+            "subject": f"Options Plunge Morning Brief — {brief.subject_theme} ({brief.date})"
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+@app.route("/admin/send-test/morning-brief", methods=["POST"])
+@login_required
+def send_test_morning_brief():
+    """Send test morning brief email"""
+    # Add admin check
+    if current_user.email != 'support@optionsplunge.com':
+        return jsonify({"error": "Access denied"}), 403
+    
+    try:
+        data = request.get_json()
+        from daily_brief_schema import MorningBrief
+        from emailer import render_morning_brief, send_morning_brief
+        
+        # Validate data with Pydantic
+        brief = MorningBrief(**data)
+        context = brief.model_dump()
+        
+        # Render templates
+        html_content, text_content = render_morning_brief(context)
+        subject = f"Options Plunge Morning Brief — {brief.subject_theme} ({brief.date})"
+        
+        # Get test email from environment
+        test_email = os.getenv('TEST_EMAIL')
+        if not test_email:
+            return jsonify({"error": "TEST_EMAIL environment variable not set"}), 400
+        
+        # Send test email
+        success = send_morning_brief(html_content, text_content, subject, [test_email])
+        
+        if success:
+            return jsonify({"message": f"Test email sent to {test_email}"})
+        else:
+            return jsonify({"error": "Failed to send test email"}), 500
+            
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+@app.route("/admin/publish/morning-brief", methods=["POST"])
+@login_required
+def publish_morning_brief():
+    """Publish morning brief to all subscribers"""
+    # Add admin check
+    if current_user.email != 'support@optionsplunge.com':
+        return jsonify({"error": "Access denied"}), 403
+    
+    try:
+        data = request.get_json()
+        from daily_brief_schema import MorningBrief
+        from emailer import render_morning_brief, send_morning_brief
+        
+        # Validate data with Pydantic
+        brief = MorningBrief(**data)
+        context = brief.model_dump()
+        
+        # Render templates
+        html_content, text_content = render_morning_brief(context)
+        subject = f"Options Plunge Morning Brief — {brief.subject_theme} ({brief.date})"
+        
+        # Get subscribers from database
+        subscribers = MarketBriefSubscriber.query.filter_by(confirmed=True).all()
+        recipient_emails = [sub.email for sub in subscribers]
+        
+        if not recipient_emails:
+            return jsonify({"error": "No confirmed subscribers found"}), 400
+        
+        # Send to all subscribers
+        success = send_morning_brief(html_content, text_content, subject, recipient_emails)
+        
+        if success:
+            return jsonify({"message": f"Morning brief sent to {len(recipient_emails)} subscribers"})
+        else:
+            return jsonify({"error": "Failed to send morning brief"}), 500
+            
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
 
 
 def get_tradier_headers():
@@ -437,7 +917,7 @@ def save_uploaded_file(file, prefix="chart"):
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", hide_sidebar=True)
 
 
 @app.route("/home")
@@ -465,7 +945,7 @@ def login():
             return redirect(next_page or url_for("index"))
         flash("Invalid username or password", "danger")
 
-    return render_template("login.html", form=form)
+    return render_template("login.html", form=form, hide_sidebar=True)
 
 
 @app.route("/register", methods=["GET", "POST"])
@@ -488,7 +968,7 @@ def register():
             
         return redirect(url_for("dashboard"))
 
-    return render_template("register.html", form=form)
+    return render_template("register.html", form=form, hide_sidebar=True)
 
 
 @app.route("/logout")
@@ -503,6 +983,9 @@ def logout():
 def dashboard():
     """Dashboard page - shows basic stats and recent trades if logged in"""
     try:
+        # Check for mobile preference from session or query parameter
+        mobile_preference = session.get('mobile_preference', False) or request.args.get('mobile') == '1'
+        
         if current_user.is_authenticated:
             # Get recent trades
             recent_trades = current_user.get_recent_trades(10)
@@ -536,6 +1019,7 @@ def dashboard():
                 stats=stats,
                 recent_journals=recent_journals,
                 today_journal=today_journal,
+                mobile_preference=mobile_preference,
             )
         else:
             # Show aggregate stats for guests using all available trades
@@ -571,6 +1055,7 @@ def dashboard():
                 stats=stats,
                 recent_journals=recent_journals,
                 today_journal=None,
+                mobile_preference=mobile_preference,
             )
     except Exception as e:
         # Log the error for debugging
@@ -585,74 +1070,80 @@ def dashboard():
 
 @app.route("/trades")
 def trades():
-    """Display trades. Show sample data for unauthenticated users."""
-    if not current_user.is_authenticated:
-        # Show sample trades for unauthenticated users
-        sample_trades = [
-            {
-                'id': 1,
-                'symbol': 'AAPL',
-                'trade_type': 'stock',
-                'entry_date': datetime.now() - timedelta(days=5),
-                'entry_price': 150.25,
-                'quantity': 100,
-                'exit_date': datetime.now() - timedelta(days=2),
-                'exit_price': 155.75,
-                'profit_loss': 550.00,
-                'setup_type': 'breakout',
-                'market_condition': 'bullish',
-                'timeframe': 'daily',
-                'entry_reason': 'Breakout above resistance with high volume',
-                'exit_reason': 'Target reached',
-                'notes': 'Strong earnings catalyst',
-                'tags': 'earnings, breakout, tech'
-            },
-            {
-                'id': 2,
-                'symbol': 'TSLA',
-                'trade_type': 'option_call',
-                'entry_date': datetime.now() - timedelta(days=10),
-                'entry_price': 2.50,
-                'quantity': 10,
-                'exit_date': datetime.now() - timedelta(days=7),
-                'exit_price': 4.25,
-                'profit_loss': 1750.00,
-                'setup_type': 'momentum',
-                'market_condition': 'bullish',
-                'timeframe': '4h',
-                'entry_reason': 'Strong momentum with high IV',
-                'exit_reason': 'IV crush after earnings',
-                'notes': 'Earnings play - sold before announcement',
-                'tags': 'earnings, options, momentum'
-            },
-            {
-                'id': 3,
-                'symbol': 'SPY',
-                'trade_type': 'credit_put_spread',
-                'entry_date': datetime.now() - timedelta(days=15),
-                'entry_price': 1.25,
-                'quantity': 5,
-                'exit_date': datetime.now() - timedelta(days=12),
-                'exit_price': 0.50,
-                'profit_loss': 375.00,
-                'setup_type': 'income',
-                'market_condition': 'sideways',
-                'timeframe': 'daily',
-                'entry_reason': 'High probability setup in sideways market',
-                'exit_reason': 'Early profit taking',
-                'notes': 'Theta decay working in our favor',
-                'tags': 'income, spreads, theta'
-            }
-        ]
-        return render_template("trades.html", trades=sample_trades, show_login_prompt=True, is_authenticated=False)
+    """Display trades. Show real data for authenticated users, sample data for others."""
+    
+    # Show sample trades for unauthenticated users
+    sample_trades = [
+        {
+            'id': 1,
+            'symbol': 'AAPL',
+            'trade_type': 'stock',
+            'entry_date': datetime.now() - timedelta(days=5),
+            'entry_price': 150.25,
+            'quantity': 100,
+            'exit_date': datetime.now() - timedelta(days=2),
+            'exit_price': 155.75,
+            'profit_loss': 550.00,
+            'setup_type': 'breakout',
+            'market_condition': 'bullish',
+            'timeframe': 'daily',
+            'entry_reason': 'Breakout above resistance with high volume',
+            'exit_reason': 'Target reached',
+            'notes': 'Strong earnings catalyst',
+            'tags': 'earnings, breakout, tech'
+        },
+        {
+            'id': 2,
+            'symbol': 'TSLA',
+            'trade_type': 'option_call',
+            'entry_date': datetime.now() - timedelta(days=10),
+            'entry_price': 2.50,
+            'quantity': 10,
+            'exit_date': datetime.now() - timedelta(days=7),
+            'exit_price': 4.25,
+            'profit_loss': 1750.00,
+            'setup_type': 'momentum',
+            'market_condition': 'bullish',
+            'timeframe': '4h',
+            'entry_reason': 'Strong momentum with high IV',
+            'exit_reason': 'IV crush after earnings',
+            'notes': 'Earnings play - sold before announcement',
+            'tags': 'earnings, options, momentum'
+        },
+        {
+            'id': 3,
+            'symbol': 'SPY',
+            'trade_type': 'credit_put_spread',
+            'entry_date': datetime.now() - timedelta(days=15),
+            'entry_price': 1.25,
+            'quantity': 5,
+            'exit_date': datetime.now() - timedelta(days=12),
+            'exit_price': 0.50,
+            'profit_loss': 375.00,
+            'setup_type': 'income',
+            'market_condition': 'sideways',
+            'timeframe': 'daily',
+            'entry_reason': 'High probability setup in sideways market',
+            'exit_reason': 'Early profit taking',
+            'notes': 'Theta decay working in our favor',
+            'tags': 'income, spreads, theta'
+        }
+    ]
+    
+    if current_user.is_authenticated:
+        # Check if user has real trades
+        user_trades = Trade.query.filter_by(user_id=current_user.id).order_by(Trade.entry_date.desc()).paginate(
+            page=request.args.get('page', 1, type=int), per_page=10, error_out=False)
         
-    page = request.args.get("page", 1, type=int)
-    trades = (
-        Trade.query.filter_by(user_id=current_user.id)
-        .order_by(Trade.entry_date.desc())
-        .paginate(page=page, per_page=20, error_out=False)
-    )
-    return render_template("trades.html", trades=trades, show_login_prompt=False, is_authenticated=True)
+        if user_trades.total > 0:
+            # User has real trades - show them
+            return render_template("trades.html", trades=user_trades, show_login_prompt=False, is_authenticated=True, show_demo_data=False)
+        else:
+            # User has no trades - show demo data
+            return render_template("trades.html", trades=sample_trades, show_login_prompt=False, is_authenticated=True, show_demo_data=True)
+    else:
+        # For unauthenticated users, show sample data with login prompt
+        return render_template("trades.html", trades=sample_trades, show_login_prompt=True, is_authenticated=False)
 
 
 @app.route("/add_trade", methods=["GET", "POST"])
@@ -868,16 +1359,32 @@ def edit_trade(id):
 
 @app.route("/trade/<int:id>/analyze", methods=["POST"])
 @login_required
+@requires_pro
 def analyze_trade(id):
     trade = Trade.query.filter_by(id=id, user_id=current_user.id).first_or_404()
 
     try:
+        print(f"DEBUG: Starting AI analysis for trade {trade.id}")
+        print(f"DEBUG: About to call ai_analyzer.analyze_trade")
+        print(f"DEBUG: OPENAI_API_KEY from env: {os.getenv('OPENAI_API_KEY', 'NOT_FOUND')[:20] if os.getenv('OPENAI_API_KEY') else 'NOT_FOUND'}...")
         analysis = ai_analyzer.analyze_trade(trade)
-        if analysis:
+        print(f"DEBUG: Analysis result: {analysis}")
+        print(f"DEBUG: Analysis type: {type(analysis)}")
+        
+        if analysis is None:
+            print(f"DEBUG: Analysis returned None")
+            flash("Analysis failed. Please check your OpenAI API key.", "error")
+        elif isinstance(analysis, dict) and analysis.get("error"):
+            print(f"DEBUG: Analysis error: {analysis['error']}")
+            flash(f"Analysis failed: {analysis['error']}", "error")
+        elif hasattr(analysis, 'trade_id'):  # TradeAnalysis object
+            print(f"DEBUG: Analysis successful, trade_id: {analysis.trade_id}")
             flash("Trade analysis completed!", "success")
         else:
+            print(f"DEBUG: Unexpected analysis result type")
             flash("Analysis failed. Please check your OpenAI API key.", "error")
     except Exception as e:
+        print(f"DEBUG: Analysis exception: {str(e)}")
         flash(f"Analysis error: {str(e)}", "error")
 
     return redirect(url_for("view_trade", id=id))
@@ -885,69 +1392,76 @@ def analyze_trade(id):
 
 @app.route("/journal")
 def journal():
-    """Display journal entries. Guests see sample entries."""
+    """Display journal entries. Show real data for authenticated users, sample data for others."""
     page = request.args.get("page", 1, type=int)
+    
+    # Show sample journal entries for unauthenticated users
+    from datetime import datetime, timedelta
+    
+    sample_journals = [
+        {
+            'journal_date': datetime.now() - timedelta(days=1),
+            'market_notes': 'Market showing strong momentum in tech sector. AAPL and TSLA leading the charge with earnings catalysts. VIX remains low indicating complacency.',
+            'trading_notes': 'Executed 3 trades today: AAPL breakout (winner), TSLA momentum (winner), SPY reversal (loser). Overall P&L: +$450. Stuck to my plan and managed risk well.',
+            'emotions': 'Felt confident and focused. No FOMO or revenge trading urges. Stayed disciplined with position sizing.',
+            'lessons_learned': 'Breakout trades work best with volume confirmation. Need to be more patient with reversal setups.',
+            'tomorrow_plan': 'Focus on high-probability setups only. Watch for continuation patterns in tech. Keep position sizes consistent.',
+            'daily_pnl': 450.00,
+            'daily_score': 8.5,
+            'ai_daily_feedback': 'Excellent discipline today! Your risk management was spot-on and you stuck to your trading plan. Consider adding volume analysis to your reversal setups.'
+        },
+        {
+            'journal_date': datetime.now() - timedelta(days=2),
+            'market_notes': 'Market choppy with mixed signals. Fed minutes caused some volatility. Sector rotation into defensive names.',
+            'trading_notes': 'Only 1 trade: QQQ put spread (small loss). Market conditions weren\'t ideal for my setups. Better to sit out than force trades.',
+            'emotions': 'Frustrated with the choppy market but stayed patient. Proud that I didn\'t chase bad setups.',
+            'lessons_learned': 'Sometimes the best trade is no trade. Market conditions matter more than individual setups.',
+            'tomorrow_plan': 'Wait for clearer market direction. Focus on quality over quantity.',
+            'daily_pnl': -75.00,
+            'daily_score': 7.0,
+            'ai_daily_feedback': 'Great job staying patient in difficult market conditions. Your discipline to avoid forcing trades shows maturity. Consider adding market condition filters to your strategy.'
+        },
+        {
+            'journal_date': datetime.now() - timedelta(days=3),
+            'market_notes': 'Strong bullish day with clear trend. All major indices up 1%+. Volume confirming the move.',
+            'trading_notes': '2 trades: SPY call (winner), IWM breakout (winner). Both trades followed the trend and had clear setups.',
+            'emotions': 'Excited about the clear market direction. Felt in sync with the market rhythm.',
+            'lessons_learned': 'Trend following works best in strong trending markets. Don\'t fight the trend.',
+            'tomorrow_plan': 'Look for continuation patterns. Consider adding to winning positions if trend continues.',
+            'daily_pnl': 325.00,
+            'daily_score': 9.0,
+            'ai_daily_feedback': 'Outstanding performance! You perfectly aligned with market conditions and executed flawlessly. Your trend-following approach was textbook.'
+        }
+    ]
+    
+    # Create a mock pagination object for the sample data
+    class MockPagination:
+        def __init__(self, items, page, per_page):
+            self.items = items
+            self.page = page
+            self.per_page = per_page
+            self.total = len(items)
+            self.pages = 1
+            self.has_prev = False
+            self.has_next = False
+            self.prev_num = None
+            self.next_num = None
+            self.iter_pages = lambda: [1]
+    
     if current_user.is_authenticated:
-        journals = (
-            TradingJournal.query.filter_by(user_id=current_user.id)
-            .order_by(TradingJournal.journal_date.desc())
-            .paginate(page=page, per_page=20, error_out=False)
-        )
-        return render_template("journal.html", journals=journals, show_login_prompt=False)
+        # Check if user has real journal entries
+        user_journals = TradingJournal.query.filter_by(user_id=current_user.id).order_by(TradingJournal.journal_date.desc()).paginate(
+            page=page, per_page=20, error_out=False)
+        
+        if user_journals.total > 0:
+            # User has real journal entries - show them
+            return render_template("journal.html", journals=user_journals, show_login_prompt=False, show_demo_data=False)
+        else:
+            # User has no journal entries - show demo data
+            journals = MockPagination(sample_journals, page, 20)
+            return render_template("journal.html", journals=journals, show_login_prompt=False, show_demo_data=True)
     else:
-        # Show sample journal entries for anonymous users
-        from datetime import datetime, timedelta
-        
-        sample_journals = [
-            {
-                'journal_date': datetime.now() - timedelta(days=1),
-                'market_notes': 'Market showing strong momentum in tech sector. AAPL and TSLA leading the charge with earnings catalysts. VIX remains low indicating complacency.',
-                'trading_notes': 'Executed 3 trades today: AAPL breakout (winner), TSLA momentum (winner), SPY reversal (loser). Overall P&L: +$450. Stuck to my plan and managed risk well.',
-                'emotions': 'Felt confident and focused. No FOMO or revenge trading urges. Stayed disciplined with position sizing.',
-                'lessons_learned': 'Breakout trades work best with volume confirmation. Need to be more patient with reversal setups.',
-                'tomorrow_plan': 'Focus on high-probability setups only. Watch for continuation patterns in tech. Keep position sizes consistent.',
-                'daily_pnl': 450.00,
-                'daily_score': 8.5,
-                'ai_daily_feedback': 'Excellent discipline today! Your risk management was spot-on and you stuck to your trading plan. Consider adding volume analysis to your reversal setups.'
-            },
-            {
-                'journal_date': datetime.now() - timedelta(days=2),
-                'market_notes': 'Market choppy with mixed signals. Fed minutes caused some volatility. Sector rotation into defensive names.',
-                'trading_notes': 'Only 1 trade: QQQ put spread (small loss). Market conditions weren\'t ideal for my setups. Better to sit out than force trades.',
-                'emotions': 'Frustrated with the choppy market but stayed patient. Proud that I didn\'t chase bad setups.',
-                'lessons_learned': 'Sometimes the best trade is no trade. Market conditions matter more than individual setups.',
-                'tomorrow_plan': 'Wait for clearer market direction. Focus on quality over quantity.',
-                'daily_pnl': -75.00,
-                'daily_score': 7.0,
-                'ai_daily_feedback': 'Great job staying patient in difficult market conditions. Your discipline to avoid forcing trades shows maturity. Consider adding market condition filters to your strategy.'
-            },
-            {
-                'journal_date': datetime.now() - timedelta(days=3),
-                'market_notes': 'Strong bullish day with clear trend. All major indices up 1%+. Volume confirming the move.',
-                'trading_notes': '2 trades: SPY call (winner), IWM breakout (winner). Both trades followed the trend and had clear setups.',
-                'emotions': 'Excited about the clear market direction. Felt in sync with the market rhythm.',
-                'lessons_learned': 'Trend following works best in strong trending markets. Don\'t fight the trend.',
-                'tomorrow_plan': 'Look for continuation patterns. Consider adding to winning positions if trend continues.',
-                'daily_pnl': 325.00,
-                'daily_score': 9.0,
-                'ai_daily_feedback': 'Outstanding performance! You perfectly aligned with market conditions and executed flawlessly. Your trend-following approach was textbook.'
-            }
-        ]
-        
-        # Create a mock pagination object for the sample data
-        class MockPagination:
-            def __init__(self, items, page, per_page):
-                self.items = items
-                self.page = page
-                self.per_page = per_page
-                self.total = len(items)
-                self.pages = 1
-                self.has_prev = False
-                self.has_next = False
-                self.prev_num = None
-                self.next_num = None
-                self.iter_pages = lambda: [1]
-        
+        # For unauthenticated users, show sample data with login prompt
         journals = MockPagination(sample_journals, page, 20)
         return render_template("journal.html", journals=journals, show_login_prompt=True)
 
@@ -1011,11 +1525,15 @@ def add_edit_journal(journal_date=None):
                 daily_analysis = ai_analyzer.analyze_daily_performance(
                     journal, day_trades
                 )
-                if daily_analysis:
+                if daily_analysis and not daily_analysis.get("error"):
                     journal.ai_daily_feedback = daily_analysis["feedback"]
                     journal.daily_score = daily_analysis["daily_score"]
-            except:
-                pass  # Continue without AI analysis if it fails
+                elif daily_analysis and daily_analysis.get("error"):
+                    print(f"AI Analysis Error: {daily_analysis['error']}")
+                    flash(f"AI Analysis failed: {daily_analysis['error']}", "warning")
+            except Exception as e:
+                print(f"AI Analysis Exception: {str(e)}")
+                flash(f"AI Analysis failed: {str(e)}", "warning")
 
         db.session.add(journal)
         db.session.commit()
@@ -1056,66 +1574,64 @@ def add_edit_journal(journal_date=None):
 
 @app.route("/analytics")
 def analytics():
-    """Show performance analytics for both open and closed trades."""
+    """Show performance analytics. Show real data for authenticated users, sample data for others."""
+    
     if current_user.is_authenticated:
-        # Show real data for authenticated users
-        trades = Trade.query.filter_by(user_id=current_user.id).all()
-
-        if not trades:
-            return render_template(
-                "analytics.html", no_data=True, charts_json=None, stats=None, show_login_prompt=False
-            )
-
-        for trade in trades:
-            if trade.is_open_position():
-                # Update unrealized P&L so open trades are included accurately
-                trade.calculate_pnl()
-
-        df = pd.DataFrame(
-            [
+        # Check if user has real trades for analytics
+        user_trades = Trade.query.filter_by(user_id=current_user.id).filter(Trade.exit_price.isnot(None)).all()
+        
+        if len(user_trades) >= 3:  # Need at least 3 completed trades for meaningful analytics
+            # User has enough real trades - show real analytics
+            df = pd.DataFrame([
                 {
                     "date": trade.exit_date or trade.entry_date,
-                    "symbol": trade.symbol,
                     "pnl": trade.profit_loss or 0,
-                    "pnl_percent": trade.profit_loss_percent or 0,
-                    "setup_type": trade.setup_type,
-                    "timeframe": trade.timeframe,
-                    "is_winner": trade.is_winner(),
+                    "is_winner": (trade.profit_loss or 0) > 0,
+                    "setup_type": trade.setup_type or "unknown"
                 }
-                for trade in trades
-            ]
-        )
-
-        stats = {
-            "total_trades": len(trades),
-            "winning_trades": len([t for t in trades if t.is_winner()]),
-            "losing_trades": len(
-                [t for t in trades if t.profit_loss is not None and t.profit_loss < 0]
-            ),
-            "win_rate": len([t for t in trades if t.is_winner()]) / len(trades) * 100,
-            "total_pnl": sum(t.profit_loss or 0 for t in trades),
-            "avg_win": df[df["pnl"] > 0]["pnl"].mean() if len(df[df["pnl"] > 0]) > 0 else 0,
-            "avg_loss": (
-                df[df["pnl"] < 0]["pnl"].mean() if len(df[df["pnl"] < 0]) > 0 else 0
-            ),
-            "largest_win": df["pnl"].max(),
-            "largest_loss": df["pnl"].min(),
-            "profit_factor": (
-                abs(df[df["pnl"] > 0]["pnl"].sum() / df[df["pnl"] < 0]["pnl"].sum())
-                if df[df["pnl"] < 0]["pnl"].sum() != 0
-                else 0
-            ),
-        }
-
-        # Create charts
-        charts = create_analytics_charts(df)
-        charts_json = json.dumps(charts, cls=plotly.utils.PlotlyJSONEncoder)
-
+                for trade in user_trades
+            ])
+            
+            if not df.empty:
+                # Calculate real stats
+                total_trades = len(df)
+                winning_trades = len(df[df["is_winner"] == True])
+                losing_trades = len(df[df["is_winner"] == False])
+                win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
+                total_pnl = df["pnl"].sum()
+                avg_win = df[df["pnl"] > 0]["pnl"].mean() if len(df[df["pnl"] > 0]) > 0 else 0
+                avg_loss = df[df["pnl"] < 0]["pnl"].mean() if len(df[df["pnl"] < 0]) > 0 else 0
+                largest_win = df["pnl"].max() if len(df) > 0 else 0
+                largest_loss = df["pnl"].min() if len(df) > 0 else 0
+                profit_factor = abs(avg_win / avg_loss) if avg_loss != 0 else 0
+                
+                stats = {
+                    "total_trades": total_trades,
+                    "winning_trades": winning_trades,
+                    "losing_trades": losing_trades,
+                    "win_rate": win_rate,
+                    "total_pnl": total_pnl,
+                    "avg_win": avg_win,
+                    "avg_loss": avg_loss,
+                    "largest_win": largest_win,
+                    "largest_loss": largest_loss,
+                    "profit_factor": profit_factor,
+                }
+                
+                # Create charts with real data
+                charts = create_analytics_charts(df)
+                charts_json = json.dumps(charts, cls=plotly.utils.PlotlyJSONEncoder)
+                
+                return render_template(
+                    "analytics.html", charts_json=charts_json, stats=stats, no_data=False, show_login_prompt=False, show_demo_data=False
+                )
+        
+        # User doesn't have enough real trades - show demo data
         return render_template(
-            "analytics.html", charts_json=charts_json, stats=stats, no_data=False, show_login_prompt=False
+            "analytics.html", charts_json=None, stats=None, no_data=True, show_login_prompt=False, show_demo_data=True
         )
     else:
-        # Show example data for anonymous users
+        # For unauthenticated users, show sample data
         from datetime import datetime, timedelta
         
         # Create sample data for demonstration
@@ -1157,7 +1673,7 @@ def analytics():
         # Create charts with sample data
         charts = create_analytics_charts(df)
         charts_json = json.dumps(charts, cls=plotly.utils.PlotlyJSONEncoder)
-
+        
         return render_template(
             "analytics.html", charts_json=charts_json, stats=stats, no_data=False, show_login_prompt=True
         )
@@ -1236,34 +1752,129 @@ def create_analytics_charts(df):
 @app.route("/settings", methods=["GET", "POST"])
 @login_required
 def settings():
+    # Get or create user settings
     user_settings = current_user.settings
     if not user_settings:
         user_settings = UserSettings(user_id=current_user.id)
         db.session.add(user_settings)
         db.session.commit()
 
-    form = UserSettingsForm(obj=user_settings)
+    # Create form with current user data
+    form = SettingsForm(obj=current_user)
+    
+    # Pre-populate basic user settings fields (only if they exist)
+    if user_settings:
+        try:
+            if hasattr(form, 'auto_analyze_trades'):
+                form.auto_analyze_trades.data = user_settings.auto_analyze_trades
+            if hasattr(form, 'analysis_detail_level'):
+                form.analysis_detail_level.data = user_settings.analysis_detail_level
+        except AttributeError:
+            pass  # Skip if fields don't exist
 
     if form.validate_on_submit():
-        form.populate_obj(user_settings)
+        # Update current_user fields from the form (only basic fields)
+        current_user.display_name = form.display_name.data
+        current_user.dark_mode = form.dark_mode.data
+        current_user.daily_brief_email = form.daily_brief_email.data
+        current_user.timezone = form.timezone.data
+        
+        # Only update fields that exist in the form
+        try:
+            if hasattr(form, 'api_key'):
+                current_user.api_key = form.api_key.data
+            if hasattr(form, 'account_size'):
+                current_user.account_size = form.account_size.data
+            if hasattr(form, 'default_risk_percent'):
+                current_user.default_risk_percent = form.default_risk_percent.data
+        except AttributeError:
+            pass
 
-        # Also update user account size if provided
-        if form.account_size.data:
-            current_user.account_size = form.account_size.data
-        if form.default_risk_percent.data:
-            current_user.default_risk_percent = form.default_risk_percent.data
+        # Update user settings (only if fields exist)
+        if user_settings:
+            try:
+                if hasattr(form, 'auto_analyze_trades'):
+                    user_settings.auto_analyze_trades = form.auto_analyze_trades.data
+                if hasattr(form, 'analysis_detail_level'):
+                    user_settings.analysis_detail_level = form.analysis_detail_level.data
+            except AttributeError:
+                pass
 
         db.session.commit()
-        flash("Settings updated successfully!", "success")
-        return redirect(url_for("settings"))
+        flash('Settings updated successfully!', 'success')
+        return redirect(url_for('settings'))
 
-    return render_template("settings.html", form=form)
+    # Prepare billing context for template
+    from datetime import datetime, timezone
+    billing_ctx = None
+    
+    # Show billing info for any user with Pro access or subscription status
+    if current_user.has_pro_access() or current_user.subscription_status != 'free':
+        days_left = None
+        if current_user.subscription_status == "trialing" and current_user.trial_end:
+            now = datetime.now(timezone.utc)
+            days_left = max(0, (current_user.trial_end.replace(tzinfo=timezone.utc) - now).days)
+        
+        billing_ctx = {
+            "status": current_user.subscription_status,
+            "plan": current_user.plan_type,
+            "trial_days_left": days_left,
+            "has_portal": bool(current_user.stripe_customer_id),
+        }
+
+    return render_template("settings.html", form=form, billing=billing_ctx)
 
 
 @app.route("/bulk_analysis", methods=["GET", "POST"])
 def bulk_analysis():
     form = BulkAnalysisForm()
+    
+    # Check for preview mode query param
+    preview_mode = request.args.get('preview') == '1'
+    
+    # Determine if user should see preview or full access
+    show_preview = not is_pro_user() or preview_mode
+    
+    if show_preview:
+        # Preview mode - show demo data and upsell
+        sample_trade = {
+            'symbol': 'AAPL',
+            'entry_date': datetime.now() - timedelta(days=5),
+            'exit_date': datetime.now() - timedelta(days=1),
+            'entry_price': 150.00,
+            'exit_price': 155.00,
+            'quantity': 100,
+            'trade_type': 'long',
+            'profit_loss': 500.00
+        }
+        
+        sample_analysis = {
+            'summary': 'This was a well-executed long position on AAPL that captured a 3.3% move. The entry timing was good, entering on a pullback to support.',
+            'strengths': ['Good entry timing', 'Proper position sizing', 'Clear exit strategy'],
+            'improvements': ['Could have held longer for more profit', 'Consider trailing stops'],
+            'risk_management': 'Position size was appropriate at 2% of account. Stop loss was well-placed.',
+            'lessons': 'This trade demonstrates the importance of entering on pullbacks to key support levels.'
+        }
+        
+        return render_template(
+            "bulk_analysis.html",
+            form=form,
+            unanalyzed_count=0,
+            recent_count=0,
+            sample_trade=sample_trade,
+            sample_analysis=sample_analysis,
+            show_login_prompt=False,
+            show_pro_upsell=True,
+            show_demo_data=True,
+            feature_name="AI Analysis",
+            limitations=[
+                "Sample analysis only - no real trade analysis",
+                "Cannot analyze your actual trades",
+                "No bulk analysis capabilities"
+            ]
+        )
 
+    # Full Pro access - original logic
     if current_user.is_authenticated:
         # Populate trade choices for individual analysis
         trades = (
@@ -1286,8 +1897,13 @@ def bulk_analysis():
                 ).first()
                 if trade:
                     try:
-                        ai_analyzer.analyze_trade(trade)
-                        flash("Trade analyzed successfully!", "success")
+                        analysis = ai_analyzer.analyze_trade(trade)
+                        if analysis and hasattr(analysis, 'trade_id'):  # TradeAnalysis object
+                            flash("Trade analyzed successfully!", "success")
+                        elif analysis and isinstance(analysis, dict) and analysis.get("error"):
+                            flash(f"Analysis failed: {analysis['error']}", "error")
+                        else:
+                            flash("Analysis failed. Please check your OpenAI API key.", "error")
                     except Exception as e:
                         flash(f"Analysis failed: {str(e)}", "error")
                     return redirect(url_for("view_trade", id=trade.id))
@@ -1317,9 +1933,11 @@ def bulk_analysis():
             success_count = 0
             for trade in trades_to_analyze:
                 try:
-                    ai_analyzer.analyze_trade(trade)
-                    success_count += 1
-                except:
+                    analysis = ai_analyzer.analyze_trade(trade)
+                    if analysis and hasattr(analysis, 'trade_id'):  # TradeAnalysis object
+                        success_count += 1
+                except Exception as e:
+                    print(f"Error analyzing trade {trade.id}: {e}")
                     continue
 
             flash(
@@ -1350,7 +1968,9 @@ def bulk_analysis():
             recent_count=recent_count,
             sample_trade=None,
             sample_analysis=None,
-            show_login_prompt=False
+            show_login_prompt=False,
+            show_pro_upsell=False,
+            show_demo_data=False
         )
     else:
         # Show example data for anonymous users
@@ -1406,12 +2026,15 @@ def bulk_analysis():
             recent_count=0,
             sample_trade=sample_trade,
             sample_analysis=sample_analysis,
-            show_login_prompt=True
+            show_login_prompt=True,
+            show_pro_upsell=False,
+            show_demo_data=False
         )
 
 
 @app.route("/api/quick_trade", methods=["POST"])
 @login_required
+@requires_pro
 def api_quick_trade():
     """API endpoint for quick trade entry"""
     form = QuickTradeForm()
@@ -1454,9 +2077,65 @@ def education():
     return render_template("education.html")
 
 
+@app.route("/pricing")
+def pricing():
+    """Display pricing page."""
+    return render_template("pricing.html")
+
+
 @app.route("/tools/options-calculator", methods=["GET", "POST"])
 def options_calculator():
     """Options calculator with Tradier data only"""
+    
+    # Check for preview mode query param
+    preview_mode = request.args.get('preview') == '1'
+    
+    # Determine if user should see preview or full access
+    show_preview = not is_pro_user() or preview_mode
+    
+    if show_preview:
+        # Preview mode - show demo data
+        demo_context = {
+            "symbol": "AAPL",
+            "current_price": 150.25,
+            "stock_name": "Apple Inc.",
+            "expiration_dates": ["2024-01-19", "2024-02-16", "2024-03-15"],
+            "selected_date": "2024-01-19",
+            "calls": [
+                {"strike": 145, "bid": 6.50, "ask": 6.60, "last": 6.55, "volume": 1250, "open_interest": 3450},
+                {"strike": 150, "bid": 2.15, "ask": 2.25, "last": 2.20, "volume": 890, "open_interest": 2100},
+                {"strike": 155, "bid": 0.45, "ask": 0.50, "last": 0.48, "volume": 567, "open_interest": 1200}
+            ],
+            "puts": [
+                {"strike": 145, "bid": 0.30, "ask": 0.35, "last": 0.32, "volume": 234, "open_interest": 890},
+                {"strike": 150, "bid": 2.10, "ask": 2.20, "last": 2.15, "volume": 456, "open_interest": 1560},
+                {"strike": 155, "bid": 6.40, "ask": 6.50, "last": 6.45, "volume": 123, "open_interest": 890}
+            ],
+            "options_rows": [
+                {"call": {"strike": 145, "bid": 6.50, "ask": 6.60, "last": 6.55, "volume": 1250, "open_interest": 3450}, 
+                 "put": {"strike": 145, "bid": 0.30, "ask": 0.35, "last": 0.32, "volume": 234, "open_interest": 890}},
+                {"call": {"strike": 150, "bid": 2.15, "ask": 2.25, "last": 2.20, "volume": 890, "open_interest": 2100}, 
+                 "put": {"strike": 150, "bid": 2.10, "ask": 2.20, "last": 2.15, "volume": 456, "open_interest": 1560}},
+                {"call": {"strike": 155, "bid": 0.45, "ask": 0.50, "last": 0.48, "volume": 567, "open_interest": 1200}, 
+                 "put": {"strike": 155, "bid": 6.40, "ask": 6.50, "last": 6.45, "volume": 123, "open_interest": 890}}
+            ],
+            "error_message": None
+        }
+        
+        return render_template(
+            "tools/options_calculator.html", 
+            context=demo_context,
+            show_pro_upsell=True,
+            show_demo_data=True,
+            feature_name="Options Calculator",
+            limitations=[
+                "Demo data only - no real-time quotes",
+                "Cannot search for other symbols",
+                "No P&L calculations"
+            ]
+        )
+
+    # Full Pro access - original logic
     context = {
         "symbol": None,
         "current_price": None,
@@ -1529,10 +2208,16 @@ def options_calculator():
                 print(f"Error in options calculator: {e}")
                 context["error_message"] = f"Error: {str(e)}"
 
-    return render_template("tools/options_calculator.html", context=context)
+    return render_template(
+        "tools/options_calculator.html", 
+        context=context,
+        show_pro_upsell=False,
+        show_demo_data=False
+    )
 
 
 @app.route("/tools/options-pnl", methods=["POST"])
+@requires_pro
 def calculate_options_pnl():
     """Calculate comprehensive options P&L analysis"""
     try:
@@ -1641,6 +2326,7 @@ def black_scholes_calculator():
 
 
 @app.route("/tools/calculate-bs", methods=["POST"])
+@requires_pro
 def calculate_black_scholes():
     """Calculate Black-Scholes price and Greeks"""
     try:
@@ -1892,7 +2578,7 @@ def reset_password_request():
             send_password_reset_email(user)
         flash("If an account exists with that email, you will receive password reset instructions.", "info")
         return redirect(url_for("login"))
-    return render_template("reset_password_request.html", form=form)
+    return render_template("reset_password_request.html", form=form, hide_sidebar=True)
 
 @app.route("/reset_password/<token>", methods=["GET", "POST"])
 def reset_password(token):
@@ -1913,7 +2599,7 @@ def reset_password(token):
         flash("Your password has been reset.", "success")
         return redirect(url_for("login"))
     
-    return render_template("reset_password.html", form=form)
+    return render_template("reset_password.html", form=form, hide_sidebar=True)
 
 
 # Error handlers
@@ -1926,6 +2612,43 @@ def not_found_error(error):
 def internal_error(error):
     db.session.rollback()
     return render_template("500.html"), 500
+
+
+# ───────── In-House Education Routes ─────────
+@app.route("/education/greeks")
+def education_greeks():
+    """Understanding the Greeks page"""
+    return render_template("education/greeks.html")
+
+@app.route("/education/strategies")
+def education_strategies():
+    """Options Strategies Guide page"""
+    return render_template("education/strategies.html")
+
+@app.route("/education/risk-management")
+def education_risk_management():
+    """Risk Management Guide page"""
+    return render_template("education/risk_management.html")
+
+@app.route("/education/position-sizing")
+def education_position_sizing():
+    """Position Sizing for Options page"""
+    return render_template("education/position_sizing.html")
+
+@app.route("/education/implied-volatility")
+def education_implied_volatility():
+    """Implied Volatility Guide page"""
+    return render_template("education/implied_volatility.html")
+
+@app.route("/education/advanced-options")
+def education_advanced_options():
+    """Advanced Options Education page"""
+    return render_template("education/advanced_options.html")
+
+# ──────────────────────────────────────────────────
+# DEBUG ROUTE FOR TESTING
+# ──────────────────────────────────────────────────
+
 
 
 if __name__ == "__main__":

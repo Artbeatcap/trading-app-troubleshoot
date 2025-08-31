@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Position Sizing for Options - Options Education{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <h1 class="display-5 mb-3"><i class="fas fa-balance-scale text-info me-2"></i>Position Sizing for Options</h1>
+                    <p class="lead">Determine how many contracts to trade relative to account size and risk tolerance.</p>
+                    <hr>
+                    <h3>Why Position Sizing Matters</h3>
+                    <p>Proper sizing prevents catastrophic drawdowns and smooths equity curve volatility.</p>
+                    <h3>Step-by-Step Method</h3>
+                    <ol>
+                        <li>Define <strong>Account Risk %</strong> (e.g., 1%).</li>
+                        <li>Find <strong>Per-Contract Max Loss</strong> (premium paid for long options or assignment risk for short puts).</li>
+                        <li>Contracts = (Account Size × Risk %) ÷ Max Loss.</li>
+                    </ol>
+                    <p class="small">Example: $25,000 account, 1% risk = $250. Buying calls at $2.50 premium (×100) = $250 risk → 1 contract.</p>
+                    <h3>Delta-Adjusted Exposure</h3>
+                    <p>Multiply contracts × delta × 100 to approximate share equivalence; helps maintain consistent directional exposure.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

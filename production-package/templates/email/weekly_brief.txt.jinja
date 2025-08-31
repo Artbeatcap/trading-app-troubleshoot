@@ -1,0 +1,71 @@
+Options Plunge Weekly Brief — {{ subject_theme }} ({{ date_human }})
+
+{{ preheader }}
+
+================================================================================
+
+LAST WEEK IN 60S
+================================================================================
+{{ recap.index_blurb }}
+
+SECTOR ROTATIONS & THEMES
+================================================================================
+{{ recap.sector_blurb }}
+
+{% if recap.movers_bullets %}
+TOP MOVERS
+================================================================================
+{% for mover in recap.movers_bullets %}
+• {{ mover }}
+{% endfor %}
+{% endif %}
+
+{% if recap.flow_blurb %}
+OPTIONS SENTIMENT
+================================================================================
+{{ recap.flow_blurb }}
+{% endif %}
+
+LEVELS TO WATCH
+================================================================================
+SPY: S1 {{ levels.spy.s1 }} | S2 {{ levels.spy.s2 }} | R1 {{ levels.spy.r1 }} | R2 {{ levels.spy.r2 }} | R3 {{ levels.spy.r3 }}
+{% if levels.qqq %}
+QQQ: S1 {{ levels.qqq.s1 }} | S2 {{ levels.qqq.s2 }} | R1 {{ levels.qqq.r1 }} | R2 {{ levels.qqq.r2 }} | R3 {{ levels.qqq.r3 }}
+{% endif %}
+{% if levels.iwm %}
+IWM: S1 {{ levels.iwm.s1 }} | S2 {{ levels.iwm.s2 }} | R1 {{ levels.iwm.r1 }} | R2 {{ levels.iwm.r2 }} | R3 {{ levels.iwm.r3 }}
+{% endif %}
+
+WEEK AHEAD
+================================================================================
+{% if week_ahead.macro_bullets %}
+MACRO EVENTS:
+{% for item in week_ahead.macro_bullets %}
+• {{ item }}
+{% endfor %}
+{% endif %}
+
+{% if week_ahead.earnings_bullets %}
+EARNINGS:
+{% for item in week_ahead.earnings_bullets %}
+• {{ item }}
+{% endfor %}
+{% endif %}
+
+{% if swing_playbook_bullets %}
+SWING PLAYBOOK
+================================================================================
+{% for item in swing_playbook_bullets %}
+• {{ item }}
+{% endfor %}
+{% endif %}
+
+================================================================================
+
+Powered by Options Plunge
+
+View Full Analysis: {{ cta_url }}
+
+You're receiving this because you confirmed your subscription to the Weekly Market Brief.
+Unsubscribe: {{ unsubscribe_url }}
+Update Preferences: {{ preferences_url }}

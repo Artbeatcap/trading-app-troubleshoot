@@ -327,6 +327,54 @@ class AnalyzeTradeForm(FlaskForm):
     trade_id = IntegerField('Trade ID', validators=[DataRequired()])
     submit = SubmitField('Analyze Trade')
 
+class SettingsForm(FlaskForm):
+    """Enhanced user settings form with new fields"""
+    # Account and display
+    display_name = StringField('Display Name', validators=[Length(max=64)],
+                              render_kw={"placeholder": "How you want to be displayed"})
+    dark_mode = BooleanField('Enable dark mode')
+    daily_brief_email = BooleanField('Receive morning market brief emails')
+    timezone = SelectField('Time Zone', choices=[
+        ('UTC', 'UTC'),
+        ('America/New_York', 'America/New_York'),
+        ('America/Chicago', 'America/Chicago'),
+        ('America/Denver', 'America/Denver'),
+        ('America/Los_Angeles', 'America/Los_Angeles')
+    ])
+    
+    # API and account settings
+    api_key = StringField('API Key', validators=[Optional(), Length(max=64)],
+                         render_kw={"placeholder": "Optional API key for future features"})
+    account_size = FloatField('Account Size ($)', validators=[Optional(), NumberRange(min=0)],
+                             render_kw={"step": "0.01", "placeholder": "Optional: for position sizing"})
+    default_risk_percent = FloatField('Default Risk Per Trade (%)', 
+                                     validators=[Optional(), NumberRange(min=0.1, max=50)],
+                                     render_kw={"step": "0.1", "placeholder": "2.0"})
+    
+    # Analysis preferences
+    auto_analyze_trades = BooleanField('Auto-analyze closed trades')
+    analysis_detail_level = SelectField('Analysis Detail Level', choices=[
+        ('brief', 'Brief'),
+        ('detailed', 'Detailed'),
+        ('comprehensive', 'Comprehensive')
+    ])
+    
+    # Risk management
+    max_daily_loss = FloatField('Max Daily Loss ($)', validators=[Optional(), NumberRange(min=0)],
+                               render_kw={"step": "0.01", "placeholder": "Optional daily stop"})
+    max_position_size = FloatField('Max Position Size ($)', validators=[Optional(), NumberRange(min=0)],
+                                  render_kw={"step": "0.01", "placeholder": "Optional position limit"})
+    
+    # Display preferences
+    trades_per_page = SelectField('Trades Per Page', choices=[
+        (10, '10'),
+        (20, '20'),
+        (50, '50'),
+        (100, '100')
+    ], coerce=int)
+    
+    submit = SubmitField('Save Changes')
+
 class UserSettingsForm(FlaskForm):
     """User preferences and settings"""
     # Account info
@@ -380,3 +428,15 @@ class ResetPasswordForm(FlaskForm):
     password = PasswordField('New Password', validators=[DataRequired(), Length(min=8)])
     password2 = PasswordField('Repeat Password', validators=[DataRequired(), EqualTo('password')])
     submit = SubmitField('Reset Password')
+
+class MarketBriefSignupForm(FlaskForm):
+    """Signup form for the free morning market brief"""
+    name = StringField('Name', validators=[DataRequired(), Length(max=120)])
+    email = StringField('Email', validators=[DataRequired(), Email()])
+    submit = SubmitField('Get My Free Brief')
+
+    def validate_email(self, email):
+        from models import MarketBriefSubscriber
+        subscriber = MarketBriefSubscriber.query.filter_by(email=email.data).first()
+        if subscriber and subscriber.confirmed:
+            raise ValidationError('This email is already subscribed and confirmed.')

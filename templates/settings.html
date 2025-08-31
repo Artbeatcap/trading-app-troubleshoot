@@ -56,138 +56,127 @@
                             </div>
                         </div>
 
-                        <!-- Account Settings Section -->
+                        <!-- Email Preferences Section -->
                         <div class="mb-4">
                             <h5 class="text-primary mb-3">
-                                <i class="fas fa-chart-line me-2"></i>Trading Account
+                                <i class="fas fa-envelope me-2"></i>Email Preferences
                             </h5>
-                            <div class="row g-3">
-                                <div class="col-md-6">
-                                    {{ form.account_size.label(class="form-label fw-bold") }}
-                                    {{ form.account_size(class="form-control") }}
-                                    {% if form.account_size.errors %}
-                                        <div class="text-danger small">
-                                            {% for error in form.account_size.errors %}
-                                                <div>{{ error }}</div>
-                                            {% endfor %}
-                                        </div>
-                                    {% endif %}
-                                </div>
-                                <div class="col-md-6">
-                                    {{ form.default_risk_percent.label(class="form-label fw-bold") }}
-                                    {{ form.default_risk_percent(class="form-control") }}
-                                    {% if form.default_risk_percent.errors %}
-                                        <div class="text-danger small">
-                                            {% for error in form.default_risk_percent.errors %}
-                                                <div>{{ error }}</div>
-                                            {% endfor %}
-                                        </div>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Analysis Preferences Section -->
-                        <div class="mb-4">
-                            <h5 class="text-primary mb-3">
-                                <i class="fas fa-robot me-2"></i>AI Analysis Preferences
-                            </h5>
-                            <div class="form-check mb-3">
-                                {{ form.auto_analyze_trades(class="form-check-input") }}
-                                {{ form.auto_analyze_trades.label(class="form-check-label") }}
-                                <small class="text-muted d-block">Automatically analyze trades when they are closed</small>
-                            </div>
-                            <div class="mb-3">
-                                {{ form.analysis_detail_level.label(class="form-label fw-bold") }}
-                                {{ form.analysis_detail_level(class="form-select") }}
-                                {% if form.analysis_detail_level.errors %}
-                                    <div class="text-danger small">
-                                        {% for error in form.analysis_detail_level.errors %}
-                                            <div>{{ error }}</div>
-                                        {% endfor %}
+                            <div class="row mt-3">
+                                <div class="col-12">
+                                    <div class="form-check">
+                                        {{ form.daily_brief_email(class="form-check-input") }}
+                                        {{ form.daily_brief_email.label(class="form-check-label") }}
+                                        <small class="text-muted d-block">Receive morning market brief emails</small>
                                     </div>
-                                {% endif %}
-                            </div>
-                        </div>
-
-                        <!-- Risk Management Section -->
-                        <div class="mb-4">
-                            <h5 class="text-primary mb-3">
-                                <i class="fas fa-shield-alt me-2"></i>Risk Management
-                            </h5>
-                            <div class="row g-3">
-                                <div class="col-md-6">
-                                    {{ form.max_daily_loss.label(class="form-label fw-bold") }}
-                                    {{ form.max_daily_loss(class="form-control") }}
-                                    {% if form.max_daily_loss.errors %}
-                                        <div class="text-danger small">
-                                            {% for error in form.max_daily_loss.errors %}
-                                                <div>{{ error }}</div>
-                                            {% endfor %}
-                                        </div>
-                                    {% endif %}
-                                </div>
-                                <div class="col-md-6">
-                                    {{ form.max_position_size.label(class="form-label fw-bold") }}
-                                    {{ form.max_position_size(class="form-control") }}
-                                    {% if form.max_position_size.errors %}
-                                        <div class="text-danger small">
-                                            {% for error in form.max_position_size.errors %}
-                                                <div>{{ error }}</div>
-                                            {% endfor %}
-                                        </div>
-                                    {% endif %}
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Display Preferences Section -->
+                        <!-- Billing & Plan (Pro) -->
                         <div class="mb-4">
                             <h5 class="text-primary mb-3">
-                                <i class="fas fa-desktop me-2"></i>Display Preferences
+                                <i class="fas fa-credit-card me-2"></i>Billing & Plan (Pro)
                             </h5>
-                            <div class="mb-3">
-                                {{ form.trades_per_page.label(class="form-label fw-bold") }}
-                                {{ form.trades_per_page(class="form-select") }}
-                                {% if form.trades_per_page.errors %}
-                                    <div class="text-danger small">
-                                        {% for error in form.trades_per_page.errors %}
-                                            <div>{{ error }}</div>
-                                        {% endfor %}
-                                    </div>
-                                {% endif %}
-                            </div>
-                        </div>
 
-                        <!-- Notifications Section -->
-                        <div class="mb-4">
-                            <h5 class="text-primary mb-3">
-                                <i class="fas fa-bell me-2"></i>Notifications
-                            </h5>
-                            <div class="form-check">
-                                {{ form.daily_brief_email(class="form-check-input") }}
-                                {{ form.daily_brief_email.label(class="form-check-label") }}
-                                <small class="text-muted d-block">Receive daily market brief emails with analysis and insights</small>
-                            </div>
-                        </div>
-
-                        <!-- API Settings Section -->
-                        <div class="mb-4">
-                            <h5 class="text-primary mb-3">
-                                <i class="fas fa-key me-2"></i>API Settings
-                            </h5>
-                            <div class="mb-3">
-                                {{ form.api_key.label(class="form-label fw-bold") }}
-                                {{ form.api_key(class="form-control") }}
-                                <small class="text-muted">Optional—used for future API integrations and advanced features</small>
-                                {% if form.api_key.errors %}
-                                    <div class="text-danger small">
-                                        {% for error in form.api_key.errors %}
-                                            <div>{{ error }}</div>
-                                        {% endfor %}
+                            {% if not billing %}
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    You're on the Free plan. Start a <strong>14-day free trial</strong> from the <a href="{{ url_for('pricing') }}">Pricing</a> page to unlock Pro.
+                                    <div class="mt-2">
+                                        <button id="refresh-subscription-free" class="btn btn-outline-success btn-sm" type="button">
+                                            <i class="fas fa-sync-alt me-1"></i>Refresh status
+                                        </button>
                                     </div>
+                                    <script>
+                                        document.getElementById('refresh-subscription-free')?.addEventListener('click', async () => {
+                                            try {
+                                                const r = await fetch('/api/billing/sync', { method: 'POST' });
+                                                const d = await r.json();
+                                                if (d.error) {
+                                                    alert('Could not refresh: ' + d.error);
+                                                } else {
+                                                    window.location.reload();
+                                                }
+                                            } catch (e) {
+                                                alert('Could not refresh subscription.');
+                                            }
+                                        });
+                                    </script>
+                                </div>
+                            {% else %}
+                                <div class="card">
+                                    <div class="card-body d-flex flex-wrap align-items-center gap-3">
+                                        <div>
+                                            <div class="fw-bold">Current plan</div>
+                                            <div class="text-muted">{{ billing.plan|title }} ({{ billing.status }})</div>
+                                            {% if billing.trial_days_left is not none %}
+                                                <div class="small mt-1">Trial days left: <strong>{{ billing.trial_days_left }}</strong></div>
+                                            {% endif %}
+                                        </div>
+
+                                        <div class="ms-auto d-flex gap-2">
+                                            {% if billing.has_portal %}
+                                                <button id="manage-billing" class="btn btn-outline-primary" type="button">Manage billing</button>
+                                            {% endif %}
+                                            <button id="refresh-subscription" class="btn btn-outline-success" type="button">Refresh status</button>
+                                            <a href="{{ url_for('pricing') }}" class="btn btn-outline-secondary">Switch plan</a>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% if billing.has_portal %}
+                                    <small class="text-muted d-block mt-2">
+                                        Manage billing takes you to Stripe's secure portal to update card, view invoices, switch monthly/annual, or cancel anytime.
+                                    </small>
+                                    <script>
+                                        document.addEventListener('DOMContentLoaded', function() {
+                                            const manageBillingBtn = document.getElementById('manage-billing');
+                                            if (manageBillingBtn) {
+                                                console.log('Manage billing button found');
+                                                manageBillingBtn.addEventListener('click', async () => {
+                                                    console.log('Manage billing button clicked');
+                                                    try {
+                                                        const r = await fetch('/api/billing/create-portal-session', { 
+                                                            method: 'POST',
+                                                            headers: {
+                                                                'Content-Type': 'application/json'
+                                                            }
+                                                        });
+                                                        const d = await r.json();
+                                                        console.log('Portal response:', d);
+                                                        if (d.url) {
+                                                            window.location.href = d.url;
+                                                        } else {
+                                                            alert('Could not open billing portal: ' + (d.error || 'Unknown error'));
+                                                        }
+                                                    } catch (error) {
+                                                        console.error('Portal error:', error);
+                                                        alert('Could not open billing portal: ' + error.message);
+                                                    }
+                                                });
+                                            } else {
+                                                console.log('Manage billing button not found');
+                                            }
+                                        });
+                                        document.getElementById('refresh-subscription')?.addEventListener('click', async () => {
+                                            try {
+                                                const r = await fetch('/api/billing/sync', { method: 'POST' });
+                                                const d = await r.json();
+                                                if (d.error) {
+                                                    alert('Could not refresh: ' + d.error);
+                                                } else {
+                                                    window.location.reload();
+                                                }
+                                            } catch (e) {
+                                                alert('Could not refresh subscription.');
+                                            }
+                                        });
+                                    </script>
+                                {% else %}
+                                    <small class="text-muted d-block mt-2">
+                                        Contact support to manage your subscription.
+                                    </small>
                                 {% endif %}
-                            </div>
+                            {% endif %}
                         </div>
 
                         <!-- Submit Button -->

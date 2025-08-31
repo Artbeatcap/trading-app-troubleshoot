@@ -8,6 +8,9 @@ DATABASE_URL=postgresql://localhost/tradingapp
 # OpenAI API (for AI analysis)
 OPENAI_API_KEY=your-openai-api-key
 
+# Finnhub (for newsletter market news)
+FINNHUB_TOKEN=your-finnhub-token
+
 # Tradier Configuration
 TRADIER_API_TOKEN=your-tradier-token
 
@@ -15,6 +18,10 @@ TRADIER_API_TOKEN=your-tradier-token
 # Get these from: https://console.cloud.google.com/apis/credentials
 GOOGLE_OAUTH_CLIENT_ID=your-google-client-id-here
 GOOGLE_OAUTH_CLIENT_SECRET=your-google-client-secret-here
+
+# OAuth Development Settings
+# Allow OAuth over HTTP for local development (set to 1 for development)
+OAUTHLIB_INSECURE_TRANSPORT=1
 
 # Email Configuration (optional)
 MAIL_SERVER=smtp.gmail.com
@@ -25,6 +32,7 @@ MAIL_PASSWORD=your-app-password
 # Mail sender configuration
 MAIL_DEFAULT_SENDER_NAME=Options Plunge Support
 MAIL_DEFAULT_SENDER_EMAIL=support@optionsplunge.com
+SENDGRID_KEY=your-sendgrid-api-key
 
 # File Upload Settings
 UPLOAD_FOLDER=static/uploads
@@ -35,4 +43,15 @@ ALLOWED_EXTENSIONS=png,jpg,jpeg,gif,pdf
 # For production: SERVER_NAME=optionsplunge.com
 # For development: leave SERVER_NAME unset to allow all hosts
 SERVER_NAME=
-PREFERRED_URL_SCHEME=https 
+PREFERRED_URL_SCHEME=https
+
+# Stripe Configuration (for Pro subscriptions)
+# Get these from: https://dashboard.stripe.com/apikeys
+STRIPE_SECRET_KEY=sk_test_your-stripe-secret-key
+STRIPE_WEBHOOK_SECRET=whsec_your-webhook-secret
+
+# Stripe Price IDs (create these in Stripe Dashboard)
+# Monthly: $29/month
+STRIPE_PRICE_MONTHLY=price_your-monthly-price-id
+# Annual: $228/year ($19/month billed annually)
+STRIPE_PRICE_ANNUAL=price_your-annual-price-id 

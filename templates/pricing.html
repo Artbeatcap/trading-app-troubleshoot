@@ -1,0 +1,382 @@
+{% extends "base.html" %}
+
+{% block title %}Pricing - Options Plunge{% endblock %}
+
+{% block content %}
+            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <h1 class="h2">Choose Your Plan</h1>
+            </div>
+
+            <!-- Header Section -->
+            <div class="text-center mb-5">
+                <h2 class="display-4 fw-bold text-primary mb-3">Unlock Your Trading Potential</h2>
+                <p class="lead text-muted">Get access to AI tools, options calculator, and daily market briefs with Pro</p>
+            </div>
+
+            <!-- Billing Toggle -->
+            <div class="text-center mb-5">
+                <div class="btn-group" role="group" aria-label="Billing toggle">
+                    <input type="radio" class="btn-check" name="billing" id="monthly" value="monthly" checked>
+                    <label class="btn btn-outline-primary" for="monthly">Monthly</label>
+                    
+                    <input type="radio" class="btn-check" name="billing" id="annual" value="annual">
+                    <label class="btn btn-outline-primary" for="annual">
+                        Annual <span class="badge bg-success ms-1">Save 34%</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Pricing Cards -->
+            <div class="row justify-content-center">
+                <!-- Free Plan -->
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-header bg-light text-center py-4">
+                            <h4 class="fw-bold mb-0">Free</h4>
+                            <p class="text-muted mb-0">Perfect for getting started</p>
+                        </div>
+                        <div class="card-body d-flex flex-column">
+                            <div class="text-center mb-4">
+                                <div class="display-4 fw-bold text-primary">$0</div>
+                                <div class="text-muted">Forever free</div>
+                            </div>
+                            
+                            <ul class="list-unstyled mb-4">
+                                <li class="mb-2">
+                                    <i class="fas fa-check text-success me-2"></i>
+                                    Dashboard & trade tracking
+                                </li>
+                                <li class="mb-2">
+                                    <i class="fas fa-check text-success me-2"></i>
+                                    Trading journal
+                                </li>
+                                <li class="mb-2">
+                                    <i class="fas fa-check text-success me-2"></i>
+                                    Basic analytics
+                                </li>
+                                <li class="mb-2">
+                                    <i class="fas fa-check text-success me-2"></i>
+                                    Education content
+                                </li>
+                                <li class="mb-2">
+                                    <i class="fas fa-check text-success me-2"></i>
+                                    Market brief (basic)
+                                </li>
+                                <li class="mb-2 text-muted">
+                                    <i class="fas fa-times text-muted me-2"></i>
+                                    AI Analysis Tool
+                                </li>
+                                <li class="mb-2 text-muted">
+                                    <i class="fas fa-times text-muted me-2"></i>
+                                    Options Calculator
+                                </li>
+                                <li class="mb-2 text-muted">
+                                    <i class="fas fa-times text-muted me-2"></i>
+                                    Priority support
+                                </li>
+                            </ul>
+                            
+                            <div class="mt-auto">
+                                <a href="{{ url_for('register') }}" class="btn btn-outline-primary w-100">
+                                    Continue with Free
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pro Plan -->
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <div class="card h-100 shadow-lg border-primary">
+                        <div class="card-header bg-primary text-white text-center py-4 position-relative">
+                            <span class="position-absolute top-0 start-50 translate-middle badge bg-warning text-dark px-3 py-2">
+                                Most Popular
+                            </span>
+                            <h4 class="fw-bold mb-0">Pro</h4>
+                            <p class="mb-0 opacity-75">Unlock everything</p>
+                        </div>
+                        <div class="card-body d-flex flex-column">
+                            <div class="text-center mb-4">
+                                <div class="display-4 fw-bold text-primary">
+                                    <span id="pro-price">$29</span>
+                                    <small class="fs-6">/mo</small>
+                                </div>
+                                <div class="text-muted" id="pro-subcopy">Billed monthly</div>
+                                {% if current_user.is_authenticated and not current_user.has_pro_access() %}
+                                    <div class="text-success small mt-1">
+                                        <i class="fas fa-gift me-1"></i>
+                                        {% if current_user.had_trial %}
+                                            Start Pro — immediate billing
+                                        {% else %}
+                                            Start 14-day free trial — no charge today
+                                        {% endif %}
+                                    </div>
+                                {% else %}
+                                    <div class="text-success small mt-1">
+                                        <i class="fas fa-gift me-1"></i>Start 14-day free trial — no charge today
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <ul class="list-unstyled mb-4">
+                                <li class="mb-2">
+                                    <i class="fas fa-check text-success me-2"></i>
+                                    <strong>Everything in Free</strong>
+                                </li>
+                                <li class="mb-2">
+                                    <i class="fas fa-check text-success me-2"></i>
+                                    <strong>AI Analysis Tool</strong> (bulk trade analysis)
+                                </li>
+                                <li class="mb-2">
+                                    <i class="fas fa-check text-success me-2"></i>
+                                    <strong>Options Calculator</strong> (profit/loss & Greeks)
+                                </li>
+                                <li class="mb-2">
+                                    <i class="fas fa-check text-success me-2"></i>
+                                    <strong>Black-Scholes Calculator</strong>
+                                </li>
+                                <li class="mb-2">
+                                    <i class="fas fa-check text-success me-2"></i>
+                                    <strong>Enhanced Market Brief</strong> (daily email)
+                                </li>
+                                <li class="mb-2">
+                                    <i class="fas fa-check text-success me-2"></i>
+                                    Priority support
+                                </li>
+                                <li class="mb-2">
+                                    <i class="fas fa-check text-success me-2"></i>
+                                    Advanced trade analytics
+                                </li>
+                                <li class="mb-2">
+                                    <i class="fas fa-check text-success me-2"></i>
+                                    Premium education content
+                                </li>
+                            </ul>
+                            
+                            <div class="mt-auto">
+                                {% if current_user.is_authenticated %}
+                                    {% if current_user.has_pro_access() %}
+                                        <div class="text-center">
+                                            <div class="alert alert-success mb-3">
+                                                <i class="fas fa-check-circle me-2"></i>
+                                                You already have Pro access!
+                                            </div>
+                                            <a href="{{ url_for('settings') }}" class="btn btn-outline-primary w-100">
+                                                Manage Subscription
+                                            </a>
+                                        </div>
+                                    {% else %}
+                                        <button id="start-pro-btn" class="btn btn-primary w-100 fw-bold">
+                                            {% if current_user.had_trial %}
+                                                Start Pro
+                                            {% else %}
+                                                Start 14-Day Free Trial
+                                            {% endif %}
+                                        </button>
+                                        <div class="text-center mt-2">
+                                            <small class="text-muted">
+                                                {% if current_user.had_trial %}
+                                                    You've already had a trial. This will start billing immediately.
+                                                {% else %}
+                                                    By starting a trial you authorize us to charge after 14 days unless you cancel in Settings.
+                                                {% endif %}
+                                            </small>
+                                        </div>
+                                    {% endif %}
+                                {% else %}
+                                    <a href="{{ url_for('login') }}" class="btn btn-primary w-100 fw-bold">
+                                        Log In to Start Trial
+                                    </a>
+                                    <div class="text-center mt-2">
+                                        <small class="text-muted">
+                                            Please log in to start your 14-day free trial.
+                                        </small>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trust Indicators -->
+            <div class="row mt-5">
+                <div class="col-12">
+                    <div class="text-center">
+                        <div class="row justify-content-center">
+                            <div class="col-md-4 mb-3">
+                                <i class="fas fa-shield-alt text-success fs-1 mb-2"></i>
+                                <h5>Secure Checkout</h5>
+                                <p class="text-muted">Your payment information is encrypted and secure</p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <i class="fas fa-undo text-info fs-1 mb-2"></i>
+                                <h5>Cancel Anytime</h5>
+                                <p class="text-muted">No long-term contracts, cancel your subscription anytime</p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <i class="fas fa-headset text-warning fs-1 mb-2"></i>
+                                <h5>30-Day Money Back</h5>
+                                <p class="text-muted">Not satisfied? Get a full refund within 30 days</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FAQ Section -->
+            <div class="row mt-5">
+                <div class="col-12">
+                    <h3 class="text-center mb-4">Frequently Asked Questions</h3>
+                    <div class="accordion" id="pricingFAQ">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="faq1">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse1">
+                                    What's included in the Pro plan?
+                                </button>
+                            </h2>
+                            <div id="collapse1" class="accordion-collapse collapse" data-bs-parent="#pricingFAQ">
+                                <div class="accordion-body">
+                                    Pro includes full access to our AI Trading Tool, Options Calculator, Daily Market Briefs, priority support, advanced analytics, and premium education content.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="faq2">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse2">
+                                    Can I switch between monthly and annual billing?
+                                </button>
+                            </h2>
+                            <div id="collapse2" class="accordion-collapse collapse" data-bs-parent="#pricingFAQ">
+                                <div class="accordion-body">
+                                    Yes! You can change your billing cycle at any time from your account settings. Changes will take effect at your next billing cycle.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="faq3">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse3">
+                                    What payment methods do you accept?
+                                </button>
+                            </h2>
+                            <div id="collapse3" class="accordion-collapse collapse" data-bs-parent="#pricingFAQ">
+                                <div class="accordion-body">
+                                    We accept all major credit cards (Visa, Mastercard, American Express) and debit cards through our secure Stripe payment processor.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+<!-- Loading Modal -->
+<div class="modal fade" id="loadingModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body text-center py-4">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <h5>Setting up your checkout...</h5>
+                <p class="text-muted">Please wait while we redirect you to our secure payment processor.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const billingRadios = document.querySelectorAll('input[name="billing"]');
+    const proPrice = document.getElementById('pro-price');
+    const proSubcopy = document.getElementById('pro-subcopy');
+    const startProBtn = document.getElementById('start-pro-btn');
+    const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
+
+    // Pricing data
+    const pricing = {
+        monthly: {
+            price: '$29',
+            subcopy: 'Billed monthly'
+        },
+        annual: {
+            price: '$19',
+            subcopy: 'Billed annually ($228/yr)'
+        }
+    };
+
+    // Update pricing display
+    function updatePricing(plan) {
+        proPrice.textContent = pricing[plan].price;
+        proSubcopy.textContent = pricing[plan].subcopy;
+    }
+
+    // Handle billing toggle
+    billingRadios.forEach(radio => {
+        radio.addEventListener('change', function() {
+            updatePricing(this.value);
+        });
+    });
+
+    // Handle Pro checkout (only if user is authenticated)
+    if (startProBtn) {
+        startProBtn.addEventListener('click', async function() {
+        const selectedPlan = document.querySelector('input[name="billing"]:checked').value;
+        
+        // Show loading modal
+        loadingModal.show();
+        
+        try {
+            const response = await fetch('/api/billing/create-checkout-session', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ plan: selectedPlan }),
+                credentials: 'same-origin' // Include cookies for authentication
+            });
+
+            // Check if we got redirected (likely to login page)
+            if (response.redirected) {
+                loadingModal.hide();
+                alert('Please log in to start your trial. You will be redirected to the login page.');
+                window.location.href = response.url;
+                return;
+            }
+
+            const data = await response.json();
+            
+            if (data.checkout_url) {
+                // Redirect to Stripe Checkout
+                window.location.href = data.checkout_url;
+            } else if (data.error) {
+                loadingModal.hide();
+                alert('Error: ' + data.error);
+            } else {
+                loadingModal.hide();
+                alert('Unable to start checkout. Please try again.');
+            }
+        } catch (error) {
+            loadingModal.hide();
+            console.error('Checkout error:', error);
+            alert('Something went wrong starting checkout. Please try again.');
+        }
+    });
+    }
+});
+</script>
+
+<!-- Financial Disclaimer Section -->
+<section class="financial-disclaimer bg-light py-4 mt-5">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="text-center">
+                    <p class="text-muted small mb-0">
+                        <strong>Financial Disclaimer:</strong> Options Plunge is a publisher. No content constitutes a recommendation that any particular investment, security, portfolio of securities, transaction or investment strategy is suitable for any specific person. Please consult with a qualified advisor before making investment decisions. Trading contains substantial risk and is not for every investor.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

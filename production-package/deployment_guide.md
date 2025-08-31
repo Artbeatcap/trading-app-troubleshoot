@@ -90,28 +90,98 @@ su - tradingapp
 
 ## Step 3: Set Up PostgreSQL
 
-### 3.1 Configure PostgreSQL
+### 3.1 Install and Start PostgreSQL
 ```bash
-# Switch back to root
-exit
+# Install PostgreSQL (if not already installed)
+sudo apt install postgresql postgresql-contrib -y
 
-# Access PostgreSQL
-sudo -u postgres psql
+# Start and enable PostgreSQL
+sudo systemctl start postgresql
+sudo systemctl enable postgresql
 
-# Create database and user
-CREATE DATABASE trading_journal;
-CREATE USER tradingapp WITH PASSWORD 'your-secure-password';
-GRANT ALL PRIVILEGES ON DATABASE trading_journal TO tradingapp;
-\q
+# Verify PostgreSQL is running
+sudo systemctl status postgresql
 ```
 
-### 3.2 Test Database Connection
+### 3.2 Configure PostgreSQL Database and User
 ```bash
-# Switch to tradingapp user
-su - tradingapp
+# Access PostgreSQL as root (no password required)
+sudo -u postgres psql
 
-# Test connection
-psql -h localhost -U tradingapp -d trading_journal
+# Create the database user
+CREATE USER trading_user WITH PASSWORD 'Hvjband12345';
+
+# Create the database
+CREATE DATABASE trading_analysis OWNER trading_user;
+
+# Grant all privileges to the user
+GRANT ALL PRIVILEGES ON DATABASE trading_analysis TO trading_user;
+
+# Verify the setup
+\l                    # List databases
+\du                   # List users
+\q                    # Exit PostgreSQL
+```
+
+### 3.3 Test Database Connection
+```bash
+# Test connection as root (for verification)
+sudo -u postgres psql -c "SELECT version();"
+
+# Test connection with the new user
+psql -h localhost -U trading_user -d trading_analysis -c "SELECT version();"
+# Enter password when prompted: Hvjband12345
+```
+
+### 3.4 Troubleshooting PostgreSQL Connection Issues
+
+If you encounter connection issues:
+
+1. **Check if PostgreSQL is running:**
+   ```bash
+   sudo systemctl status postgresql
+   ```
+
+2. **Verify the database and user exist:**
+   ```bash
+   sudo -u postgres psql -c "\l"    # List databases
+   sudo -u postgres psql -c "\du"   # List users
+   ```
+
+3. **Check PostgreSQL logs:**
+   ```bash
+   sudo tail -f /var/log/postgresql/postgresql-*.log
+   ```
+
+4. **Verify connection from application:**
+   ```bash
+   cd /home/tradingapp/trading-analysis
+   source venv/bin/activate
+   python -c "from app import app, db; print('Database connection test:', db.engine.execute(db.text('SELECT 1')).fetchone())"
+   ```
+
+### 3.5 Update Application Configuration
+```bash
+# Navigate to your app directory
+cd /home/tradingapp/trading-analysis
+
+# Update the .env file to use PostgreSQL
+sed -i 's|DATABASE_URL=sqlite:///.*|DATABASE_URL=postgresql://trading_user:Hvjband12345@localhost/trading_analysis|g' .env
+
+# Verify the change
+grep DATABASE_URL .env
+```
+
+### 3.6 Initialize Database with PostgreSQL
+```bash
+# Activate virtual environment
+source venv/bin/activate
+
+# Initialize database (this will create tables in PostgreSQL)
+python init_db.py
+
+# Verify tables were created
+psql -h localhost -U trading_user -d trading_analysis -c "\dt"
 ```
 
 ## Step 4: Deploy Your Application
@@ -352,6 +422,80 @@ find $BACKUP_DIR -name "*.tar.gz" -mtime +7 -delete
 Make it executable:
 ```bash
 chmod +x /home/tradingapp/backup.sh
+```
+
+## Step 11: Managing Deployments and Cleanup
+
+### 11.1 Clean Up Old Deployments
+If you have multiple instances or old deployments running, follow these steps:
+
+```bash
+# Stop and disable old services
+sudo systemctl stop ai-trading-analysis.service 2>/dev/null || true
+sudo systemctl disable ai-trading-analysis.service 2>/dev/null || true
+sudo rm -f /etc/systemd/system/ai-trading-analysis.service
+
+# Kill all stray Gunicorn processes
+sudo pkill -f gunicorn 2>/dev/null || true
+
+# Remove old application directories
+sudo rm -rf /var/www/ai-trading-analysis
+
+# Clean up old Nginx configurations
+sudo rm -f /etc/nginx/sites-enabled/ai-trading-analysis
+sudo rm -f /etc/nginx/sites-available/ai-trading-analysis
+
+# Reload systemd and Nginx
+sudo systemctl daemon-reload
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+### 11.2 Verify Single Instance Running
+```bash
+# Check for Gunicorn processes
+pgrep -fl gunicorn
+
+# Should show only one master process from /home/tradingapp/trading-analysis
+# Example output:
+# 12345 /home/tradingapp/trading-analysis/venv/bin/python /home/tradingapp/trading-analysis/venv/bin/gunicorn --bind 127.0.0.1:8000 wsgi:app
+
+# Check service status
+sudo systemctl status trading-analysis --no-pager
+```
+
+### 11.3 Port Management
+```bash
+# Check what's using port 8000
+sudo netstat -tlnp | grep :8000
+
+# If you need to expose port 8000 directly (not recommended for production)
+sudo ufw allow 8000/tcp
+sudo ufw reload
+
+# For production, use Nginx proxy (port 80) instead
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw reload
+```
+
+### 11.4 Database Migration from SQLite to PostgreSQL
+If you're migrating from SQLite to PostgreSQL:
+
+```bash
+# 1. Backup existing SQLite data
+cp /home/tradingapp/trading-analysis/trading_analysis.db /home/tradingapp/backups/
+
+# 2. Update .env to use PostgreSQL
+sed -i 's|DATABASE_URL=sqlite:///.*|DATABASE_URL=postgresql://trading_user:Hvjband12345@localhost/trading_analysis|g' .env
+
+# 3. Initialize PostgreSQL database
+cd /home/tradingapp/trading-analysis
+source venv/bin/activate
+python init_db.py
+
+# 4. Verify PostgreSQL connection
+python -c "from app import app, db; print('PostgreSQL connection successful')"
 ```
 
 ## Troubleshooting

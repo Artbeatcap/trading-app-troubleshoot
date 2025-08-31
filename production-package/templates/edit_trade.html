@@ -1,8 +1,336 @@
 {% extends "base.html" %}
 {% block title %}Edit Trade - Options Plunge{% endblock %}
+
 {% block content %}
-<div class="container py-4">
-  <h1 class="h3 mb-3">Edit Trade</h1>
-  <p class="text-muted">This feature is not fully implemented in this demo.</p>
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-edit text-primary me-2"></i>
+        Edit Trade: {{ trade.symbol }}
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{{ url_for('view_trade', id=trade.id) }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>
+            Back to Trade
+        </a>
+    </div>
 </div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-edit me-2"></i>
+                    Edit Trade Details
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="row">
+                        <!-- Basic Trade Information -->
+                        <div class="col-md-6">
+                            <h6 class="mb-3">Basic Information</h6>
+                            
+                            <div class="mb-3">
+                                {{ form.symbol.label(class="form-label") }}
+                                {{ form.symbol(class="form-control", placeholder="e.g., AAPL") }}
+                                {% if form.symbol.errors %}
+                                    <div class="text-danger small">{{ form.symbol.errors[0] }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="mb-3">
+                                {{ form.trade_type.label(class="form-label") }}
+                                {{ form.trade_type(class="form-select") }}
+                                {% if form.trade_type.errors %}
+                                    <div class="text-danger small">{{ form.trade_type.errors[0] }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="mb-3">
+                                {{ form.entry_date.label(class="form-label") }}
+                                {{ form.entry_date(class="form-control", type="datetime-local") }}
+                                {% if form.entry_date.errors %}
+                                    <div class="text-danger small">{{ form.entry_date.errors[0] }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="mb-3">
+                                {{ form.entry_price.label(class="form-label") }}
+                                {{ form.entry_price(class="form-control", placeholder="0.00") }}
+                                {% if form.entry_price.errors %}
+                                    <div class="text-danger small">{{ form.entry_price.errors[0] }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="mb-3">
+                                {{ form.quantity.label(class="form-label") }}
+                                {{ form.quantity(class="form-control", placeholder="100") }}
+                                {% if form.quantity.errors %}
+                                    <div class="text-danger small">{{ form.quantity.errors[0] }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Exit Information -->
+                        <div class="col-md-6">
+                            <h6 class="mb-3">Exit Information</h6>
+                            
+                            <div class="mb-3">
+                                {{ form.exit_date.label(class="form-label") }}
+                                {{ form.exit_date(class="form-control", type="datetime-local") }}
+                                {% if form.exit_date.errors %}
+                                    <div class="text-danger small">{{ form.exit_date.errors[0] }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="mb-3">
+                                {{ form.exit_price.label(class="form-label") }}
+                                {{ form.exit_price(class="form-control", placeholder="0.00") }}
+                                {% if form.exit_price.errors %}
+                                    <div class="text-danger small">{{ form.exit_price.errors[0] }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="mb-3">
+                                {{ form.stop_loss.label(class="form-label") }}
+                                {{ form.stop_loss(class="form-control", placeholder="0.00") }}
+                                {% if form.stop_loss.errors %}
+                                    <div class="text-danger small">{{ form.stop_loss.errors[0] }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="mb-3">
+                                {{ form.take_profit.label(class="form-label") }}
+                                {{ form.take_profit(class="form-control", placeholder="0.00") }}
+                                {% if form.take_profit.errors %}
+                                    <div class="text-danger small">{{ form.take_profit.errors[0] }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="mb-3">
+                                {{ form.risk_amount.label(class="form-label") }}
+                                {{ form.risk_amount(class="form-control", placeholder="0.00") }}
+                                {% if form.risk_amount.errors %}
+                                    <div class="text-danger small">{{ form.risk_amount.errors[0] }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Trade Context -->
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h6 class="mb-3">Trade Context</h6>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                {{ form.setup_type.label(class="form-label") }}
+                                {{ form.setup_type(class="form-select") }}
+                                {% if form.setup_type.errors %}
+                                    <div class="text-danger small">{{ form.setup_type.errors[0] }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                {{ form.market_condition.label(class="form-label") }}
+                                {{ form.market_condition(class="form-select") }}
+                                {% if form.market_condition.errors %}
+                                    <div class="text-danger small">{{ form.market_condition.errors[0] }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                {{ form.timeframe.label(class="form-label") }}
+                                {{ form.timeframe(class="form-select") }}
+                                {% if form.timeframe.errors %}
+                                    <div class="text-danger small">{{ form.timeframe.errors[0] }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Options-specific fields (shown conditionally) -->
+                    <div id="options-fields" class="row mt-4" style="display: none;">
+                        <div class="col-12">
+                            <h6 class="mb-3">Options Details</h6>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                {{ form.strike_price.label(class="form-label") }}
+                                {{ form.strike_price(class="form-control", placeholder="0.00") }}
+                                {% if form.strike_price.errors %}
+                                    <div class="text-danger small">{{ form.strike_price.errors[0] }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                {{ form.expiration_date.label(class="form-label") }}
+                                {{ form.expiration_date(class="form-control", type="date") }}
+                                {% if form.expiration_date.errors %}
+                                    <div class="text-danger small">{{ form.expiration_date.errors[0] }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                {{ form.premium_paid.label(class="form-label") }}
+                                {{ form.premium_paid(class="form-control", placeholder="0.00") }}
+                                {% if form.premium_paid.errors %}
+                                    <div class="text-danger small">{{ form.premium_paid.errors[0] }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                {{ form.underlying_price_at_entry.label(class="form-label") }}
+                                {{ form.underlying_price_at_entry(class="form-control", placeholder="0.00") }}
+                                {% if form.underlying_price_at_entry.errors %}
+                                    <div class="text-danger small">{{ form.underlying_price_at_entry.errors[0] }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Trade Reasoning -->
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h6 class="mb-3">Trade Reasoning</h6>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                {{ form.entry_reason.label(class="form-label") }}
+                                {{ form.entry_reason(class="form-control", rows="3", placeholder="Why did you enter this trade?") }}
+                                {% if form.entry_reason.errors %}
+                                    <div class="text-danger small">{{ form.entry_reason.errors[0] }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                {{ form.exit_reason.label(class="form-label") }}
+                                {{ form.exit_reason(class="form-control", rows="3", placeholder="Why did you exit this trade?") }}
+                                {% if form.exit_reason.errors %}
+                                    <div class="text-danger small">{{ form.exit_reason.errors[0] }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Additional Information -->
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h6 class="mb-3">Additional Information</h6>
+                        </div>
+                        
+                        <div class="col-12">
+                            <div class="mb-3">
+                                {{ form.notes.label(class="form-label") }}
+                                {{ form.notes(class="form-control", rows="3", placeholder="Additional notes about this trade...") }}
+                                {% if form.notes.errors %}
+                                    <div class="text-danger small">{{ form.notes.errors[0] }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="col-12">
+                            <div class="mb-3">
+                                {{ form.tags.label(class="form-label") }}
+                                {{ form.tags(class="form-control", placeholder="earnings, breakout, momentum (comma-separated)") }}
+                                {% if form.tags.errors %}
+                                    <div class="text-danger small">{{ form.tags.errors[0] }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="d-flex gap-2">
+                                {{ form.calculate_pnl(class="btn btn-outline-info") }}
+                                {{ form.submit(class="btn btn-primary") }}
+                                <a href="{{ url_for('view_trade', id=trade.id) }}" class="btn btn-outline-secondary">Cancel</a>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar with trade summary -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Current Trade Summary
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <strong>Symbol:</strong> {{ trade.symbol }}<br>
+                    <strong>Type:</strong> {{ trade.trade_type.replace('_', ' ').title() }}<br>
+                    <strong>Entry:</strong> ${{ "%.2f"|format(trade.entry_price) }} on {{ trade.entry_date.strftime('%Y-%m-%d %H:%M') }}<br>
+                    {% if trade.exit_price %}
+                        <strong>Exit:</strong> ${{ "%.2f"|format(trade.exit_price) }} on {{ trade.exit_date.strftime('%Y-%m-%d %H:%M') if trade.exit_date else 'N/A' }}<br>
+                        <strong>P&L:</strong> 
+                        <span class="{% if trade.profit_loss and trade.profit_loss > 0 %}text-success{% elif trade.profit_loss and trade.profit_loss < 0 %}text-danger{% endif %}">
+                            ${{ "%.2f"|format(trade.profit_loss) if trade.profit_loss else 'N/A' }}
+                        </span>
+                    {% else %}
+                        <strong>Status:</strong> <span class="badge bg-warning">Open</span>
+                    {% endif %}
+                </div>
+                
+                {% if trade.profit_loss %}
+                    <div class="alert alert-info">
+                        <small>
+                            <strong>Hold Time:</strong> {{ trade.get_hold_time() }}<br>
+                            <strong>Risk/Reward:</strong> {{ "%.2f"|format(trade.get_risk_reward_ratio()) if trade.get_risk_reward_ratio() else 'N/A' }}
+                        </small>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+// Show/hide options fields based on trade type
+document.addEventListener('DOMContentLoaded', function() {
+    const tradeTypeSelect = document.getElementById('trade_type');
+    const optionsFields = document.getElementById('options-fields');
+    
+    function toggleOptionsFields() {
+        const selectedValue = tradeTypeSelect.value;
+        if (selectedValue && (selectedValue.includes('option') || selectedValue.includes('spread'))) {
+            optionsFields.style.display = 'block';
+        } else {
+            optionsFields.style.display = 'none';
+        }
+    }
+    
+    tradeTypeSelect.addEventListener('change', toggleOptionsFields);
+    toggleOptionsFields(); // Run on page load
+});
+</script>
 {% endblock %}

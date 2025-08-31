@@ -1,0 +1,73 @@
+Options Plunge Morning Brief — {{ subject_theme }} ({{ date }})
+
+{{ preheader }}
+
+================================================================================
+
+📈 Options Plunge - Morning Brief
+{{ date }}
+
+================================================================================
+
+MARKET OVERVIEW
+{{ market_overview }}
+
+================================================================================
+
+MACRO/DATA
+{{ macro_data }}
+
+{% if earnings %}
+================================================================================
+
+EARNINGS IN FOCUS
+{% for item in earnings %}
+• {{ item.ticker }}: {{ item.note }}
+{% endfor %}
+{% endif %}
+
+{% if sectors %}
+================================================================================
+
+SECTORS
+{{ sectors }}
+{% endif %}
+
+================================================================================
+
+KEY LEVELS
+SPY: S1 {{ spy_s1 }} | S2 {{ spy_s2 }} | R1 {{ spy_r1 }} | R2 {{ spy_r2 }} | R3 {{ spy_r3 }}
+{% if extra_levels %}{{ extra_levels }}{% endif %}
+
+================================================================================
+
+DAY PLAN
+{% for item in day_plan %}
+• {{ item }}
+{% endfor %}
+
+================================================================================
+
+SWING PLAN
+{% for item in swing_plan %}
+• {{ item }}
+{% endfor %}
+
+{% if on_deck %}
+================================================================================
+
+ON DECK
+{{ on_deck }}
+{% endif %}
+
+================================================================================
+
+Powered by Options Plunge
+View Full Analysis: {{ cta_url }}
+
+You're receiving this because you confirmed your subscription to the Morning Market Brief.
+Unsubscribe: {{ unsubscribe_url }}
+Update Preferences: {{ preferences_url }}
+
+
+

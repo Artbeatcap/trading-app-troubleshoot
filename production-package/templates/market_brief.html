@@ -1,0 +1,164 @@
+{% extends 'base.html' %}
+{% block title %}Market Brief - Options Plunge{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2 mb-0"><i class="fas fa-newspaper me-2"></i>Market Brief</h1>
+</div>
+{% include "_pro_upsell.html" %}
+
+<div class="row g-4">
+        <!-- MAIN CONTENT AREA -->
+        <div class="col-12 col-lg-9">
+            <!-- Tabs -->
+            <ul class="nav nav-tabs mb-4" id="briefTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="daily-tab" data-bs-toggle="tab" data-bs-target="#daily" type="button" role="tab">
+                        <i class="fas fa-sun me-2"></i>Daily Brief
+                        {% if not current_user.is_authenticated or not current_user.subscription_status == 'active' %}
+                        <span class="badge bg-warning ms-2">Pro</span>
+                        {% endif %}
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="weekly-tab" data-bs-toggle="tab" data-bs-target="#weekly" type="button" role="tab">
+                        <i class="fas fa-calendar-week me-2"></i>Weekly Brief
+                        <span class="badge bg-success ms-2">Free</span>
+                    </button>
+                </li>
+            </ul>
+
+            <!-- TAB CONTENT -->
+            <div class="tab-content" id="briefTabContent">
+                <!-- DAILY TAB -->
+                <div class="tab-pane fade show active" id="daily" role="tabpanel">
+                    {% if current_user.is_authenticated and current_user.subscription_status == 'active' %}
+                        {% if latest_daily_brief %}
+                        <div class="card mb-4">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0"><i class="fas fa-bolt me-2"></i>Latest Daily Market Brief</h5>
+                                <span class="text-muted small">{{ latest_daily_brief.date.strftime('%B %d, %Y') }}</span>
+                            </div>
+                            <div class="card-body">
+                                <div class="ratio ratio-16x9" style="min-height: 600px;">
+                                    <iframe
+                                        style="border:0; width:100%; height:100%;"
+                                        loading="lazy"
+                                        srcdoc="{{ latest_daily_brief.html_content | e }}">
+                                    </iframe>
+                                </div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-info">No daily brief available yet.</div>
+                        {% endif %}
+
+                        {% if historical_daily_briefs %}
+                        <div class="card mb-4">
+                            <div class="card-header"><h5 class="mb-0"><i class="fas fa-history me-2"></i>Recent Daily Briefs</h5></div>
+                            <div class="list-group list-group-flush">
+                                {% for brief in historical_daily_briefs %}
+                                <a class="list-group-item list-group-item-action" href="{{ url_for('view_brief', brief_id=brief.id) }}">
+                                    {{ brief.subject }}<span class="text-muted float-end small">{{ brief.date.strftime('%b %d, %Y') }}</span>
+                                </a>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+                    {% else %}
+                    <div class="card text-center mb-4">
+                        <div class="card-body">
+                            <i class="fas fa-lock fa-3x text-warning mb-3"></i>
+                            <h4>Daily Market Brief - Pro Feature</h4>
+                            <p class="text-muted">Upgrade to Pro to access daily briefs.</p>
+                            <a href="{{ url_for('pricing') }}" class="btn btn-primary"><i class="fas fa-crown me-2"></i>Upgrade to Pro</a>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- WEEKLY TAB -->
+                <div class="tab-pane fade" id="weekly" role="tabpanel">
+                    {% if latest_weekly_brief %}
+                    <div class="card mb-4">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="fas fa-calendar-week me-2"></i>Latest Weekly Market Brief</h5>
+                            <span class="text-muted small">{{ latest_weekly_brief.date.strftime('%B %d, %Y') }}</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="alert alert-success mb-3"><strong>Free for Everyone</strong></div>
+                            <div class="ratio ratio-16x9" style="min-height: 600px;">
+                                <iframe
+                                    style="border:0; width:100%; height:100%;"
+                                    loading="lazy"
+                                    srcdoc="{{ latest_weekly_brief.html_content | e }}">
+                                </iframe>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">No weekly brief available yet.</div>
+                    {% endif %}
+
+                    {% if historical_weekly_briefs %}
+                    <div class="card mb-4">
+                        <div class="card-header"><h5 class="mb-0"><i class="fas fa-history me-2"></i>Recent Weekly Briefs</h5></div>
+                        <div class="list-group list-group-flush">
+                            {% for brief in historical_weekly_briefs %}
+                            <a class="list-group-item list-group-item-action" href="{{ url_for('view_brief', brief_id=brief.id) }}">
+                                {{ brief.subject }}<span class="text-muted float-end small">{{ brief.date.strftime('%b %d, %Y') }}</span>
+                            </a>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div><!-- end tab-content -->
+        </div><!-- /col-12 main -->
+
+        <!-- SIDEBAR WIDGETS -->
+        <div class="col-12 col-lg-3">
+            <!-- subscribe card -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="fas fa-envelope me-2"></i>Subscribe to Market Briefs</h5>
+                    <p class="card-text">Get market analysis delivered to your inbox.</p>
+                    <form method="POST" novalidate>
+                        {{ form.hidden_tag() }}
+                        <div class="mb-2">{{ form.name.label(class="form-label") }}{{ form.name(class="form-control") }}</div>
+                        <div class="mb-3">{{ form.email.label(class="form-label") }}{{ form.email(class="form-control", type="email") }}</div>
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-paper-plane me-2"></i>{{ form.submit.label.text }}
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- benefits -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h6 class="card-title"><i class="fas fa-check-circle me-2"></i>What You'll Get</h6>
+                    <ul class="list-unstyled mb-0">
+                        <li><i class="fas fa-chart-line text-primary me-2"></i>Market Analysis</li>
+                        <li><i class="fas fa-newspaper text-primary me-2"></i>Key Headlines</li>
+                        <li><i class="fas fa-bullseye text-primary me-2"></i>Trading Setups</li>
+                        <li><i class="fas fa-clock text-primary me-2"></i>Daily at 8 AM ET (Pro)</li>
+                        <li><i class="fas fa-calendar-week text-primary me-2"></i>Weekly on Sundays (Free)</li>
+                    </ul>
+                </div>
+            </div>
+
+            {% if current_user.is_authenticated and current_user.email == 'support@optionsplunge.com' %}
+            <div class="card">
+                <div class="card-header"><h5 class="mb-0"><i class="fas fa-cog me-2"></i>Admin Tools</h5></div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('send_brief') }}" class="d-grid gap-2 mb-2">
+                        <button class="btn btn-warning" type="submit"><i class="fas fa-paper-plane me-2"></i>Send Test Brief</button>
+                    </form>
+                    <a href="{{ url_for('admin_morning_brief') }}" class="btn btn-primary w-100"><i class="fas fa-edit me-2"></i>Morning Brief Admin</a>
+                </div>
+            </div>
+            {% endif %}
+        </div><!-- /widgets -->
+    </div><!-- /row -->
+{% endblock %} 

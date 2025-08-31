@@ -17,11 +17,7 @@
 {% if show_login_prompt %}
 <div class="alert alert-info">
     <i class="fas fa-info-circle me-2"></i>
-    {% if is_authenticated %}
-        You can view and manage your trades after logging in or creating an account.
-    {% else %}
-        This is sample data to demonstrate the trading journal features. <strong>Log in or create an account</strong> to track your own trades and get personalized analytics.
-    {% endif %}
+    This is sample data to demonstrate the trading journal features. <strong>Log in or create an account</strong> to track your own trades and get personalized analytics.
     <div class="mt-2">
         <a href="{{ url_for('login') }}" class="btn btn-outline-primary btn-sm me-2">Log In</a>
         <a href="{{ url_for('register') }}" class="btn btn-outline-success btn-sm">Create Account</a>
@@ -29,56 +25,97 @@
 </div>
 {% endif %}
 
+{% if show_demo_data %}
+<div class="alert alert-info alert-dismissible fade show" role="alert">
+    <div class="d-flex align-items-center">
+        <i class="fas fa-image me-3 fa-lg"></i>
+        <div class="flex-grow-1">
+            <strong>Demo View:</strong> Below is a sample trades table for illustration purposes. Add your own trades to see your actual data.
+        </div>
+    </div>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+{% endif %}
+
 {% if trades %}
     <div class="container py-4">
-        <h1 class="h3 mb-3">{% if is_authenticated %}Your Trades{% else %}Sample Trades{% endif %}</h1>
-        <div class="table-responsive">
-            <table class="table table-hover">
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Symbol</th>
-                        <th>Type</th>
-                        <th>Setup</th>
-                        <th>Entry</th>
-                        <th>Exit</th>
-                        <th>P&L</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% if is_authenticated %}
-                        {% for trade in trades.items %}
-                            <tr class="trade-row {% if trade.exit_price and trade.exit_price > trade.entry_price %}profit{% elif trade.exit_price %}loss{% endif %}">
-                                <td>{{ trade.entry_date.strftime('%Y-%m-%d') if trade.entry_date is not string else trade.entry_date }}</td>
-                                <td>{{ trade.symbol }}</td>
-                                <td>{{ trade.trade_type.replace('_', ' ').title() }}</td>
-                                <td>{{ trade.setup_type }}</td>
-                                <td>${{ "%.2f"|format(trade.entry_price) }}</td>
-                                <td>
-                                    {% if trade.exit_price %}
-                                        ${{ "%.2f"|format(trade.exit_price) }}
-                                    {% else %}
-                                        -
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if trade.profit_loss %}
-                                        <span class="{% if trade.profit_loss > 0 %}text-success{% else %}text-danger{% endif %}">
-                                            ${{ "%.2f"|format(trade.profit_loss) }}
-                                        </span>
-                                    {% else %}
-                                        -
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <a href="{{ url_for('view_trade', id=trade.id) }}" class="btn btn-sm btn-info">
-                                        <i class="fas fa-eye"></i>
-                                    </a>
-                                </td>
-                            </tr>
-                        {% endfor %}
-                    {% else %}
+        <h1 class="h3 mb-3">{% if is_authenticated and not show_demo_data %}Your Trades{% else %}Sample Trades{% endif %}</h1>
+        
+        {% if show_demo_data %}
+            <!-- Demo image for logged-in users -->
+            <div class="text-center mb-4">
+                <div class="card border-0 shadow-sm" style="opacity: 0.8;">
+                    <div class="card-body p-0">
+                        <div class="bg-light p-4">
+                            <div class="table-responsive">
+                                <table class="table table-sm table-borderless mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th class="text-muted small">Date</th>
+                                            <th class="text-muted small">Symbol</th>
+                                            <th class="text-muted small">Type</th>
+                                            <th class="text-muted small">Setup</th>
+                                            <th class="text-muted small">Entry</th>
+                                            <th class="text-muted small">Exit</th>
+                                            <th class="text-muted small">P&L</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td class="text-muted small">2025-08-10</td>
+                                            <td class="fw-bold">AAPL</td>
+                                            <td class="text-muted small">Stock</td>
+                                            <td class="text-muted small">Breakout</td>
+                                            <td class="text-muted small">$150.25</td>
+                                            <td class="text-muted small">$155.75</td>
+                                            <td class="text-success small fw-bold">+$550.00</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-muted small">2025-08-05</td>
+                                            <td class="fw-bold">TSLA</td>
+                                            <td class="text-muted small">Option Call</td>
+                                            <td class="text-muted small">Momentum</td>
+                                            <td class="text-muted small">$2.50</td>
+                                            <td class="text-muted small">$4.25</td>
+                                            <td class="text-success small fw-bold">+$1,750.00</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-muted small">2025-08-01</td>
+                                            <td class="fw-bold">SPY</td>
+                                            <td class="text-muted small">Credit Put Spread</td>
+                                            <td class="text-muted small">Income</td>
+                                            <td class="text-muted small">$1.25</td>
+                                            <td class="text-muted small">$0.50</td>
+                                            <td class="text-success small fw-bold">+$375.00</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <p class="text-muted small mt-2">
+                    <i class="fas fa-info-circle me-1"></i>
+                    Sample data for demonstration purposes
+                </p>
+            </div>
+        {% else %}
+            <!-- Real data table for unauthenticated users -->
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Symbol</th>
+                            <th>Type</th>
+                            <th>Setup</th>
+                            <th>Entry</th>
+                            <th>Exit</th>
+                            <th>P&L</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
                         {% for trade in trades %}
                             <tr class="trade-row {% if trade.profit_loss and trade.profit_loss > 0 %}profit{% elif trade.profit_loss %}loss{% endif %}">
                                 <td>{{ trade.entry_date.strftime('%Y-%m-%d') if trade.entry_date is not string else trade.entry_date }}</td>
@@ -109,14 +146,14 @@
                                 </td>
                             </tr>
                         {% endfor %}
-                    {% endif %}
-                </tbody>
-            </table>
-        </div>
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
     </div>
     
-    <!-- Pagination - only for authenticated users -->
-    {% if is_authenticated and trades.pages > 1 %}
+    <!-- Pagination - only for authenticated users with real data -->
+    {% if is_authenticated and not show_demo_data and trades.pages > 1 %}
     <nav aria-label="Page navigation">
         <ul class="pagination justify-content-center">
             {% if trades.has_prev %}

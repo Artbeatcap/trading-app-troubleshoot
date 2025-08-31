@@ -1,0 +1,385 @@
+{% extends 'base.html' %}
+{% block title %}Admin - Morning Brief - Options Plunge{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h1 class="mb-4"><i class="fas fa-cog me-2"></i>Morning Brief Admin</h1>
+    
+    <div class="row">
+        <!-- Form Section -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-edit me-2"></i>Brief Data</h5>
+                </div>
+                <div class="card-body">
+                    <form id="briefForm">
+                        <div class="mb-3">
+                            <label for="subject_theme" class="form-label">Subject Theme</label>
+                            <input type="text" class="form-control" id="subject_theme" name="subject_theme" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="date" class="form-label">Date</label>
+                            <input type="text" class="form-control" id="date" name="date" placeholder="August 20, 2025" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="preheader" class="form-label">Preheader</label>
+                            <textarea class="form-control" id="preheader" name="preheader" rows="2" required></textarea>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="market_overview" class="form-label">Market Overview</label>
+                            <textarea class="form-control" id="market_overview" name="market_overview" rows="3" required></textarea>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="macro_data" class="form-label">Macro/Data</label>
+                            <textarea class="form-control" id="macro_data" name="macro_data" rows="3" required></textarea>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Earnings</label>
+                            <div id="earningsContainer">
+                                <div class="earnings-item mb-2">
+                                    <div class="row">
+                                        <div class="col-3">
+                                            <input type="text" class="form-control" name="earnings[0][ticker]" placeholder="Ticker" required>
+                                        </div>
+                                        <div class="col-9">
+                                            <textarea class="form-control" name="earnings[0][note]" rows="2" placeholder="Note" required></textarea>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="addEarningsItem()">
+                                <i class="fas fa-plus me-1"></i>Add Earnings
+                            </button>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="sectors" class="form-label">Sectors (Optional)</label>
+                            <textarea class="form-control" id="sectors" name="sectors" rows="2"></textarea>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="spy_s1" class="form-label">SPY S1</label>
+                                    <input type="text" class="form-control" id="spy_s1" name="spy_s1" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="spy_s2" class="form-label">SPY S2</label>
+                                    <input type="text" class="form-control" id="spy_s2" name="spy_s2" required>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="spy_r1" class="form-label">SPY R1</label>
+                                    <input type="text" class="form-control" id="spy_r1" name="spy_r1" required>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="spy_r2" class="form-label">SPY R2</label>
+                                    <input type="text" class="form-control" id="spy_r2" name="spy_r2" required>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="spy_r3" class="form-label">SPY R3</label>
+                                    <input type="text" class="form-control" id="spy_r3" name="spy_r3" required>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="extra_levels" class="form-label">Extra Levels (Optional)</label>
+                            <textarea class="form-control" id="extra_levels" name="extra_levels" rows="2"></textarea>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Day Plan</label>
+                            <div id="dayPlanContainer">
+                                <div class="day-plan-item mb-2">
+                                    <textarea class="form-control" name="day_plan[0]" rows="2" placeholder="Day plan item" required></textarea>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="addDayPlanItem()">
+                                <i class="fas fa-plus me-1"></i>Add Day Plan Item
+                            </button>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Swing Plan</label>
+                            <div id="swingPlanContainer">
+                                <div class="swing-plan-item mb-2">
+                                    <textarea class="form-control" name="swing_plan[0]" rows="2" placeholder="Swing plan item" required></textarea>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="addSwingPlanItem()">
+                                <i class="fas fa-plus me-1"></i>Add Swing Plan Item
+                            </button>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="on_deck" class="form-label">On Deck (Optional)</label>
+                            <textarea class="form-control" id="on_deck" name="on_deck" rows="2"></textarea>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="cta_url" class="form-label">CTA URL</label>
+                            <input type="url" class="form-control" id="cta_url" name="cta_url" value="https://optionsplunge.com" required>
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <button type="button" class="btn btn-primary" onclick="previewBrief()">
+                                <i class="fas fa-eye me-2"></i>Preview
+                            </button>
+                            <button type="button" class="btn btn-warning" onclick="sendTest()">
+                                <i class="fas fa-paper-plane me-2"></i>Send Test
+                            </button>
+                            <button type="button" class="btn btn-success" onclick="publishBrief()">
+                                <i class="fas fa-broadcast-tower me-2"></i>Publish to All
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Preview Section -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-eye me-2"></i>Preview</h5>
+                </div>
+                <div class="card-body">
+                    <div id="previewContent" class="border rounded p-3" style="min-height: 400px; background: #f8f9fa;">
+                        <p class="text-muted text-center">Fill out the form and click "Preview" to see the email</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let earningsIndex = 1;
+let dayPlanIndex = 1;
+let swingPlanIndex = 1;
+
+function addEarningsItem() {
+    const container = document.getElementById('earningsContainer');
+    const newItem = document.createElement('div');
+    newItem.className = 'earnings-item mb-2';
+    newItem.innerHTML = `
+        <div class="row">
+            <div class="col-3">
+                <input type="text" class="form-control" name="earnings[${earningsIndex}][ticker]" placeholder="Ticker" required>
+            </div>
+            <div class="col-8">
+                <textarea class="form-control" name="earnings[${earningsIndex}][note]" rows="2" placeholder="Note" required></textarea>
+            </div>
+            <div class="col-1">
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeEarningsItem(this)">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    container.appendChild(newItem);
+    earningsIndex++;
+}
+
+function removeEarningsItem(button) {
+    button.closest('.earnings-item').remove();
+}
+
+function addDayPlanItem() {
+    const container = document.getElementById('dayPlanContainer');
+    const newItem = document.createElement('div');
+    newItem.className = 'day-plan-item mb-2';
+    newItem.innerHTML = `
+        <div class="row">
+            <div class="col-11">
+                <textarea class="form-control" name="day_plan[${dayPlanIndex}]" rows="2" placeholder="Day plan item" required></textarea>
+            </div>
+            <div class="col-1">
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeDayPlanItem(this)">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    container.appendChild(newItem);
+    dayPlanIndex++;
+}
+
+function removeDayPlanItem(button) {
+    button.closest('.day-plan-item').remove();
+}
+
+function addSwingPlanItem() {
+    const container = document.getElementById('swingPlanContainer');
+    const newItem = document.createElement('div');
+    newItem.className = 'swing-plan-item mb-2';
+    newItem.innerHTML = `
+        <div class="row">
+            <div class="col-11">
+                <textarea class="form-control" name="swing_plan[${swingPlanIndex}]" rows="2" placeholder="Swing plan item" required></textarea>
+            </div>
+            <div class="col-1">
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeSwingPlanItem(this)">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    container.appendChild(newItem);
+    swingPlanIndex++;
+}
+
+function removeSwingPlanItem(button) {
+    button.closest('.swing-plan-item').remove();
+}
+
+function getFormData() {
+    const form = document.getElementById('briefForm');
+    const formData = new FormData(form);
+    const data = {};
+    
+    // Handle regular fields
+    for (let [key, value] of formData.entries()) {
+        if (key.includes('[')) {
+            // Handle array fields
+            const match = key.match(/(\w+)\[(\d+)\](\[\w+\])?/);
+            if (match) {
+                const fieldName = match[1];
+                const index = parseInt(match[2]);
+                const subField = match[3] ? match[3].replace(/[\[\]]/g, '') : null;
+                
+                if (!data[fieldName]) {
+                    data[fieldName] = [];
+                }
+                
+                if (subField) {
+                    if (!data[fieldName][index]) {
+                        data[fieldName][index] = {};
+                    }
+                    data[fieldName][index][subField] = value;
+                } else {
+                    data[fieldName][index] = value;
+                }
+            }
+        } else {
+            data[key] = value;
+        }
+    }
+    
+    // Filter out empty arrays and convert to proper format
+    Object.keys(data).forEach(key => {
+        if (Array.isArray(data[key])) {
+            data[key] = data[key].filter(item => item && (typeof item === 'string' ? item.trim() : true));
+        }
+    });
+    
+    return data;
+}
+
+function previewBrief() {
+    const data = getFormData();
+    
+    fetch('/admin/preview/morning-brief', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.error) {
+            alert('Error: ' + result.error);
+        } else {
+            document.getElementById('previewContent').innerHTML = result.html;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error previewing brief');
+    });
+}
+
+function sendTest() {
+    if (!confirm('Send test email?')) return;
+    
+    const data = getFormData();
+    
+    fetch('/admin/send-test/morning-brief', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.error) {
+            alert('Error: ' + result.error);
+        } else {
+            alert(result.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error sending test email');
+    });
+}
+
+function publishBrief() {
+    if (!confirm('Publish morning brief to all subscribers? This action cannot be undone.')) return;
+    
+    const data = getFormData();
+    
+    fetch('/admin/publish/morning-brief', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.error) {
+            alert('Error: ' + result.error);
+        } else {
+            alert(result.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error publishing brief');
+    });
+}
+
+// Load sample data
+document.addEventListener('DOMContentLoaded', function() {
+    // You can load sample data here if needed
+    document.getElementById('date').value = new Date().toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+    });
+});
+</script>
+{% endblock %}
+
+
+

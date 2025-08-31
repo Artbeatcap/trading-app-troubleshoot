@@ -1,97 +1,137 @@
 {% extends "base.html" %}
-{% block title %}Settings - Options Plunge{% endblock %}
+{% block title %}Account Settings - Options Plunge{% endblock %}
+
 {% block content %}
 <div class="container py-4">
-  <h1 class="h3 mb-4">User Settings</h1>
-
-  <form method="POST">
-    {{ form.hidden_tag() }}
-
-    <h5 class="mb-3">Account</h5>
     <div class="row">
-      <div class="col-md-6 mb-3">
-        {{ form.account_size.label(class="form-label") }}
-        {{ form.account_size(class="form-control") }}
-        {% if form.account_size.errors %}
-          <div class="text-danger small">
-            {% for error in form.account_size.errors %}
-              <div>{{ error }}</div>
-            {% endfor %}
-          </div>
-        {% endif %}
-      </div>
-      <div class="col-md-6 mb-3">
-        {{ form.default_risk_percent.label(class="form-label") }}
-        {{ form.default_risk_percent(class="form-control") }}
-        {% if form.default_risk_percent.errors %}
-          <div class="text-danger small">
-            {% for error in form.default_risk_percent.errors %}
-              <div>{{ error }}</div>
-            {% endfor %}
-          </div>
-        {% endif %}
-      </div>
-    </div>
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h2 class="h4 mb-0">
+                        <i class="fas fa-cog me-2"></i>Account Settings
+                    </h2>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        {{ form.hidden_tag() }}
 
-    <h5 class="mt-4 mb-3">Analysis Preferences</h5>
-    <div class="form-check mb-3">
-      {{ form.auto_analyze_trades(class="form-check-input") }}
-      {{ form.auto_analyze_trades.label(class="form-check-label") }}
-    </div>
-    <div class="mb-3">
-      {{ form.analysis_detail_level.label(class="form-label") }}
-      {{ form.analysis_detail_level(class="form-select") }}
-      {% if form.analysis_detail_level.errors %}
-        <div class="text-danger small">
-          {% for error in form.analysis_detail_level.errors %}
-            <div>{{ error }}</div>
-          {% endfor %}
+                        <!-- Account & Display Section -->
+                        <div class="mb-4">
+                            <h5 class="text-primary mb-3">
+                                <i class="fas fa-user me-2"></i>Account & Display
+                            </h5>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    {{ form.display_name.label(class="form-label fw-bold") }}
+                                    {{ form.display_name(class="form-control") }}
+                                    {% if form.display_name.errors %}
+                                        <div class="text-danger small">
+                                            {% for error in form.display_name.errors %}
+                                                <div>{{ error }}</div>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6">
+                                    {{ form.timezone.label(class="form-label fw-bold") }}
+                                    {{ form.timezone(class="form-select") }}
+                                    {% if form.timezone.errors %}
+                                        <div class="text-danger small">
+                                            {% for error in form.timezone.errors %}
+                                                <div>{{ error }}</div>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="row mt-3">
+                                <div class="col-12">
+                                    <div class="form-check">
+                                        {{ form.dark_mode(class="form-check-input") }}
+                                        {{ form.dark_mode.label(class="form-check-label") }}
+                                        <small class="text-muted d-block">Enable dark mode for better viewing in low light</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Email Preferences Section -->
+                        <div class="mb-4">
+                            <h5 class="text-primary mb-3">
+                                <i class="fas fa-envelope me-2"></i>Email Preferences
+                            </h5>
+                            <div class="row mt-3">
+                                <div class="col-12">
+                                    <div class="form-check">
+                                        {{ form.daily_brief_email(class="form-check-input") }}
+                                        {{ form.daily_brief_email.label(class="form-check-label") }}
+                                        <small class="text-muted d-block">Receive morning market brief emails</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Billing & Plan (Pro) -->
+                        <div class="mb-4">
+                            <h5 class="text-primary mb-3">
+                                <i class="fas fa-credit-card me-2"></i>Billing & Plan (Pro)
+                            </h5>
+
+                            {% if not billing %}
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    You're on the Free plan. Start a <strong>14-day free trial</strong> from the <a href="{{ url_for('pricing') }}">Pricing</a> page to unlock Pro.
+                                </div>
+                            {% else %}
+                                <div class="card">
+                                    <div class="card-body d-flex flex-wrap align-items-center gap-3">
+                                        <div>
+                                            <div class="fw-bold">Current plan</div>
+                                            <div class="text-muted">{{ billing.plan|title }} ({{ billing.status }})</div>
+                                            {% if billing.trial_days_left is not none %}
+                                                <div class="small mt-1">Trial days left: <strong>{{ billing.trial_days_left }}</strong></div>
+                                            {% endif %}
+                                        </div>
+
+                                        <div class="ms-auto d-flex gap-2">
+                                            {% if billing.has_portal %}
+                                                <button id="manage-billing" class="btn btn-outline-primary" type="button">Manage billing</button>
+                                            {% endif %}
+                                            <a href="{{ url_for('pricing') }}" class="btn btn-outline-secondary">Switch plan</a>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% if billing.has_portal %}
+                                    <small class="text-muted d-block mt-2">
+                                        Manage billing takes you to Stripe's secure portal to update card, view invoices, switch monthly/annual, or cancel anytime.
+                                    </small>
+                                    <script>
+                                        document.getElementById('manage-billing')?.addEventListener('click', async () => {
+                                            const r = await fetch('/api/billing/create-portal-session', { method: 'POST' });
+                                            const d = await r.json();
+                                            if (d.url) window.location.href = d.url; else alert('Could not open billing portal.');
+                                        });
+                                    </script>
+                                {% else %}
+                                    <small class="text-muted d-block mt-2">
+                                        Contact support to manage your subscription.
+                                    </small>
+                                {% endif %}
+                            {% endif %}
+                        </div>
+
+                        <!-- Submit Button -->
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary me-md-2">
+                                <i class="fas fa-times me-1"></i>Cancel
+                            </a>
+                            {{ form.submit(class="btn btn-primary btn-lg") }}
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
-      {% endif %}
     </div>
-
-    <h5 class="mt-4 mb-3">Risk Management</h5>
-    <div class="row">
-      <div class="col-md-6 mb-3">
-        {{ form.max_daily_loss.label(class="form-label") }}
-        {{ form.max_daily_loss(class="form-control") }}
-        {% if form.max_daily_loss.errors %}
-          <div class="text-danger small">
-            {% for error in form.max_daily_loss.errors %}
-              <div>{{ error }}</div>
-            {% endfor %}
-          </div>
-        {% endif %}
-      </div>
-      <div class="col-md-6 mb-3">
-        {{ form.max_position_size.label(class="form-label") }}
-        {{ form.max_position_size(class="form-control") }}
-        {% if form.max_position_size.errors %}
-          <div class="text-danger small">
-            {% for error in form.max_position_size.errors %}
-              <div>{{ error }}</div>
-            {% endfor %}
-          </div>
-        {% endif %}
-      </div>
-    </div>
-
-    <h5 class="mt-4 mb-3">Display</h5>
-    <div class="mb-3">
-      {{ form.trades_per_page.label(class="form-label") }}
-      {{ form.trades_per_page(class="form-select") }}
-      {% if form.trades_per_page.errors %}
-        <div class="text-danger small">
-          {% for error in form.trades_per_page.errors %}
-            <div>{{ error }}</div>
-          {% endfor %}
-        </div>
-      {% endif %}
-    </div>
-
-    <div class="d-grid mt-4">
-      {{ form.submit(class="btn btn-primary btn-lg") }}
-    </div>
-  </form>
 </div>
 {% endblock %}

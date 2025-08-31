@@ -1,10 +1,36 @@
-# Flask App Deployment Guide for Hostinger VPS
+# Flask App Deployment Guide for VPS
 
-This guide will walk you through deploying your AI Trading Analysis Flask app to a VPS on Hostinger.
+This guide will walk you through deploying your AI Trading Analysis Flask app to a VPS.
+
+## Current Deployment Information
+
+**Live Application Status:**
+- **VPS Hostname**: `167.88.43.61`
+- **Application Path**: `/home/tradingapp/trading-analysis`
+- **Service Name**: `trading-analysis.service`
+- **Status**: ✅ **ACTIVE AND RUNNING**
+- **Memory Usage**: ~157MB
+- **Workers**: 4 Gunicorn workers
+- **HTTP Response**: 200 OK
+
+**Quick Access Commands:**
+```bash
+# SSH to VPS
+ssh root@167.88.43.61
+
+# Check service status
+systemctl status trading-analysis
+
+# View application logs
+journalctl -u trading-analysis -f
+
+# Test application
+curl http://localhost:8000/
+```
 
 ## Prerequisites
 
-1. **Hostinger VPS Access**: SSH access to your VPS
+1. **VPS Access**: SSH access to your VPS (e.g., root@167.88.43.61)
 2. **Domain Name**: A domain pointing to your VPS (optional but recommended)
 3. **API Keys**: Ensure you have your API keys ready:
    - OpenAI API Key
@@ -52,7 +78,7 @@ SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///trading_j
 
 ### 2.1 Connect to Your VPS
 ```bash
-ssh root@your-vps-ip
+ssh root@167.88.43.61
 ```
 
 ### 2.2 Update System
@@ -80,12 +106,12 @@ apt install build-essential python3-dev libpq-dev -y
 
 ### 2.4 Create a Non-Root User
 ```bash
-# Create a new user
+# Create a new user (if not already exists)
 adduser tradingapp
 usermod -aG sudo tradingapp
 
-# Switch to the new user
-su - tradingapp
+# Note: For this deployment, we're using the existing tradingapp user
+# The application is already deployed at /home/tradingapp/trading-analysis
 ```
 
 ## Step 3: Set Up PostgreSQL
@@ -186,26 +212,36 @@ psql -h localhost -U trading_user -d trading_analysis -c "\dt"
 
 ## Step 4: Deploy Your Application
 
-### 4.1 Clone Your Repository
+### 4.1 Deploy Your Application Files
 ```bash
-# Create app directory
-mkdir /home/tradingapp/trading-analysis
-cd /home/tradingapp/trading-analysis
+# The application is already deployed at:
+# /home/tradingapp/trading-analysis
 
-# Clone your repository (replace with your actual repo URL)
-git clone https://github.com/yourusername/ai-trading-analysis-troubleshoot.git .
+# For updates, you can either:
 
-# Or upload files via SCP/SFTP if not using Git
+# Option 1: Upload via SCP (recommended for updates)
+scp trading-analysis-update-$(date +%Y%m%d_%H%M%S).tar.gz root@167.88.43.61:/home/tradingapp/trading-analysis/
+
+# Option 2: Clone from repository (for fresh deployments)
+# mkdir /home/tradingapp/trading-analysis
+# cd /home/tradingapp/trading-analysis
+# git clone https://github.com/yourusername/ai-trading-analysis-troubleshoot.git .
 ```
 
 ### 4.2 Set Up Python Environment
 ```bash
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
+# Navigate to app directory
+cd /home/tradingapp/trading-analysis
+
+# Create virtual environment (if not exists)
+python3 -m venv venv_new
+source venv_new/bin/activate
 
 # Install dependencies
-pip install -r requirements.txt
+pip install -r requirements.txt --no-cache-dir
+
+# Install additional required packages
+pip install psycopg2-binary
 ```
 
 ### 4.3 Configure Environment Variables
@@ -221,13 +257,13 @@ nano .env
 ### 4.4 Initialize Database
 ```bash
 # Activate virtual environment
-source venv/bin/activate
+source venv_new/bin/activate
 
 # Initialize database
 python init_db.py
 
 # Run migrations
-flask db upgrade
+python migrate_db.py
 ```
 
 ## Step 5: Set Up Gunicorn
@@ -249,13 +285,15 @@ User=tradingapp
 Group=tradingapp
 WorkingDirectory=/home/tradingapp/trading-analysis
 Environment="PATH=/home/tradingapp/trading-analysis/venv/bin"
-ExecStart=/home/tradingapp/trading-analysis/venv/bin/gunicorn --config gunicorn.conf.py wsgi:app
+ExecStart=/home/tradingapp/trading-analysis/venv/bin/gunicorn --bind 127.0.0.1:8000 --workers 4 app:app
 ExecReload=/bin/kill -s HUP $MAINPID
 Restart=always
 
 [Install]
 WantedBy=multi-user.target
 ```
+
+**Note**: The service is already configured and running. The current service uses the existing `venv` directory.
 
 ### 5.2 Start the Service
 ```bash
@@ -268,6 +306,9 @@ sudo systemctl start trading-analysis
 
 # Check status
 sudo systemctl status trading-analysis
+
+# For updates, restart the service
+sudo systemctl restart trading-analysis
 ```
 
 ## Step 6: Configure Nginx
@@ -377,21 +418,30 @@ StandardError=append:/var/log/trading-analysis/error.log
 
 ### 10.1 Update Your Application
 ```bash
-# Pull latest changes
+# Method 1: Upload and extract update package
 cd /home/tradingapp/trading-analysis
-git pull origin main
+tar -xzf trading-analysis-update-*.tar.gz --overwrite
+
+# Method 2: Pull from Git (if using repository)
+# cd /home/tradingapp/trading-analysis
+# git pull origin main
 
 # Activate virtual environment
-source venv/bin/activate
+source venv_new/bin/activate
 
 # Install new dependencies
-pip install -r requirements.txt
+pip install -r requirements.txt --no-cache-dir
+pip install psycopg2-binary
 
 # Run database migrations
-flask db upgrade
+python migrate_db.py
 
 # Restart the service
 sudo systemctl restart trading-analysis
+
+# Verify deployment
+sudo systemctl status trading-analysis
+curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/
 ```
 
 ### 10.2 Backup Strategy
@@ -426,7 +476,14 @@ chmod +x /home/tradingapp/backup.sh
 
 ## Step 11: Managing Deployments and Cleanup
 
-### 11.1 Clean Up Old Deployments
+### 11.1 Current Deployment Status
+The application is currently deployed and running at:
+- **VPS Hostname**: `167.88.43.61`
+- **Application Path**: `/home/tradingapp/trading-analysis`
+- **Service Name**: `trading-analysis.service`
+- **Port**: `8000` (internal), `80` (external via Nginx)
+
+### 11.2 Clean Up Old Deployments
 If you have multiple instances or old deployments running, follow these steps:
 
 ```bash
@@ -451,20 +508,23 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-### 11.2 Verify Single Instance Running
+### 11.3 Verify Single Instance Running
 ```bash
 # Check for Gunicorn processes
 pgrep -fl gunicorn
 
 # Should show only one master process from /home/tradingapp/trading-analysis
 # Example output:
-# 12345 /home/tradingapp/trading-analysis/venv/bin/python /home/tradingapp/trading-analysis/venv/bin/gunicorn --bind 127.0.0.1:8000 wsgi:app
+# 12345 /home/tradingapp/trading-analysis/venv/bin/python /home/tradingapp/trading-analysis/venv/bin/gunicorn --bind 127.0.0.1:8000 --workers 4 app:app
 
 # Check service status
 sudo systemctl status trading-analysis --no-pager
+
+# Verify application is responding
+curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/
 ```
 
-### 11.3 Port Management
+### 11.4 Port Management
 ```bash
 # Check what's using port 8000
 sudo netstat -tlnp | grep :8000
@@ -479,7 +539,7 @@ sudo ufw allow 443/tcp
 sudo ufw reload
 ```
 
-### 11.4 Database Migration from SQLite to PostgreSQL
+### 11.5 Database Migration from SQLite to PostgreSQL
 If you're migrating from SQLite to PostgreSQL:
 
 ```bash
@@ -491,7 +551,7 @@ sed -i 's|DATABASE_URL=sqlite:///.*|DATABASE_URL=postgresql://trading_user:Hvjba
 
 # 3. Initialize PostgreSQL database
 cd /home/tradingapp/trading-analysis
-source venv/bin/activate
+source venv_new/bin/activate
 python init_db.py
 
 # 4. Verify PostgreSQL connection

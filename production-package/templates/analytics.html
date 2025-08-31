@@ -6,13 +6,25 @@
     <h1 class="h3 mb-3">Analytics</h1>
 
     {% if show_login_prompt %}
-        <div class="alert alert-info alert-dismissible fade show" role="alert">
+        <div class="alert alert-info alert-dismissible fade show no-auto-hide" role="alert">
             <div class="d-flex align-items-center">
                 <i class="fas fa-info-circle me-3 fa-lg"></i>
                 <div class="flex-grow-1">
                     <strong>Demo Mode:</strong> You're viewing sample analytics data. 
                     <a href="{{ url_for('login', next=request.path) }}" class="alert-link">Sign in</a> or 
                     <a href="{{ url_for('register') }}" class="alert-link">create an account</a> to track your own trading performance!
+                </div>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    {% endif %}
+
+    {% if show_demo_data %}
+        <div class="alert alert-info alert-dismissible fade show no-auto-hide" role="alert">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-image me-3 fa-lg"></i>
+                <div class="flex-grow-1">
+                    <strong>Demo View:</strong> Below is a sample analytics dashboard for illustration purposes. Add your own trades to see your actual performance.
                 </div>
             </div>
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
@@ -29,89 +41,171 @@
             </a>
         </div>
     {% else %}
-        <!-- Summary Statistics -->
-        <div class="row g-4 mb-4">
-            <div class="col-md-2">
-                <div class="card h-100">
-                    <div class="card-body text-center">
-                        <h6 class="card-subtitle mb-2 text-muted">Total Trades</h6>
-                        <h5 class="card-title mb-0">{{ stats.total_trades }}</h5>
+        {% if show_demo_data %}
+            <!-- Demo analytics for logged-in users -->
+            <div class="text-center mb-4">
+                <div class="card border-0 shadow-sm" style="opacity: 0.8;">
+                    <div class="card-body p-0">
+                        <div class="bg-light p-4">
+                            <!-- Summary Statistics -->
+                            <div class="row g-3 mb-4">
+                                <div class="col-md-2">
+                                    <div class="text-center">
+                                        <h6 class="text-muted small mb-1">Total Trades</h6>
+                                        <h5 class="mb-0 fw-bold">7</h5>
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="text-center">
+                                        <h6 class="text-muted small mb-1">Wins</h6>
+                                        <h5 class="mb-0 fw-bold text-success">5</h5>
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="text-center">
+                                        <h6 class="text-muted small mb-1">Losses</h6>
+                                        <h5 class="mb-0 fw-bold text-danger">2</h5>
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="text-center">
+                                        <h6 class="text-muted small mb-1">Win Rate</h6>
+                                        <h5 class="mb-0 fw-bold">71.4%</h5>
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="text-center">
+                                        <h6 class="text-muted small mb-1">Total P&L</h6>
+                                        <h5 class="mb-0 fw-bold text-success">$900.00</h5>
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="text-center">
+                                        <h6 class="text-muted small mb-1">Profit Factor</h6>
+                                        <h5 class="mb-0 fw-bold">3.57</h5>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Demo Charts Placeholder -->
+                            <div class="row g-3">
+                                <div class="col-lg-6">
+                                    <div class="bg-white rounded p-3 border">
+                                        <h6 class="text-muted small mb-2">Cumulative P&L Over Time</h6>
+                                        <div class="bg-light rounded" style="height: 200px; display: flex; align-items: center; justify-content: center;">
+                                            <span class="text-muted small">📈 Chart Placeholder</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-lg-6">
+                                    <div class="bg-white rounded p-3 border mb-3">
+                                        <h6 class="text-muted small mb-2">Win/Loss Distribution</h6>
+                                        <div class="bg-light rounded" style="height: 150px; display: flex; align-items: center; justify-content: center;">
+                                            <span class="text-muted small">🥧 Chart Placeholder</span>
+                                        </div>
+                                    </div>
+                                    <div class="bg-white rounded p-3 border">
+                                        <h6 class="text-muted small mb-2">P&L by Setup Type</h6>
+                                        <div class="bg-light rounded" style="height: 150px; display: flex; align-items: center; justify-content: center;">
+                                            <span class="text-muted small">📊 Chart Placeholder</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <p class="text-muted small mt-2">
+                    <i class="fas fa-info-circle me-1"></i>
+                    Sample analytics for demonstration purposes
+                </p>
+            </div>
+        {% else %}
+            <!-- Real analytics for unauthenticated users -->
+            <!-- Summary Statistics -->
+            <div class="row g-4 mb-4">
+                <div class="col-md-2">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            <h6 class="card-subtitle mb-2 text-muted">Total Trades</h6>
+                            <h5 class="card-title mb-0">{{ stats.total_trades }}</h5>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            <h6 class="card-subtitle mb-2 text-muted">Wins</h6>
+                            <h5 class="card-title mb-0">{{ stats.winning_trades }}</h5>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            <h6 class="card-subtitle mb-2 text-muted">Losses</h6>
+                            <h5 class="card-title mb-0">{{ stats.losing_trades }}</h5>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            <h6 class="card-subtitle mb-2 text-muted">Win Rate</h6>
+                            <h5 class="card-title mb-0">{{ "%.1f"|format(stats.win_rate) }}%</h5>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            <h6 class="card-subtitle mb-2 text-muted">Total P&L</h6>
+                            <h5 class="card-title mb-0 {% if stats.total_pnl > 0 %}text-success{% elif stats.total_pnl < 0 %}text-danger{% endif %}">
+                                ${{ "%.2f"|format(stats.total_pnl) }}
+                            </h5>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            <h6 class="card-subtitle mb-2 text-muted">Profit Factor</h6>
+                            <h5 class="card-title mb-0">{{ "%.2f"|format(stats.profit_factor) }}</h5>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-2">
-                <div class="card h-100">
-                    <div class="card-body text-center">
-                        <h6 class="card-subtitle mb-2 text-muted">Wins</h6>
-                        <h5 class="card-title mb-0">{{ stats.winning_trades }}</h5>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-2">
-                <div class="card h-100">
-                    <div class="card-body text-center">
-                        <h6 class="card-subtitle mb-2 text-muted">Losses</h6>
-                        <h5 class="card-title mb-0">{{ stats.losing_trades }}</h5>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-2">
-                <div class="card h-100">
-                    <div class="card-body text-center">
-                        <h6 class="card-subtitle mb-2 text-muted">Win Rate</h6>
-                        <h5 class="card-title mb-0">{{ "%.1f"|format(stats.win_rate) }}%</h5>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-2">
-                <div class="card h-100">
-                    <div class="card-body text-center">
-                        <h6 class="card-subtitle mb-2 text-muted">Total P&L</h6>
-                        <h5 class="card-title mb-0 {% if stats.total_pnl > 0 %}text-success{% elif stats.total_pnl < 0 %}text-danger{% endif %}">
-                            ${{ "%.2f"|format(stats.total_pnl) }}
-                        </h5>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-2">
-                <div class="card h-100">
-                    <div class="card-body text-center">
-                        <h6 class="card-subtitle mb-2 text-muted">Profit Factor</h6>
-                        <h5 class="card-title mb-0">{{ "%.2f"|format(stats.profit_factor) }}</h5>
-                    </div>
-                </div>
-            </div>
-        </div>
 
-        <!-- Charts -->
-        <div class="row g-4">
-            <div class="col-lg-6">
-                <div class="card">
-                    <div class="card-body">
-                        <div id="pnl_over_time"></div>
+            <!-- Charts -->
+            <div class="row g-4">
+                <div class="col-lg-6">
+                    <div class="card">
+                        <div class="card-body">
+                            <div id="pnl_over_time"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <div id="win_loss_pie"></div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-body">
+                            <div id="setup_performance"></div>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-lg-6">
-                <div class="card mb-4">
-                    <div class="card-body">
-                        <div id="win_loss_pie"></div>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-body">
-                        <div id="setup_performance"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        {% endif %}
     {% endif %}
 </div>
 {% endblock %}
 
 {% block scripts %}
 {{ super() }}
-{% if charts_json %}
+{% if charts_json and not show_demo_data %}
 <script>
     const charts = {{ charts_json | safe }};
     Plotly.newPlot('pnl_over_time', charts.pnl_over_time.data, charts.pnl_over_time.layout, {responsive: true});

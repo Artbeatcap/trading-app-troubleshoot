@@ -10,6 +10,9 @@ SECRET_KEY=your-super-secret-production-key-change-this-immediately
 # OpenAI Configuration
 OPENAI_API_KEY=your-openai-api-key-here
 
+# Finnhub (for newsletter market news)
+FINNHUB_TOKEN=your-finnhub-token
+
 # Tradier Configuration
 TRADIER_API_TOKEN=your-tradier-token-here
 
@@ -22,6 +25,7 @@ MAIL_PASSWORD=your-gmail-app-password
 # Mail sender configuration
 MAIL_DEFAULT_SENDER_NAME=Options Plunge Support
 MAIL_DEFAULT_SENDER_EMAIL=support@optionsplunge.com
+SENDGRID_KEY=your-sendgrid-api-key
 
 # App Configuration
 FLASK_ENV=production

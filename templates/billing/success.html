@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block title %}Welcome to Pro - Options Plunge{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- Sidebar -->
+        <div class="col-md-3 col-lg-2 d-md-block sidebar collapse">
+            <div class="position-sticky pt-3">
+                <div class="text-center mb-4">
+                    <a href="{{ url_for('dashboard') }}" class="brand-link text-decoration-none">
+                        <h4 class="text-white mb-0">
+                            <i class="fas fa-chart-line me-2"></i>
+                            Options Plunge
+                        </h4>
+                    </a>
+                </div>
+                
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('dashboard') }}">
+                            <i class="fas fa-tachometer-alt me-2"></i>
+                            Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('trades') }}">
+                            <i class="fas fa-chart-bar me-2"></i>
+                            Trades
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('analytics') }}">
+                            <i class="fas fa-chart-pie me-2"></i>
+                            Analytics
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('journal') }}">
+                            <i class="fas fa-book me-2"></i>
+                            Journal
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('tools') }}">
+                            <i class="fas fa-tools me-2"></i>
+                            Tools
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('education') }}">
+                            <i class="fas fa-graduation-cap me-2"></i>
+                            Education
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Main content -->
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <h1 class="h2">Welcome to Pro!</h1>
+            </div>
+
+            <!-- Success Message -->
+            <div class="row justify-content-center">
+                <div class="col-lg-8">
+                    <div class="card border-success shadow">
+                        <div class="card-header bg-success text-white text-center py-4">
+                            <i class="fas fa-check-circle fs-1 mb-3"></i>
+                            <h3 class="mb-0">Payment Successful!</h3>
+                        </div>
+                        <div class="card-body text-center py-5">
+                            <h4 class="text-success mb-4">🎉 Welcome to Options Plunge Pro!</h4>
+                            <p class="lead mb-4">
+                                Your subscription has been activated successfully. You now have access to all Pro features including:
+                            </p>
+                            
+                            <div class="row mb-4">
+                                <div class="col-md-6">
+                                    <div class="d-flex align-items-center mb-3">
+                                        <i class="fas fa-robot text-primary fs-4 me-3"></i>
+                                        <div>
+                                            <h6 class="mb-0">AI Trading Tool</h6>
+                                            <small class="text-muted">Full access to AI analysis</small>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex align-items-center mb-3">
+                                        <i class="fas fa-calculator text-primary fs-4 me-3"></i>
+                                        <div>
+                                            <h6 class="mb-0">Options Calculator</h6>
+                                            <small class="text-muted">Advanced profit/loss calculations</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="d-flex align-items-center mb-3">
+                                        <i class="fas fa-newspaper text-primary fs-4 me-3"></i>
+                                        <div>
+                                            <h6 class="mb-0">Daily Market Brief</h6>
+                                            <small class="text-muted">Email + dashboard access</small>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex align-items-center mb-3">
+                                        <i class="fas fa-headset text-primary fs-4 me-3"></i>
+                                        <div>
+                                            <h6 class="mb-0">Priority Support</h6>
+                                            <small class="text-muted">Faster response times</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle me-2"></i>
+                                <strong>Next steps:</strong> Check your email for a welcome message and start exploring your new Pro features!
+                            </div>
+
+                            <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                                <a href="{{ url_for('dashboard') }}" class="btn btn-primary btn-lg me-md-2">
+                                    <i class="fas fa-tachometer-alt me-2"></i>
+                                    Go to Dashboard
+                                </a>
+                                <a href="{{ url_for('tools') }}" class="btn btn-outline-primary btn-lg">
+                                    <i class="fas fa-tools me-2"></i>
+                                    Explore Tools
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Additional Info -->
+                    <div class="row mt-4">
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h5 class="card-title">
+                                        <i class="fas fa-question-circle text-info me-2"></i>
+                                        Need Help?
+                                    </h5>
+                                    <p class="card-text">Our support team is here to help you get the most out of your Pro subscription.</p>
+                                    <a href="#" class="btn btn-outline-info btn-sm">Contact Support</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h5 class="card-title">
+                                        <i class="fas fa-graduation-cap text-warning me-2"></i>
+                                        Learn More
+                                    </h5>
+                                    <p class="card-text">Explore our education section to master advanced trading strategies.</p>
+                                    <a href="{{ url_for('education') }}" class="btn btn-outline-warning btn-sm">Start Learning</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock %}
+

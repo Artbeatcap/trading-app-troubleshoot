@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Options Strategies Guide - Options Education{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <h1 class="display-5 mb-3"><i class="fas fa-chess text-success me-2"></i>Options Strategies Guide</h1>
+                    <p class="lead">Explore foundational income and directional strategies, their risk/reward trade-offs, and when to deploy them.</p>
+                    <hr>
+                    <h3>Long Call</h3>
+                    <p>Buy a call when bullish on the underlying.</p>
+                    <ul>
+                        <li><strong>Risk:</strong> Premium paid.</li>
+                        <li><strong>Reward:</strong> Unlimited.</li>
+                        <li><strong>Breakeven:</strong> Strike + premium.</li>
+                    </ul>
+                    <h3>Long Put</h3>
+                    <p>Buy a put when bearish.</p>
+                    <ul>
+                        <li><strong>Risk:</strong> Premium paid.</li>
+                        <li><strong>Reward:</strong> Up to strike − premium.</li>
+                    </ul>
+                    <h3>Covered Call</h3>
+                    <p>Sell a call against 100 shares you own to generate income.</p>
+                    <ul>
+                        <li><strong>Risk:</strong> Stock upside capped above strike.</li>
+                        <li><strong>Reward:</strong> Premium + stock gains up to strike.</li>
+                        <li><strong>Ideal When:</strong> Slightly bullish / neutral.</li>
+                    </ul>
+                    <h3>Cash-Secured Put</h3>
+                    <p>Short a put while holding cash to potentially buy stock at strike.</p>
+                    <ul>
+                        <li><strong>Risk:</strong> Stock can fall to zero.</li>
+                        <li><strong>Reward:</strong> Premium income.</li>
+                        <li><strong>Ideal When:</strong> Slightly bullish / willing to own shares.</li>
+                    </ul>
+                    <hr>
+                    <h4>Visual Risk/Reward Profiles</h4>
+                    <p class="small">(Placeholder for payoff diagrams – coming soon.)</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

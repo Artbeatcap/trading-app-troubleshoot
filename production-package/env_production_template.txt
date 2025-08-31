@@ -2,13 +2,16 @@
 # Copy this to .env on your VPS and replace with your actual values
 
 # Database Configuration (PostgreSQL)
-DATABASE_URL=postgresql://tradingapp:your-secure-password-here@localhost/trading_journal
+DATABASE_URL=postgresql://trading_user:Hvjband12345@localhost/trading_analysis
 
 # Security - Generate a strong secret key
 SECRET_KEY=your-super-secret-production-key-change-this-immediately
 
 # OpenAI Configuration
 OPENAI_API_KEY=your-openai-api-key-here
+
+# Finnhub (for newsletter market news)
+FINNHUB_TOKEN=your-finnhub-token
 
 # Tradier Configuration
 TRADIER_API_TOKEN=your-tradier-token-here
@@ -22,7 +25,12 @@ MAIL_PASSWORD=your-gmail-app-password
 # Mail sender configuration
 MAIL_DEFAULT_SENDER_NAME=Options Plunge Support
 MAIL_DEFAULT_SENDER_EMAIL=support@optionsplunge.com
+SENDGRID_KEY=your-sendgrid-api-key
 
 # App Configuration
 FLASK_ENV=production
-FLASK_DEBUG=false 
+FLASK_DEBUG=false
+
+# URL Configuration (for email links)
+SERVER_NAME=optionsplunge.com
+PREFERRED_URL_SCHEME=https 

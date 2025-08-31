@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Options Plunge Morning Brief — {{ subject_theme }} ({{ date }})</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 700px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 20px;
+        }
+        .logo {
+            font-size: 28px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        .date {
+            color: #7f8c8d;
+            font-size: 16px;
+        }
+        .section {
+            margin-bottom: 25px;
+        }
+        .section-title {
+            color: #2c3e50;
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            border-left: 4px solid #3498db;
+            padding-left: 10px;
+        }
+        .levels {
+            background: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.8;
+        }
+        .earnings-item {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 5px;
+            margin: 8px 0;
+            border-left: 3px solid #3498db;
+        }
+        .ticker {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .plan-item {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 12px;
+            border-radius: 5px;
+            margin: 8px 0;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #666;
+            font-size: 14px;
+        }
+        .unsubscribe {
+            color: #95a5a6;
+            font-size: 12px;
+        }
+        .cta-button {
+            display: inline-block;
+            background: #3498db;
+            color: white;
+            padding: 12px 25px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            margin: 15px 0;
+        }
+        .cta-button:hover {
+            background: #2980b9;
+        }
+        .optional-section {
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">📈 Options Plunge</div>
+            <h1>Morning Brief</h1>
+            <div class="date">{{ date }}</div>
+            <p style="color: #7f8c8d; font-size: 14px; margin-top: 10px;">{{ preheader }}</p>
+        </div>
+        
+        <!-- Market Overview -->
+        <div class="section">
+            <div class="section-title">Market Overview</div>
+            <p>{{ market_overview }}</p>
+        </div>
+        
+        <!-- Macro/Data -->
+        <div class="section">
+            <div class="section-title">Macro/Data</div>
+            <p>{{ macro_data }}</p>
+        </div>
+
+        <!-- What's moving — After-hours & Premarket -->
+        <div class="section">
+            <div class="section-title">What’s moving — After-hours & Premarket</div>
+
+            <div class="card" style="margin-bottom:16px; padding:12px; border:1px solid #ecf0f1; border-radius:6px;">
+                <strong>After-hours (yesterday)</strong>
+                <ul class="bullets" style="padding-left:18px; margin-top:6px;">
+                    {% for m in ah_moves %}
+                    <li style="margin-bottom:4px;"><strong>{{ m.ticker }}</strong> {{ m.move }} — {{ m.why }}{% if m.source_url %} <a href="{{ m.source_url }}">[source]</a>{% endif %}</li>
+                    {% endfor %}
+                    {% if not ah_moves %}<li>No notable liquid movers.</li>{% endif %}
+                </ul>
+            </div>
+
+            <div class="card" style="padding:12px; border:1px solid #ecf0f1; border-radius:6px;">
+                <strong>Premarket (today)</strong>
+                <ul class="bullets" style="padding-left:18px; margin-top:6px;">
+                    {% for m in premarket_moves %}
+                    <li style="margin-bottom:4px;"><strong>{{ m.ticker }}</strong> {{ m.move }} — {{ m.why }}{% if m.source_url %} <a href="{{ m.source_url }}">[source]</a>{% endif %}</li>
+                    {% endfor %}
+                    {% if not premarket_moves %}<li>No notable liquid movers.</li>{% endif %}
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Earnings in Focus -->
+        {% if earnings %}
+        <div class="section">
+            <div class="section-title">Earnings in Focus</div>
+            {% for item in earnings %}
+            <div class="earnings-item">
+                <span class="ticker">{{ item.ticker }}:</span> {{ item.note }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        
+        <!-- Sectors (Optional) -->
+        {% if sectors %}
+        <div class="section optional-section">
+            <div class="section-title">Sectors</div>
+            <p>{{ sectors }}</p>
+        </div>
+        {% endif %}
+        
+        <!-- Key Levels -->
+        <div class="section">
+            <div class="section-title">Key Levels</div>
+            <div class="levels">
+                SPY: S1 {{ spy_s1 }} | S2 {{ spy_s2 }} | R1 {{ spy_r1 }} | R2 {{ spy_r2 }} | R3 {{ spy_r3 }}
+                {% if extra_levels %}<br>{{ extra_levels }}{% endif %}
+            </div>
+        </div>
+        
+        <!-- Day Plan -->
+        <div class="section">
+            <div class="section-title">Day Plan</div>
+            {% for item in day_plan %}
+            <div class="plan-item">
+                • {{ item }}
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- Swing Plan -->
+        <div class="section">
+            <div class="section-title">Swing Plan</div>
+            {% for item in swing_plan %}
+            <div class="plan-item">
+                • {{ item }}
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- On Deck (Optional) -->
+        {% if on_deck %}
+        <div class="section optional-section">
+            <div class="section-title">On Deck</div>
+            <p>{{ on_deck }}</p>
+        </div>
+        {% endif %}
+        
+        <div class="footer">
+            <p><strong>Powered by Options Plunge</strong></p>
+            <a href="{{ cta_url }}" class="cta-button">View Full Analysis</a>
+            <div class="unsubscribe">
+                <p>You're receiving this because you confirmed your subscription to the Morning Market Brief.</p>
+                <p><a href="{{ unsubscribe_url }}" style="color: #95a5a6;">Unsubscribe</a> | <a href="{{ preferences_url }}" style="color: #95a5a6;">Update Preferences</a></p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+
+

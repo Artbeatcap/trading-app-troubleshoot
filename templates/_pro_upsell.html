@@ -1,0 +1,67 @@
+{% if show_pro_upsell %}
+<div class="alert alert-warning alert-dismissible fade show mb-4 no-auto-hide" role="alert">
+    <div class="d-flex align-items-start">
+        <i class="fas fa-crown me-3 fa-lg mt-1"></i>
+        <div class="flex-grow-1">
+            <h6 class="alert-heading mb-2">
+                {% if feature_name %}{{ feature_name }} - {% endif %}Pro Preview
+            </h6>
+            <p class="mb-3">
+                You're viewing a preview of this Pro feature. Upgrade to unlock full access and all capabilities.
+            </p>
+            
+            {% if limitations %}
+            <div class="mb-3">
+                <small class="text-muted">
+                    <strong>Preview limitations:</strong>
+                    <ul class="mb-0 mt-1">
+                        {% for limitation in limitations %}
+                        <li>{{ limitation }}</li>
+                        {% endfor %}
+                    </ul>
+                </small>
+            </div>
+            {% endif %}
+            
+            <div class="d-flex flex-wrap gap-2">
+                <a href="{{ url_for('pricing') }}" class="btn btn-outline-primary btn-sm">
+                    <i class="fas fa-crown me-1"></i>See Pro Plans
+                </a>
+                <button type="button" class="btn btn-primary btn-sm" onclick="startProCheckout('monthly')">
+                    <i class="fas fa-rocket me-1"></i>Start Pro (Monthly)
+                </button>
+                <button type="button" class="btn btn-success btn-sm" onclick="startProCheckout('annual')">
+                    <i class="fas fa-calendar me-1"></i>Start Pro (Annual)
+                </button>
+            </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+</div>
+
+<script>
+async function startProCheckout(plan) {
+    try {
+        const response = await fetch('/api/billing/create-checkout-session', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ plan: plan })
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            window.location.href = data.checkout_url;
+        } else {
+            const errorData = await response.json();
+            alert('Error starting checkout: ' + (errorData.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Checkout error:', error);
+        alert('Error starting checkout. Please try again.');
+    }
+}
+</script>
+{% endif %}
+

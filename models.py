@@ -39,6 +39,18 @@ class User(UserMixin, db.Model):
     password_reset_token = db.Column(db.String(100), unique=True)
     password_reset_token_generated_at = db.Column(db.DateTime)
 
+    # Subscription fields
+    subscription_status = db.Column(db.String(20), default='free')  # free, trialing, active, canceled
+    plan_type = db.Column(db.String(20), default='none')  # none, monthly, annual
+    stripe_customer_id = db.Column(db.String(100), unique=True)
+    stripe_subscription_id = db.Column(db.String(100), unique=True)
+    trial_end = db.Column(db.DateTime)  # When trial expires
+    had_trial = db.Column(db.Boolean, default=False)  # Prevent repeat trials
+    
+    # Email subscription fields
+    is_subscribed_daily = db.Column(db.Boolean, default=False)
+    is_subscribed_weekly = db.Column(db.Boolean, default=True)
+
     # Token expires after 24 hours
     TOKEN_EXPIRATION_HOURS = 24  # Changed from 5 minutes to 24 hours
     # Password reset token expires after 1 hour
@@ -154,6 +166,10 @@ class User(UserMixin, db.Model):
             return None
         return user
 
+    def has_pro_access(self):
+        """Check if user has active Pro subscription or is in trial"""
+        return self.subscription_status in ['active', 'trialing']
+    
     def __repr__(self):
         return f"<User {self.username}>"
 
@@ -898,3 +914,31 @@ class MarketBriefSubscriber(db.Model):
     def unsubscribe(self):
         """Soft unsubscribe - mark as inactive"""
         self.is_active = False
+
+class EmailDelivery(db.Model):
+    """Model for tracking email deliveries"""
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    kind = db.Column(db.String(16), nullable=False)  # 'daily' or 'weekly'
+    subject = db.Column(db.Text, nullable=False)
+    sent_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    provider_id = db.Column(db.String(100))
+
+class MarketBrief(db.Model):
+    """Model for storing historical market briefs"""
+    id = db.Column(db.Integer, primary_key=True)
+    brief_type = db.Column(db.String(16), nullable=False)  # 'daily' or 'weekly'
+    date = db.Column(db.Date, nullable=False)
+    subject = db.Column(db.String(200), nullable=False)
+    html_content = db.Column(db.Text, nullable=False)
+    text_content = db.Column(db.Text, nullable=False)
+    json_data = db.Column(db.Text)  # Store the original JSON data
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    
+    # Index for efficient queries
+    __table_args__ = (
+        db.Index('idx_brief_type_date', 'brief_type', 'date'),
+    )
+    
+    def __repr__(self):
+        return f'<MarketBrief {self.brief_type} {self.date}>'

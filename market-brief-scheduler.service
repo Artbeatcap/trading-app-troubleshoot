@@ -1,0 +1,19 @@
+[Unit]
+Description=Market Brief Scheduler
+After=network.target
+
+[Service]
+Type=simple
+User=tradingapp
+Group=tradingapp
+WorkingDirectory=/home/tradingapp/trading-analysis
+Environment="PATH=/home/tradingapp/trading-analysis/venv/bin"
+Environment="DATABASE_URL=postgresql://trading_user:Hvjband12345@localhost/trading_analysis"
+ExecStart=/home/tradingapp/trading-analysis/venv/bin/python tasks.py
+Restart=always
+RestartSec=10
+StandardOutput=append:/var/log/trading-analysis/scheduler.log
+StandardError=append:/var/log/trading-analysis/scheduler_error.log
+
+[Install]
+WantedBy=multi-user.target

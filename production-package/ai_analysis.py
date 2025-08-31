@@ -5,7 +5,7 @@ This module provides AI-powered analysis of trading performance using OpenAI's G
 It analyzes individual trades, daily performance, and provides actionable feedback.
 """
 
-import openai
+from openai import OpenAI
 import os
 from datetime import datetime, timedelta
 import json
@@ -20,14 +20,133 @@ class TradingAIAnalyzer:
         """Initialize the AI analyzer without enforcing the API key."""
         self.api_key = os.getenv("OPENAI_API_KEY")
         self.model = "gpt-4"  # Use GPT-4 for better analysis
+        self.client = None
 
     def _ensure_api_key(self):
         """Validate the OpenAI API key. Return True if available."""
+        print(f"DEBUG: _ensure_api_key called, current api_key: {self.api_key[:10] if self.api_key else 'None'}...")
         if not self.api_key:
             self.api_key = os.getenv("OPENAI_API_KEY")
+            print(f"DEBUG: Got api_key from env: {self.api_key[:10] if self.api_key else 'None'}...")
         if not self.api_key:
+            print("DEBUG: No API key found")
             return False
-        openai.api_key = self.api_key
+        if self.client is None:
+            print("DEBUG: Creating OpenAI client")
+            try:
+                # Clear any proxy environment variables before creating client
+                import os
+                proxy_vars = ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy', 'proxies']
+                for var in proxy_vars:
+                    if var in os.environ:
+                        print(f"DEBUG: Removing {var} from environment")
+                        del os.environ[var]
+                
+                # Create client with only the API key
+                print(f"DEBUG: API key length: {len(self.api_key) if self.api_key else 0}")
+                print(f"DEBUG: API key starts with: {self.api_key[:10] if self.api_key else 'None'}...")
+                
+                # Try creating client with minimal parameters
+                client_kwargs = {'api_key': self.api_key}
+                print(f"DEBUG: Client kwargs: {client_kwargs}")
+                
+                # Try to isolate the client creation
+                import openai
+                print(f"DEBUG: OpenAI module version: {openai.__version__}")
+                print(f"DEBUG: OpenAI module path: {openai.__file__}")
+                
+                # Try creating client with explicit parameters and no kwargs
+                print("DEBUG: Attempting to create client with explicit parameters")
+                
+                # Let's inspect the OpenAI client class
+                print(f"DEBUG: OpenAI client class: {openai.OpenAI}")
+                print(f"DEBUG: OpenAI client __init__ signature: {openai.OpenAI.__init__.__code__.co_varnames}")
+                
+                # Try creating client with minimal parameters
+                try:
+                    # Check if there are any global configurations affecting the client
+                    print("DEBUG: Checking for global configurations...")
+                    
+                    # Try a different approach - use requests directly if OpenAI client fails
+                    print("DEBUG: Attempting to create OpenAI client...")
+                    self.client = openai.OpenAI(api_key=self.api_key)
+                    print("DEBUG: OpenAI client created successfully")
+                    
+                except TypeError as e:
+                    print(f"DEBUG: TypeError with OpenAI client: {e}")
+                    print("DEBUG: Falling back to direct API calls using requests")
+                    
+                    # Create a mock client that uses requests directly
+                    class MockOpenAIClient:
+                        def __init__(self, api_key):
+                            self.api_key = api_key
+                            self.base_url = "https://api.openai.com/v1"
+                        
+                        @property
+                        def chat(self):
+                            return MockChatCompletions(self.api_key, self.base_url)
+                    
+                    class MockChatCompletions:
+                        def __init__(self, api_key, base_url):
+                            self.api_key = api_key
+                            self.base_url = base_url
+                        
+                        @property
+                        def completions(self):
+                            return self
+                        
+                        def create(self, **kwargs):
+                            import requests
+                            import json
+                            
+                            headers = {
+                                "Authorization": f"Bearer {self.api_key}",
+                                "Content-Type": "application/json"
+                            }
+                            
+                            response = requests.post(
+                                f"{self.base_url}/chat/completions",
+                                headers=headers,
+                                json=kwargs,
+                                timeout=30
+                            )
+                            
+                            if response.status_code == 200:
+                                return MockResponse(response.json())
+                            else:
+                                raise Exception(f"API request failed: {response.status_code} - {response.text}")
+                    
+                    class MockResponse:
+                        def __init__(self, data):
+                            self.data = data
+                        
+                        @property
+                        def choices(self):
+                            return [MockChoice(self.data.get('choices', [{}])[0])]
+                    
+                    class MockChoice:
+                        def __init__(self, choice_data):
+                            self.choice_data = choice_data
+                        
+                        @property
+                        def message(self):
+                            return MockMessage(self.choice_data.get('message', {}))
+                    
+                    class MockMessage:
+                        def __init__(self, message_data):
+                            self.message_data = message_data
+                        
+                        @property
+                        def content(self):
+                            return self.message_data.get('content', '')
+                    
+                    self.client = MockOpenAIClient(self.api_key)
+                    print("DEBUG: Mock OpenAI client created successfully")
+            except Exception as e:
+                print(f"DEBUG: Error creating OpenAI client: {str(e)}")
+                print(f"DEBUG: Error type: {type(e)}")
+                raise e
+        print("DEBUG: API key validation successful")
         return True
 
     def analyze_trade(self, trade):
@@ -41,8 +160,11 @@ class TradingAIAnalyzer:
             TradeAnalysis object or None if analysis fails
         """
         try:
+            print(f"DEBUG: analyze_trade called for trade {trade.id}")
             if not self._ensure_api_key():
-                return {"error": "OPENAI_API_KEY environment variable not set"}
+                print("DEBUG: API key validation failed, returning error dict")
+                return {"error": "OPENAI_API_KEY environment variable not set. Please add your OpenAI API key to the .env file."}
+            print("DEBUG: API key validation passed, proceeding with analysis")
             # Prepare trade data for analysis
             trade_data = self._prepare_trade_data(trade)
 
@@ -50,7 +172,7 @@ class TradingAIAnalyzer:
             prompt = self._create_trade_analysis_prompt(trade_data)
 
             # Get AI analysis
-            response = openai.ChatCompletion.create(
+            response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": self._get_system_prompt()},
@@ -97,7 +219,8 @@ class TradingAIAnalyzer:
             return analysis
 
         except Exception as e:
-            print(f"Error analyzing trade {trade.id}: {str(e)}")
+            print(f"DEBUG: Exception in analyze_trade: {str(e)}")
+            print(f"DEBUG: Exception type: {type(e)}")
             return None
 
     def analyze_daily_performance(self, journal_entry, trades):
@@ -113,7 +236,7 @@ class TradingAIAnalyzer:
         """
         try:
             if not self._ensure_api_key():
-                return {"error": "OPENAI_API_KEY environment variable not set"}
+                return {"error": "OPENAI_API_KEY environment variable not set. Please add your OpenAI API key to the .env file."}
             # Prepare daily data
             daily_data = self._prepare_daily_data(journal_entry, trades)
 
@@ -121,7 +244,7 @@ class TradingAIAnalyzer:
             prompt = self._create_daily_analysis_prompt(daily_data)
 
             # Get AI analysis
-            response = openai.ChatCompletion.create(
+            response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": self._get_daily_system_prompt()},
@@ -243,9 +366,9 @@ class TradingAIAnalyzer:
             "trades_count": len(trades),
             "winning_trades": len([t for t in trades if t.is_winner()]),
             "losing_trades": len(
-                [t for t in trades if t.profit_loss and t.profit_loss < 0]
+                [t for t in trades if t.profit_loss is not None and t.profit_loss < 0]
             ),
-            "total_pnl": sum(t.profit_loss for t in trades if t.profit_loss),
+            "total_pnl": sum(t.profit_loss for t in trades if t.profit_loss is not None),
             "trade_types": [t.trade_type for t in trades],
             "setups": [t.setup_type for t in trades if t.setup_type],
         }

@@ -1,0 +1,10 @@
+[33mc963fe5[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m Remove external resources from Education page; expand Advanced Options Concepts with detailed content; add Google OAuth setup and newsletter system
+[33md915248[m Add admin user creation script
+[33m41828f0[m Add market brief generator with subscriber email functionality
+[33m5bd0a4b[m Market-brief feature
+[33ma0bb6c9[m Update deployment guide with PostgreSQL setup and cleanup procedures
+[33m821bca5[m Fix dashboard 500 error and improve deployment
+[33mc8d92cf[m Update models.py (latest fixes)
+[33m790ea7c[m[33m ([m[1;31morigin/master[m[33m)[m Fix analytics and bulk analysis routes for anonymous users, add sample data and login prompts, remove duplicate education tab
+[33m3b326a2[m Resolve merge conflicts - keep feature branch improvements for unauthenticated users
+[33m7d3aff0[m[33m ([m[1;31morigin/codex/improve-visuals-for-unauthenticated-users[m[33m, [m[1;32mcodex/improve-visuals-for-unauthenticated-users[m[33m)[m Add GitHub Actions deployment workflow and VPS update scripts
