@@ -26,4 +26,8 @@ instance/
 
 # OS
 .DS_Store
-Thumbs.db 
+Thumbs.db
+
+# Deployment scripts (sensitive)
+deploy_correct_version.ps1
+deploy_correct_version.sh 
