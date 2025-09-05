@@ -7,7 +7,13 @@ import os
 import requests
 import json
 from datetime import datetime, timedelta
+from datetime import date
+import sys
 from typing import List, Dict, Any
+import math
+from typing import Optional
+from datetime import time
+import pytz
 from pathlib import Path
 from openai import OpenAI
 from flask import current_app
@@ -38,6 +44,702 @@ try:
 except ImportError:
     HEADLINE_SUMMARIZER_AVAILABLE = False
     logging.warning("Headline summarizer module not available")
+
+# ===== Tradier session/time helpers and universe =====
+NY = pytz.timezone("America/New_York")
+TRADIER_BASE = os.getenv("TRADIER_BASE_URL", "https://api.tradier.com/v1")
+TRADIER_TOKEN = os.getenv("TRADIER_API_TOKEN")
+
+# Junk scan env knobs (optional)
+JUNK_ENABLE = (os.getenv("JUNK_ENABLE", "1").strip() == "1")
+JUNK_MIN_PRICE = float(os.getenv("JUNK_MIN_PRICE", "1.0"))
+JUNK_MAX_PRICE = float(os.getenv("JUNK_MAX_PRICE", "20.0"))
+JUNK_MIN_ABS_PCT = float(os.getenv("JUNK_MIN_ABS_PCT", "5.0"))
+JUNK_MIN_PM_VOL = int(os.getenv("JUNK_MIN_PM_VOL", "100000"))
+JUNK_MIN_AH_VOL = int(os.getenv("JUNK_MIN_AH_VOL", "100000"))
+
+# Low-float tagging (optional)
+FINNHUB_TOKEN = os.getenv("FINNHUB_API_KEY") or os.getenv("FINNHUB_TOKEN")
+JUNK_FLOAT_MAX = int(os.getenv("JUNK_FLOAT_MAX", "50000000"))
+
+# Universe source for junk scan
+JUNK_UNIVERSE_TICKERS = os.getenv("JUNK_UNIVERSE_TICKERS", "").strip()
+JUNK_UNIVERSE_FILE = os.getenv("JUNK_UNIVERSE_FILE", "static/universe/junk_universe.txt")
+
+def _now_ny() -> datetime:
+    return datetime.now(tz=NY)
+
+def _is_premarket(dt: Optional[datetime] = None) -> bool:
+    dt = dt or _now_ny()
+    return time(7, 0) <= dt.timetz().replace(tzinfo=None) < time(9, 30)
+
+def _is_afterhours(dt: Optional[datetime] = None) -> bool:
+    dt = dt or _now_ny()
+    return time(16, 0) <= dt.timetz().replace(tzinfo=None) <= time(20, 0)
+
+def _session_window(dt: Optional[datetime] = None) -> tuple[str, datetime, datetime, int]:
+    dt = dt or _now_ny()
+    if _is_premarket(dt):
+        start = dt.replace(hour=7, minute=0, second=0, microsecond=0)
+        end = min(dt, dt.replace(hour=9, minute=30, second=0, microsecond=0))
+        return ("pm", start, end, JUNK_MIN_PM_VOL)
+    if _is_afterhours(dt):
+        start = dt.replace(hour=16, minute=0, second=0, microsecond=0)
+        end = min(dt, dt.replace(hour=20, minute=0, second=0, microsecond=0))
+        return ("ah", start, end, JUNK_MIN_AH_VOL)
+    return ("none", dt, dt, max(JUNK_MIN_PM_VOL, JUNK_MIN_AH_VOL))
+
+def _is_sunday_ny(dt=None) -> bool:
+    dt = dt or datetime.now(tz=NY)
+    return dt.weekday() == 6  # Sunday
+
+def _last_completed_week_range(dt=None):
+    """
+    Returns (mon_date, fri_date) for the LAST completed Mon–Fri week
+    relative to 'dt' (NY). If today is Sunday, that means the week that just ended Friday.
+    """
+    dt = (dt or datetime.now(tz=NY)).date()
+    # Go to last Friday
+    offset_to_fri = (dt.weekday() - 4) % 7
+    last_fri = dt - timedelta(days=offset_to_fri if offset_to_fri else 7)
+    last_mon = last_fri - timedelta(days=4)
+    return last_mon, last_fri
+
+def _chunk(lst, n):
+    for i in range(0, len(lst), n):
+        yield lst[i:i+n]
+
+def _liquid_universe() -> list[str]:
+    """
+    Source of truth for scanning. Override with env var UNIVERSE_TICKERS (comma-separated).
+    Keep this tight for speed; you do NOT need whole market for actionable AH/PM names.
+    """
+    env_list = (os.getenv("UNIVERSE_TICKERS") or "").strip()
+    if env_list:
+        return [s.strip().upper() for s in env_list.split(",") if s.strip()]
+    return [
+        # Index/ETFs
+        "SPY","QQQ","IWM","DIA","VTI","VOO","TLT","IEF","HYG","LQD","XLF","XLK","XLE",
+        "XLV","XLI","XLP","XLY","XLU","XLB","XLC","XLRE","SMH","SOXX","XBI","XOP","XME",
+        "XHB","XRT","GLD","SLV","USO","UNG","UVXY","VIXY",
+        # Mag7 + heavyweights
+        "AAPL","MSFT","NVDA","AMZN","META","GOOGL","GOOG","TSLA","AVGO","BRK.B",
+        # Liquid large caps across sectors
+        "AMD","NFLX","TSM","ADBE","CRM","ORCL","INTC","CSCO","QCOM","MU",
+        "JPM","BAC","WFC","GS","MS","C","V","MA","PYPL","AXP",
+        "XOM","CVX","COP","OXY","SLB","PXD",
+        "UNH","LLY","JNJ","PFE","ABBV","MRK",
+        "KO","PEP","MCD","SBUX","COST","WMT","TGT","HD","LOW","NKE",
+        "BA","CAT","DE","GE","HON","LMT","RTX",
+        "T","VZ","TMUS",
+        # Some high-beta/trader favorites
+        "PLTR","SNAP","AFRM","RIVN","LCID","COIN","HOOD","ROKU","UBER","LYFT",
+        "GME","AMC","NKLA","NVAX","AI","UPST","SMCI"
+    ]
+
+def _junk_universe() -> list[str]:
+    """
+    Build a junk universe from env or a local file.
+    - JUNK_UNIVERSE_TICKERS: comma-separated list in env
+    - JUNK_UNIVERSE_FILE: one ticker per line (ignored if file missing)
+    """
+    out: list[str] = []
+    if JUNK_UNIVERSE_TICKERS:
+        out.extend([s.strip().upper() for s in JUNK_UNIVERSE_TICKERS.split(",") if s.strip()])
+    try:
+        if os.path.exists(JUNK_UNIVERSE_FILE):
+            with open(JUNK_UNIVERSE_FILE, "r", encoding="utf-8") as f:
+                for line in f:
+                    s = line.strip().upper()
+                    if s and s not in out:
+                        out.append(s)
+    except Exception as e:
+        logger.warning(f"Could not read JUNK_UNIVERSE_FILE {JUNK_UNIVERSE_FILE}: {e}")
+    # Dedup and basic sanity
+    out = [s for s in dict.fromkeys(out) if s.isalnum() or "." in s]
+    return out[:1000]
+
+def _tradier_quotes(symbols: list[str]) -> list[dict]:
+    """
+    Calls Tradier /v1/markets/quotes in batches and returns a flat list of quote dicts.
+    """
+    if not TRADIER_TOKEN:
+        logger.warning("Tradier API token not configured")
+        return []
+
+    headers = {"Authorization": f"Bearer {TRADIER_TOKEN}", "Accept": "application/json"}
+    out: list[dict] = []
+
+    for group in _chunk(symbols, 150):
+        try:
+            resp = requests.get(
+                f"{TRADIER_BASE}/markets/quotes",
+                params={"symbols": ",".join(group), "greeks": "false"},
+                headers=headers,
+                timeout=10,
+            )
+            if resp.status_code != 200:
+                logger.warning(f"Tradier quotes HTTP {resp.status_code}: {resp.text[:200]}")
+                continue
+            data = resp.json() or {}
+            q = (data.get("quotes") or {}).get("quote")
+            if isinstance(q, dict):
+                out.append(q)
+            elif isinstance(q, list):
+                out.extend(q)
+        except Exception as e:
+            logger.exception(f"Tradier batch failed for {len(group)} symbols: {e}")
+    return out
+
+def _tradier_timesales_volume(symbol: str, start_dt: datetime, end_dt: datetime) -> int:
+    """Sum session volume from Tradier Time & Sales between start_dt and end_dt."""
+    if not TRADIER_TOKEN:
+        return 0
+    headers = {"Authorization": f"Bearer {TRADIER_TOKEN}", "Accept": "application/json"}
+    try:
+        params = {
+            "symbol": symbol,
+            "interval": "1min",
+            "start": start_dt.astimezone(pytz.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "end": end_dt.astimezone(pytz.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "session_filter": "all",
+        }
+        r = requests.get(f"{TRADIER_BASE}/markets/timesales", params=params, headers=headers, timeout=10)
+        if r.status_code != 200:
+            return 0
+        data = r.json() or {}
+        series = ((data.get("series") or {}).get("data")) or []
+        vol = 0
+        for bar in series:
+            v = bar.get("volume")
+            if isinstance(v, (int, float)):
+                vol += int(v)
+        return vol
+    except Exception:
+        return 0
+
+# ===== Stable system and user templates for Morning Brief generation =====
+BRIEF_SYSTEM = """
+You are a professional sell-side market strategist writing a concise morning brief
+for US options day-traders. Write in clear, plain English with trader-first wording.
+Audience: novice-to-intermediate day traders who need quick, actionable context.
+
+OUTPUT GOALS
+- Capture: (1) what happened yesterday (indices, yields, sectors, key catalysts),
+  (2) what matters today (data/earnings/events), (3) key levels/ranges.
+
+STYLE & TONE
+- Declarative, no hype. US Eastern Time for dates/times. Reasonable rounding.
+- Include % moves and key levels when given.
+
+HARD RULES
+- Do NOT invent data. Only use the structured inputs provided below.
+- If a field is missing, say “No data provided” briefly and move on.
+- Never give financial advice; keep to analysis/levels/sentiment.
+- Use these section headers EXACTLY (Markdown H2):
+  ## Executive Summary
+  ## What's moving — After-hours & Premarket
+  ## Key Market Headlines
+  ## Technical Analysis & Daily Range Insights
+  ## Market Sentiment & Outlook
+  ## Key Levels to Watch
+
+SECTION GUIDANCE
+- Executive Summary: 2–3 short paragraphs: what changed, why it matters, and a one-liner on risk tone.
+- What's moving: 3–8 names max. Each 2–3 sentences: catalyst + why traders should care + watch item.
+- Key Market Headlines: For each article, format as:
+    ### <Major headline>
+    #### Summary
+    <1–2 sentence paragraph>
+
+  Add a blank line between each article block.
+- Technical & Daily Range: mention SPY/QQQ spot, expected ranges, simple supports/resistances.
+- Sentiment & Outlook: one short paragraph tying VIX/rates/positioning to likely tape behavior.
+- Key Levels to Watch: Show **daily and weekly supports AND resistances** for SPY and QQQ exactly as provided
+  (e.g., “SPY — Daily S: 520.10 / 517.80; R: 525.40 / 528.60; Weekly S: 521.20 / 517.00; R: 533.10 / 536.80”).
+  Do not invent levels.
+
+FORMAT RULES
+- Plain Markdown only (no HTML). Bold tickers when first mentioned in a bullet.
+- Keep total length under ~1,500 words.
+"""
+
+BRIEF_USER_TEMPLATE = """
+DATE: {date_str}
+
+DATA FEED
+- SPOT/RANGE:
+{range_text}
+
+- VIX:
+{vix_text}
+
+- GAPPING STOCKS (AH & Premarket; if empty, skip this section):
+{gapping_text}
+
+- CANDIDATE HEADLINES (each has 'headline' and optional 'summary_2to5' fallback to 'summary'):
+{headlines_text}
+
+- KEY LEVELS FEED (do not invent; echo exactly):
+{key_levels_feed}
+
+TASK
+Using only the DATA FEED above, produce the morning brief with the exact section set:
+1) Executive Summary
+2) What's moving — After-hours & Premarket
+3) Key Market Headlines (H3 headline, H4 'Summary', then 1–2 sentence paragraph; blank line between items)
+4) Technical Analysis & Daily Range Insights
+5) Market Sentiment & Outlook
+6) Key Levels to Watch (print **Daily & Weekly S and R** for SPY and QQQ from KEY LEVELS FEED)
+"""
+
+# ===== WEEKLY BRIEF: STABLE PROMPTS (for prompt caching) =====
+WEEKLY_SYSTEM = """
+You are a professional sell-side strategist writing a concise WEEKLY market brief
+for US options traders. Write in clear, plain English with trader-first wording.
+
+SCOPE
+- Look BACK at the prior Monday–Friday trading week.
+- Look AHEAD to the coming week (macro data, earnings, policy, seasonality).
+
+HARD RULES
+- Do NOT invent data. Use only provided inputs.
+- US Eastern Time / US markets focus.
+- Section headers EXACTLY (Markdown H2):
+  ## Weekly Executive Summary
+  ## Last Week in Review
+  ## Week Ahead — Data, Earnings, Events
+  ## Sector & Factor Movers
+  ## Weekly Technicals (SPY & QQQ)
+  ## Key Levels for the Week
+
+STYLE
+- 2–3 tight paragraphs for the summary; bullets elsewhere are OK.
+- Numbers: include % moves and key levels; round sensibly.
+- No advice; analysis only.
+"""
+
+WEEKLY_USER_TEMPLATE = """
+WEEK OF: {week_of_str}
+
+INPUTS (WEEKLY)
+- INDEX RECAP (Mon–Fri) for SPY/QQQ, sector ETFs, rates:
+{index_recap}
+
+- TOP HEADLINES (last week; 5–10 items):
+{weekly_headlines}
+
+- WEEK AHEAD (macro/earnings/events; concise bullets):
+{week_ahead}
+
+- WEEKLY LEVELS (SPY/QQQ; supports & resistances):
+{weekly_levels}
+
+TASK
+Using only the inputs above, produce the weekly brief with these sections:
+1) Weekly Executive Summary
+2) Last Week in Review
+3) Week Ahead — Data, Earnings, Events
+4) Sector & Factor Movers
+5) Weekly Technicals (SPY & QQQ)
+6) Key Levels for the Week (echo the provided levels; no invention)
+"""
+# ===== END WEEKLY PROMPTS =====
+
+# ===== Tradier history + pivot helpers (Daily/Weekly) =====
+def _tradier_history_daily(symbol: str, start_d: date, end_d: date) -> list[dict]:
+    if not TRADIER_TOKEN:
+        return []
+    headers = {"Authorization": f"Bearer {TRADIER_TOKEN}", "Accept": "application/json"}
+    try:
+        r = requests.get(
+            f"{TRADIER_BASE}/markets/history",
+            params={"symbol": symbol, "interval": "daily", "start": start_d.isoformat(), "end": end_d.isoformat()},
+            headers=headers,
+            timeout=10,
+        )
+        if r.status_code != 200:
+            logger.warning(f"Tradier history HTTP {r.status_code}: {r.text[:200]}")
+            return []
+        data = r.json() or {}
+        days = ((data.get("history") or {}).get("day")) or []
+        return days if isinstance(days, list) else ([days] if days else [])
+    except Exception as e:
+        logger.exception(f"_tradier_history_daily failed for {symbol}: {e}")
+        return []
+
+def _pivot_levels_from_hlc(high: float, low: float, close: float) -> dict:
+    P = (high + low + close) / 3.0
+    R1 = 2*P - low
+    R2 = P + (high - low)
+    S1 = 2*P - high
+    S2 = P - (high - low)
+    return {"P": P, "R1": R1, "R2": R2, "S1": S1, "S2": S2}
+
+def _last_completed_session_dates(now: datetime) -> tuple[date, date]:
+    d = now.astimezone(NY).date()
+    prev = d - timedelta(days=1)
+    while prev.weekday() >= 5:
+        prev -= timedelta(days=1)
+    weekday = d.weekday()
+    last_week_end = d - timedelta(days=weekday+1)
+    last_week_start = last_week_end - timedelta(days=6)
+    last_mon = last_week_start + timedelta(days=(0 if last_week_start.weekday()==0 else (7-last_week_start.weekday())))
+    last_fri = last_mon + timedelta(days=4)
+    return (prev, last_fri)
+
+def _compute_daily_weekly_levels(symbol: str, now: Optional[datetime] = None) -> dict:
+    now = now or _now_ny()
+    prev_day, last_fri = _last_completed_session_dates(now)
+    last_mon = last_fri - timedelta(days=4)
+
+    d_hist = _tradier_history_daily(symbol, prev_day - timedelta(days=1), prev_day)
+    d_bar = d_hist[-1] if d_hist else None
+
+    w_hist = _tradier_history_daily(symbol, last_mon, last_fri)
+    if w_hist:
+        w_high = max(float(x["high"]) for x in w_hist)
+        w_low = min(float(x["low"]) for x in w_hist)
+        w_close = float(w_hist[-1]["close"])
+        w_piv = _pivot_levels_from_hlc(w_high, w_low, w_close)
+    else:
+        w_piv = None
+
+    res = {
+        "daily_resistances": None, "weekly_resistances": None,
+        "daily_supports": None, "weekly_supports": None
+    }
+    if d_bar:
+        d_piv = _pivot_levels_from_hlc(float(d_bar["high"]), float(d_bar["low"]), float(d_bar["close"]))
+        res["daily_resistances"] = [d_piv["R1"], d_piv["R2"]]
+        res["daily_supports"]    = [d_piv["S1"], d_piv["S2"]]
+    if w_piv:
+        res["weekly_resistances"] = [w_piv["R1"], w_piv["R2"]]
+        res["weekly_supports"]    = [w_piv["S1"], w_piv["S2"]]
+    return res
+
+def enrich_expected_range_with_pivots(expected_range: dict) -> dict:
+    out = dict(expected_range or {})
+    for key, sym in (("spy","SPY"), ("qqq","QQQ")):
+        try:
+            piv = _compute_daily_weekly_levels(sym)
+            sec = out.get(key, {}) if isinstance(out.get(key), dict) else {}
+            for fld in ("daily_resistances","weekly_resistances","daily_supports","weekly_supports"):
+                if piv.get(fld):
+                    sec[fld] = [round(x, 2) for x in piv[fld]]
+            out[key] = sec
+        except Exception as e:
+            logger.warning(f"Pivot enrichment failed for {sym}: {e}")
+    return out
+
+def _render_brief_user_prompt(headlines: list[dict], expected_range: dict, gapping_stocks: Any) -> str:
+    date_str = _now_ny().strftime('%A, %B %d, %Y')
+
+    # Build SPOT/RANGE lines
+    lines = []
+    for tk in ("spy", "qqq"):
+        sec = expected_range.get(tk, {}) if isinstance(expected_range, dict) else {}
+        px = sec.get("current_price")
+        sup = sec.get("support")
+        res = sec.get("resistance")
+        if isinstance(px, (int, float)):
+            lines.append(f"{tk.upper()}: ${px:.2f} (Support: ${sup or 0:.2f}, Resistance: ${res or 0:.2f})")
+    range_text = "\n".join(lines) if lines else "No data provided"
+
+    # VIX line
+    vix = expected_range.get('vix', {}) if isinstance(expected_range, dict) else {}
+    vix_val = vix.get('current_price')
+    vix_text = f"VIX: {vix_val:.2f}" if isinstance(vix_val, (int, float)) else "No data provided"
+
+    # Gapping text (AH & Premarket)
+    gapping_text = ""
+    if gapping_stocks:
+        if isinstance(gapping_stocks, dict):
+            ah_moves = gapping_stocks.get("after_hours", [])
+            pre_moves = gapping_stocks.get("premarket", [])
+            if ah_moves:
+                gapping_text += "After-hours Movers:\n"
+                for stock in ah_moves[:5]:
+                    gapping_text += f"- {stock.get('ticker','')}: {stock.get('move','')} - {stock.get('why','')}\n"
+                gapping_text += "\n"
+            if pre_moves:
+                gapping_text += "Premarket Movers:\n"
+                for stock in pre_moves[:5]:
+                    gapping_text += f"- {stock.get('ticker','')}: {stock.get('move','')} - {stock.get('why','')}\n"
+                gapping_text += "\n"
+        else:
+            for stock in gapping_stocks[:5]:
+                gapping_text += f"- {stock.get('ticker','')}: {stock.get('gap_pct',0):+.2f}% (${stock.get('current_price',0):.2f} vs ${stock.get('prev_close',0):.2f})\n"
+    if not gapping_text:
+        gapping_text = "No data provided"
+
+    # Headlines list
+    headlines_text = ""
+    for it in (headlines or [])[:10]:
+        title = it.get('headline', '')
+        summary = (it.get('summary_2to5') or it.get('summary') or '').strip()
+        headlines_text += f"- {title}\n  Summary: {summary}\n\n"
+    headlines_text = headlines_text.strip() or "No data provided"
+
+    # Build KEY LEVELS FEED (daily/weekly S & R for SPY/QQQ if available)
+    def _pair(x):
+        return f"{x[0]:.2f} / {x[1]:.2f}" if (isinstance(x, list) and len(x) >= 2) else "No data"
+
+    def _fmt_sr(sec: dict, label: str) -> str:
+        if not isinstance(sec, dict):
+            return f"{label}: No data provided"
+        ds = sec.get("daily_supports");  dr = sec.get("daily_resistances")
+        ws = sec.get("weekly_supports"); wr = sec.get("weekly_resistances")
+        return f"{label} — Daily S: {_pair(ds)}; R: {_pair(dr)}; Weekly S: {_pair(ws)}; R: {_pair(wr)}"
+
+    key_levels_lines = []
+    key_levels_lines.append(_fmt_sr(expected_range.get("spy", {}), "SPY"))
+    key_levels_lines.append(_fmt_sr(expected_range.get("qqq", {}), "QQQ"))
+    key_levels_feed = "\n".join(key_levels_lines)
+
+    return BRIEF_USER_TEMPLATE.format(
+        date_str=date_str,
+        range_text=range_text,
+        vix_text=vix_text,
+        gapping_text=gapping_text,
+        headlines_text=headlines_text,
+        key_levels_feed=key_levels_feed,
+    )
+
+def _compose_weekly_inputs() -> tuple[str, str, str, str]:
+    """
+    Build the strings for WEEKLY_USER_TEMPLATE:
+      index_recap, weekly_headlines, week_ahead, weekly_levels
+    NOTE: Use existing utilities where possible; keep formatting plain text / bullets.
+    """
+    now = datetime.now(tz=NY)
+    week_mon, week_fri = _last_completed_week_range(now)
+
+    # 1) Index recap (pull daily history and summarize SPY/QQQ + sectors if available)
+    try:
+        pivots_spy = _compute_daily_weekly_levels("SPY", now)
+        pivots_qqq = _compute_daily_weekly_levels("QQQ", now)
+    except Exception:
+        pivots_spy = pivots_qqq = {}
+
+    index_lines = []
+    try:
+        spy_hist = _tradier_history_daily("SPY", week_mon, week_fri)
+        qqq_hist = _tradier_history_daily("QQQ", week_mon, week_fri)
+        def _pct(a,b):
+            return (float(a)-float(b))/float(b)*100 if (a is not None and b and float(b)!=0) else 0.0
+        if spy_hist:
+            spy_open = float(spy_hist[0]["close"])
+            spy_close = float(spy_hist[-1]["close"])
+            index_lines.append(f"SPY: {spy_close:.2f} (wk { _pct(spy_close, spy_open):+.2f}% )")
+        if qqq_hist:
+            qqq_open = float(qqq_hist[0]["close"])
+            qqq_close = float(qqq_hist[-1]["close"])
+            index_lines.append(f"QQQ: {qqq_close:.2f} (wk { _pct(qqq_close, qqq_open):+.2f}% )")
+    except Exception:
+        pass
+    index_recap = "\n".join(index_lines) or "No data provided"
+
+    # 2) Weekly headlines: reuse fetch; if unavailable, use empty
+    try:
+        headlines = []
+    except Exception:
+        headlines = []
+    wh_lines = []
+    for i, h in enumerate(headlines[:10], 1):
+        title = h.get("headline","No headline")
+        summ = (h.get("summary_2to5") or h.get("summary") or "").strip()
+        wh_lines.append(f"{i}. {title}\n   {summ}")
+    weekly_headlines = "\n".join(wh_lines) or "No data provided"
+
+    # 3) Week ahead placeholder
+    try:
+        week_ahead = "No data provided"
+    except Exception:
+        week_ahead = "No data provided"
+
+    # 4) Weekly levels
+    def _fmt_levels(levels: dict, label: str) -> str:
+        if not isinstance(levels, dict): return f"{label}: No data"
+        ws = levels.get("weekly_supports"); wr = levels.get("weekly_resistances")
+        def _pair(x):
+            return f"{x[0]:.2f}/{x[1]:.2f}" if isinstance(x, list) and len(x)>=2 else "No data"
+        return f"{label} — Weekly S: {_pair(ws)}; R: {_pair(wr)}"
+
+    weekly_levels = "\n".join([
+        _fmt_levels(pivots_spy, "SPY"),
+        _fmt_levels(pivots_qqq, "QQQ"),
+    ])
+
+    return index_recap, weekly_headlines, week_ahead, weekly_levels
+
+def summarize_news_weekly() -> str:
+    """
+    Build and call the weekly LLM prompt. Returns Markdown.
+    """
+    if not OPENAI_API_KEY:
+        raise ValueError("OPENAI_API_KEY environment variable not set")
+    try:
+        from openai import OpenAI
+        global openai_client
+        openai_client = openai_client or OpenAI(api_key=OPENAI_API_KEY)
+    except Exception as e:
+        logger.error(f"Error initializing OpenAI client: {str(e)}")
+        return ""
+
+    now = datetime.now(tz=NY)
+    week_mon, week_fri = _last_completed_week_range(now)
+    week_of_str = f"Week of {week_mon.strftime('%B %d, %Y')}"
+
+    index_recap, weekly_headlines, week_ahead, weekly_levels = _compose_weekly_inputs()
+
+    user_prompt = WEEKLY_USER_TEMPLATE.format(
+        week_of_str=week_of_str,
+        index_recap=index_recap,
+        weekly_headlines=weekly_headlines,
+        week_ahead=week_ahead,
+        weekly_levels=weekly_levels,
+    )
+
+    resp = openai_client.chat.completions.create(
+        model="gpt-4o-mini-2024-07-18",
+        messages=[{"role":"system","content":WEEKLY_SYSTEM},
+                  {"role":"user","content":user_prompt}],
+        max_tokens=2200,
+        temperature=0.4,
+    )
+    return (resp.choices[0].message.content or "").strip()
+
+def send_weekly_market_brief_to_subscribers(force: bool=False) -> str:
+    """
+    Generate + email weekly brief. Only runs on SUNDAY (NY), unless force=True.
+    Writes static/uploads/brief_weekly_latest.html and returns its path.
+    """
+    now = datetime.now(tz=NY)
+    if not force and not _is_sunday_ny(now):
+        msg = f"Weekly brief blocked — today is {now.strftime('%A %Y-%m-%d %H:%M %Z')}, not Sunday."
+        logger.info(msg)
+        return msg
+
+    md = summarize_news_weekly()
+    if not md:
+        return "No weekly content generated."
+
+    # Markdown to HTML minimal conversion
+    try:
+        import markdown2  # type: ignore
+        html = markdown2.markdown(md)
+    except Exception:
+        html = f"<pre>{md}</pre>"
+
+    os.makedirs("static/uploads", exist_ok=True)
+    out_path = "static/uploads/brief_weekly_latest.html"
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write(html)
+
+    # Email sending
+    try:
+        from emails import send_daily_brief_direct
+        week_mon, _ = _last_completed_week_range(now)
+        subject = f"Weekly Market Brief — Week of {week_mon.strftime('%B %d, %Y')}"
+        # Reuse daily direct sender with subject override if needed; fallback embeds subject in content header
+        # Create a simple wrapper to pass subject by prepending in HTML
+        send_daily_brief_direct(html, date_str=subject)
+    except Exception as e:
+        logger.warning(f"Weekly brief email send failed: {e}")
+
+    return out_path
+
+def _fetch_float_finnhub(symbol: str) -> Optional[int]:
+    """Try to obtain float via Finnhub metrics. Returns integer shares or None."""
+    if not FINNHUB_TOKEN:
+        return None
+    try:
+        url = "https://finnhub.io/api/v1/stock/metric"
+        params = {"symbol": symbol, "metric": "all", "token": FINNHUB_TOKEN}
+        r = requests.get(url, params=params, timeout=8)
+        if r.status_code != 200:
+            return None
+        j = r.json() or {}
+        data = j.get("metric") or {}
+        for key in ("shareFloat", "freeFloat", "sharesOutstanding", "shareOutstanding"):
+            val = data.get(key)
+            if isinstance(val, (int, float)) and val > 0:
+                if val < 1:
+                    continue
+                return int(val)
+        return None
+    except Exception:
+        return None
+
+def _format_move(pct: float) -> str:
+    return f"{pct:+.2f}%"
+
+def _human_int(n: int) -> str:
+    if n >= 1_000_000:
+        return f"{n/1_000_000:.1f}M"
+    if n >= 1_000:
+        return f"{n/1_000:.1f}k"
+    return str(n)
+
+def _junk_movers_tradier(now: Optional[datetime] = None) -> list[dict]:
+    """Identify junk candidates using price/%change and session volume gates."""
+    if not JUNK_ENABLE:
+        return []
+    now = now or _now_ny()
+    sess, start_dt, end_dt, vol_gate = _session_window(now)
+    if sess == "none":
+        return []
+    universe = _junk_universe()
+    if not universe:
+        logger.info("Junk scan: empty universe (set JUNK_UNIVERSE_TICKERS or file).")
+        return []
+    q = _tradier_quotes(universe)
+    cands = []
+    for it in q:
+        sym = it.get("symbol")
+        if not sym or (it or {}).get("type") != "stock":
+            continue
+        last = it.get("last")
+        prev = it.get("prevclose")
+        if not (isinstance(last, (int, float)) and isinstance(prev, (int, float)) and prev > 0):
+            continue
+        price = float(last)
+        if price < JUNK_MIN_PRICE or price > JUNK_MAX_PRICE:
+            continue
+        pct = (price - float(prev)) / float(prev) * 100.0
+        if abs(pct) < JUNK_MIN_ABS_PCT:
+            continue
+        cands.append({"symbol": sym, "pct": pct, "price": price})
+    if not cands:
+        return []
+    cands.sort(key=lambda x: abs(x["pct"]), reverse=True)
+    top = cands[:80]
+    filtered = []
+    for it in top:
+        v = _tradier_timesales_volume(it["symbol"], start_dt, end_dt)
+        if v >= vol_gate:
+            it["session_vol"] = v
+            filtered.append(it)
+    if not filtered:
+        return []
+    results = []
+    for it in filtered[:30]:
+        tags = []
+        f_shares = _fetch_float_finnhub(it["symbol"]) if FINNHUB_TOKEN else None
+        if f_shares is not None and f_shares <= JUNK_FLOAT_MAX:
+            tags.append("LF")
+        why_bits = [f"{'PM' if sess=='pm' else 'AH'} vol ~{_human_int(it['session_vol'])}"]
+        if f_shares is not None:
+            why_bits.append(f"float ~{_human_int(f_shares)}")
+        if tags:
+            why_bits.append(f"[{','.join(tags)}]")
+        results.append({
+            "ticker": it["symbol"],
+            "move": _format_move(it["pct"]),
+            "why": " ; ".join(why_bits)
+        })
+    return results[:20]
 
 
 def fetch_news() -> List[Dict[str, Any]]:
@@ -424,63 +1126,93 @@ def calculate_expected_range(stock_prices: Dict[str, float]) -> Dict[str, Any]:
     }
 
 
-async def fetch_gapping_stocks_tradier() -> Dict[str, List[Dict[str, Any]]]:
-    """Fetch gapping stocks using Tradier for after-hours and premarket"""
-    logger.info("Fetching gapping stocks with Tradier...")
-    
+def fetch_gapping_stocks_tradier() -> dict[str, list[dict[str, str]]]:
+    """
+    Returns {'after_hours': [...], 'premarket': [...]} where each item:
+      { 'ticker': 'AAPL', 'move': '+3.2%', 'why': 'optional short blurb' }
+
+    We compute movers by comparing Tradier `last` vs `prevclose`.
+    During premarket, `last` reflects extended prints (when available).
+    During after-hours, `last` reflects post-close prints.
+    """
     try:
-        # Import the movers scan module
-        from movers_scan import scan_all_movers
-        import pytz
-        
-        # Define the universe of stocks to scan (same as before)
-        universe = [
-            'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA', 'META', 'NFLX', 'AMD', 'INTC',
-            'CRM', 'ADBE', 'PYPL', 'SQ', 'ZM', 'SHOP', 'SNOW', 'PLTR', 'CRWD', 'ZS',
-            'SPOT', 'UBER', 'LYFT', 'DASH', 'RBLX', 'HOOD', 'COIN', 'MSTR', 'RIOT', 'MARA',
-            'JPM', 'BAC', 'WFC', 'GS', 'MS', 'C', 'BLK', 'AXP', 'V', 'MA', 'DIS',
-            'NKE', 'SBUX', 'MCD', 'KO', 'PEP', 'WMT', 'TGT', 'COST', 'HD', 'LOW',
-            'JNJ', 'PFE', 'ABBV', 'UNH', 'CVS', 'ANTM', 'CI', 'HUM', 'ELV', 'DHR',
-            'PG', 'KO', 'PEP', 'CL', 'ULTA', 'NKE', 'UA', 'LULU', 'PLNT', 'PTON',
-            'XOM', 'CVX', 'COP', 'EOG', 'PXD', 'MPC', 'VLO', 'PSX', 'OXY', 'FANG',
-            'BA', 'CAT', 'DE', 'MMM', 'GE', 'HON', 'LMT', 'RTX', 'NOC', 'GD',
-            'T', 'VZ', 'TMUS', 'CMCSA', 'CHTR', 'DISH', 'PARA', 'FOX', 'NWSA', 'NWS',
-            'SPY', 'QQQ', 'IWM', 'VTI', 'VOO', 'VEA', 'VWO', 'BND', 'TLT', 'GLD',
-            'SLV', 'USO', 'UNG', 'DBA', 'DBC', 'VNQ', 'XLF', 'XLK', 'XLE', 'XLV',
-            'XLI', 'XLP', 'XLY', 'XLU', 'XLB', 'XLC', 'XLRE', 'XBI', 'XHE', 'XOP',
-            'XME', 'XRT', 'XHB', 'XSW', 'XPP', 'XPH', 'XTN', 'SOXX', 'SMH', 'XLK'
-        ]
-        
-        # Get current time in EST
-        est = pytz.timezone('America/New_York')
-        now = datetime.now(est)
-        yesterday = now - timedelta(days=1)
-        
-        # Define time windows
-        # After-hours: 4:00 PM - 8:00 PM ET yesterday
-        ah_start = int(est.localize(datetime(yesterday.year, yesterday.month, yesterday.day, 16, 0)).timestamp())
-        ah_end = int(est.localize(datetime(yesterday.year, yesterday.month, yesterday.day, 20, 0)).timestamp())
-        
-        # Pre-market: 7:00 AM - 9:24 AM ET today
-        pre_start = int(est.localize(datetime(now.year, now.month, now.day, 7, 0)).timestamp())
-        pre_end = int(est.localize(datetime(now.year, now.month, now.day, 9, 24)).timestamp())
-        
-        # Scan for movers using Tradier
-        movers = await scan_all_movers(universe, ah_start, ah_end, pre_start, pre_end)
-        
-        logger.info(f"Tradier scan complete: Found {len(movers.get('after_hours', []))} AH movers, {len(movers.get('premarket', []))} premarket movers")
-        
-        return movers
-        
-    except ImportError:
-        logger.warning("Tradier movers scan not available, falling back to yfinance")
-        return fetch_gapping_stocks_yfinance()
+        now = _now_ny()
+        uni = _liquid_universe()
+        quotes = _tradier_quotes(uni)
+        if not quotes:
+            return {"after_hours": [], "premarket": []}
+
+        items = []
+        for q in quotes:
+            if (q or {}).get("type") != "stock":
+                continue
+            sym = q.get("symbol") or q.get("root_symbols") or ""
+            last = q.get("last")
+            prev = q.get("prevclose")
+            if sym and isinstance(last, (int, float)) and isinstance(prev, (int, float)) and prev > 0:
+                px = float(last)
+                if px < 1.0:
+                    continue
+                pct = (px - float(prev)) / float(prev) * 100.0
+                items.append({"ticker": sym, "pct": pct, "last": px, "prev": float(prev), "why": ""})
+
+        items.sort(key=lambda x: abs(x["pct"]), reverse=True)
+
+        top = items[:50]
+        news_map: dict[str, str] = {}
+        try:
+            for it in top[:12]:
+                try:
+                    headlines = fetch_stock_news(it["ticker"])
+                    if headlines:
+                        news_map[it["ticker"]] = headlines[0].get("headline", "")[:140]
+                except Exception:
+                    pass
+        except NameError:
+            pass
+
+        def _format(lst: list[dict]) -> list[dict]:
+            out = []
+            for it in lst:
+                move = f"{it['pct']:+.2f}%"
+                why = news_map.get(it["ticker"], "")
+                out.append({"ticker": it["ticker"], "move": move, "why": why})
+            return out
+
+        pre_list = [it for it in top if it["pct"] >= 0][:10] + [it for it in top if it["pct"] < 0][:10]
+        ah_list = pre_list
+
+        premarket = _format(pre_list)
+        after_hours = _format(ah_list)
+
+        # --- Junk scan merge ---
+        junk = _junk_movers_tradier(now)
+        if junk:
+            seen = set()
+            def _dedup_merge(base: list[dict], add: list[dict]) -> list[dict]:
+                out = []
+                for it in base + add:
+                    t = it.get("ticker")
+                    if not t or t in seen:
+                        continue
+                    seen.add(t)
+                    out.append(it)
+                return out
+
+            if _is_premarket(now):
+                premarket = _dedup_merge(premarket, [{"ticker": x['ticker'], "move": x["move"], "why": f"(JUNK) {x['why']}"} for x in junk])
+            elif _is_afterhours(now):
+                after_hours = _dedup_merge(after_hours, [{"ticker": x['ticker'], "move": x["move"], "why": f"(JUNK) {x['why']}"} for x in junk])
+
+        if _is_premarket(now):
+            return {"after_hours": [], "premarket": premarket}
+        if _is_afterhours(now):
+            return {"after_hours": after_hours, "premarket": []}
+        return {"after_hours": [], "premarket": []}
+
     except Exception as e:
-        logger.error(f"Error in Tradier gapping stocks scan: {e}")
-        return {
-            "after_hours": [],
-            "premarket": []
-        }
+        logger.exception(f"fetch_gapping_stocks_tradier failed: {e}")
+        return {"after_hours": [], "premarket": []}
 
 def fetch_gapping_stocks_yfinance() -> List[Dict[str, Any]]:
     """Fallback: Fetch gapping stocks using yfinance for after-hours and premarket"""
@@ -619,9 +1351,8 @@ def fetch_gapping_stocks_yfinance() -> List[Dict[str, Any]]:
 def fetch_gapping_stocks() -> Dict[str, List[Dict[str, Any]]]:
     """Main function to fetch gapping stocks - tries Tradier first, falls back to yfinance"""
     try:
-        # Try Tradier first
-        import asyncio
-        return asyncio.run(fetch_gapping_stocks_tradier())
+        # Try Tradier first (sync)
+        return fetch_gapping_stocks_tradier()
     except Exception as e:
         logger.warning(f"Tradier gapping stocks failed, using yfinance fallback: {e}")
         return fetch_gapping_stocks_yfinance()
@@ -859,95 +1590,19 @@ def summarize_news(headlines: List[Dict[str, Any]], expected_range: Dict[str, An
         # Return a fallback summary instead of failing
         return generate_fallback_summary(headlines, expected_range, gapping_stocks)
 
-    # Prepare comprehensive headlines text with summaries
-    headlines_text = ""
-    for i, headline in enumerate(headlines[:15], 1):  # Top 15 headlines
-        headlines_text += f"{i}. {headline.get('headline', 'No headline')}\n"
-        headlines_text += f"   Source: {headline.get('source', 'Unknown')}\n"
-        headlines_text += f"   Summary: {headline.get('summary', 'No summary')}\n\n"
+    # Add daily/weekly resistances and supports via pivots
+    expected_range = enrich_expected_range_with_pivots(expected_range or {})
 
-    # Market data
-    spy_data = expected_range.get('spy', {})
-    qqq_data = expected_range.get('qqq', {})
-    vix_data = expected_range.get('vix', {})
-
-    # Prepare expected range text
-    range_text = ""
-    for ticker_key in ["spy", "qqq"]:
-        if expected_range.get(ticker_key):
-            data = expected_range[ticker_key]
-            range_text += f"{ticker_key.upper()}: ${data.get('current_price', 0):.2f} (Support: ${data.get('support', 0):.2f}, Resistance: ${data.get('resistance', 0):.2f})\n"
-    
-    if vix_data.get('current_price'):
-        range_text += f"VIX: {vix_data.get('current_price', 0):.2f}\n"
-
-    # Prepare gapping stocks text if available
-    gapping_text = ""
-    if gapping_stocks:
-        gapping_text = "\nGAPPING STOCKS (After-hours & Premarket):\n"
-        
-        # Handle both list and dict structures
-        if isinstance(gapping_stocks, dict):
-            # New Tradier structure
-            ah_moves = gapping_stocks.get("after_hours", [])
-            pre_moves = gapping_stocks.get("premarket", [])
-            
-            # Add after-hours movers
-            if ah_moves:
-                gapping_text += "After-hours Movers:\n"
-                for stock in ah_moves[:5]:
-                    ticker = stock.get('ticker', '')
-                    move = stock.get('move', '')
-                    why = stock.get('why', '')
-                    gapping_text += f"- {ticker}: {move} - {why}\n"
-                gapping_text += "\n"
-            
-            # Add premarket movers
-            if pre_moves:
-                gapping_text += "Premarket Movers:\n"
-                for stock in pre_moves[:5]:
-                    ticker = stock.get('ticker', '')
-                    move = stock.get('move', '')
-                    why = stock.get('why', '')
-                    gapping_text += f"- {ticker}: {move} - {why}\n"
-                gapping_text += "\n"
-        else:
-            # Old list structure
-            for stock in gapping_stocks[:5]:  # Top 5 gapping stocks
-                ticker = stock['ticker']
-                gap_pct = stock['gap_pct']
-                current_price = stock['current_price']
-                prev_close = stock['prev_close']
-                gapping_text += f"- {ticker}: {gap_pct:+.2f}% (${current_price:.2f} vs ${prev_close:.2f})\n"
-
-    prompt = f"""
-Create a comprehensive Morning Market Brief based on the following information. 
-Keep the summary to a maximum of 3 pages (approximately 1500 words).
-
-MARKET HEADLINES:
-{headlines_text}
-
-DAILY EXPECTED RANGE:
-{range_text}{gapping_text}
-
-Please structure the brief as follows:
-1. Executive Summary (2-3 paragraphs)
-2. What's moving — After-hours & Premarket (if gapping stocks available)
-3. Key Market Headlines (top 5-7 most important)
-4. Technical Analysis & Daily Range Insights
-5. Market Sentiment & Outlook
-6. Key Levels to Watch
-
-Make it professional, concise, and actionable for traders. Focus on what traders need to know for today's session.
-"""
+    # Build the cached user prompt
+    user_prompt = _render_brief_user_prompt(headlines, expected_range, gapping_stocks)
 
     try:
         # openai>=1.x client
         response = openai_client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are a professional market analyst creating a daily morning brief for traders."},
-                {"role": "user", "content": prompt}
+                {"role": "system", "content": BRIEF_SYSTEM},
+                {"role": "user", "content": user_prompt}
             ],
             max_tokens=2000,
             temperature=0.7
@@ -1109,8 +1764,6 @@ Risk sentiment remains balanced with mixed signals from various sectors. Traders
 - SPY: ${spy_data.get('current_price', 0):.2f} (Support: ${spy_data.get('support', 0):.2f}, Resistance: ${spy_data.get('resistance', 0):.2f})
 - QQQ: ${qqq_data.get('current_price', 0):.2f} (Support: ${qqq_data.get('support', 0):.2f}, Resistance: ${qqq_data.get('resistance', 0):.2f})
 - VIX: {vix_data.get('current_price', 0):.2f}
-
-Note: This is a fallback summary. For AI-generated analysis, please check your OpenAI API configuration.
 """
     return summary
 
@@ -1267,9 +1920,11 @@ def generate_html_content_with_summary(summary: str, headlines: List[Dict[str, A
     # Get current date
     current_date = datetime.now().strftime('%A, %B %d, %Y')
     
+    # Enrich ranges with pivots for HTML Key Levels (Daily/Weekly S & R)
+    piv_expected = enrich_expected_range_with_pivots(expected_range or {})
     # Get key price data for styling
-    spy_data = expected_range.get('spy', {})
-    qqq_data = expected_range.get('qqq', {})
+    spy_data = piv_expected.get('spy', {})
+    qqq_data = piv_expected.get('qqq', {})
     
     # Convert markdown to HTML with proper headline formatting
     summary_html = summary.replace('## ', '<h2 class="section-header">').replace('\n\n', '</h2>\n\n')
@@ -1777,14 +2432,18 @@ def generate_html_content_with_summary(summary: str, headlines: List[Dict[str, A
             <div class="key-levels">
                 <h3 style="margin-top: 0; color: #856404;">Key Levels to Watch</h3>
                 <div class="level-item">
-                    <strong>SPY:</strong> ${spy_data.get('resistance', 0):.2f}
-                    <span class="support">(Support: ${spy_data.get('support', 0):.2f})</span>
-                    <span class="resistance">(Resistance: ${spy_data.get('resistance', 0):.2f})</span>
+                    <strong>SPY —</strong>
+                    Daily <span class="support">S:</span> {(' / '.join(f"{x:.2f}" for x in spy_data.get('daily_supports', [])[:2])) if spy_data.get('daily_supports') else 'No data'};
+                    <span class="resistance">R:</span> {(' / '.join(f"{x:.2f}" for x in spy_data.get('daily_resistances', [])[:2])) if spy_data.get('daily_resistances') else 'No data'};
+                    Weekly <span class="support">S:</span> {(' / '.join(f"{x:.2f}" for x in spy_data.get('weekly_supports', [])[:2])) if spy_data.get('weekly_supports') else 'No data'};
+                    <span class="resistance">R:</span> {(' / '.join(f"{x:.2f}" for x in spy_data.get('weekly_resistances', [])[:2])) if spy_data.get('weekly_resistances') else 'No data'}
                 </div>
                 <div class="level-item">
-                    <strong>QQQ:</strong> ${qqq_data.get('resistance', 0):.2f}
-                    <span class="support">(Support: ${qqq_data.get('support', 0):.2f})</span>
-                    <span class="resistance">(Resistance: ${qqq_data.get('resistance', 0):.2f})</span>
+                    <strong>QQQ —</strong>
+                    Daily <span class="support">S:</span> {(' / '.join(f"{x:.2f}" for x in qqq_data.get('daily_supports', [])[:2])) if qqq_data.get('daily_supports') else 'No data'};
+                    <span class="resistance">R:</span> {(' / '.join(f"{x:.2f}" for x in qqq_data.get('daily_resistances', [])[:2])) if qqq_data.get('daily_resistances') else 'No data'};
+                    Weekly <span class="support">S:</span> {(' / '.join(f"{x:.2f}" for x in qqq_data.get('weekly_supports', [])[:2])) if qqq_data.get('weekly_supports') else 'No data'};
+                    <span class="resistance">R:</span> {(' / '.join(f"{x:.2f}" for x in qqq_data.get('weekly_resistances', [])[:2])) if qqq_data.get('weekly_resistances') else 'No data'}
                 </div>
             </div>
         </div>
@@ -1854,8 +2513,11 @@ def send_market_brief_to_subscribers():
         else:
             logger.info("GPT summary not available, skipping")
         
-        # Generate email content with GPT summary
-        brief_content = generate_html_content_with_summary(summary, filtered_headlines, expected_range, gapping_stocks, subscriber_summary)
+        # Generate two variants:
+        # - Site content: omit Subscriber Summary to avoid duplication on the Market Brief page
+        # - Email content: include Subscriber Summary for subscribers
+        site_content = generate_html_content_with_summary(summary, filtered_headlines, expected_range, gapping_stocks, None)
+        email_content = generate_html_content_with_summary(summary, filtered_headlines, expected_range, gapping_stocks, subscriber_summary)
 
         # Persist latest brief content to a static file for website display
         try:
@@ -1864,7 +2526,7 @@ def send_market_brief_to_subscribers():
             out_dir.mkdir(parents=True, exist_ok=True)
             latest_file = out_dir / 'brief_latest.html'
             latest_date_file = out_dir / 'brief_latest_date.txt'
-            latest_file.write_text(brief_content, encoding='utf-8')
+            latest_file.write_text(site_content, encoding='utf-8')
             latest_date_file.write_text(datetime.now().strftime('%Y-%m-%d'), encoding='utf-8')
             logger.info(f"Wrote latest brief HTML to {latest_file}")
         except Exception as write_err:
@@ -1872,7 +2534,46 @@ def send_market_brief_to_subscribers():
         
         # Use the new email system to send to confirmed subscribers
         from emails import send_daily_brief_direct
-        success_count = send_daily_brief_direct(brief_content)
+
+        # Visibility on config that commonly breaks sending
+        try:
+            cfg = (current_app.config if current_app else {})
+            logger.info(
+                "Email config — server:%s port:%s tls:%s ssl:%s sender:%s suppress_send:%s sendgrid:%s mailgun:%s ses:%s",
+                cfg.get("MAIL_SERVER"),
+                cfg.get("MAIL_PORT"),
+                cfg.get("MAIL_USE_TLS"),
+                cfg.get("MAIL_USE_SSL"),
+                cfg.get("MAIL_DEFAULT_SENDER"),
+                cfg.get("MAIL_SUPPRESS_SEND"),
+                bool(os.getenv("SENDGRID_API_KEY") or os.getenv("SENDGRID_KEY")),
+                bool(os.getenv("MAILGUN_DOMAIN") and os.getenv("MAILGUN_API_KEY")),
+                bool(os.getenv("AWS_SES_ACCESS_KEY_ID") and os.getenv("AWS_SES_SECRET_ACCESS_KEY")),
+            )
+        except Exception:
+            pass
+
+        success_count = send_daily_brief_direct(email_content)
+
+        # If nothing was sent, surface likely reasons
+        if not success_count:
+            try:
+                from models import MarketBriefSubscriber, db  # already imported above, but safe
+                total = db.session.query(MarketBriefSubscriber).count()
+                confirmed = db.session.query(MarketBriefSubscriber).filter_by(confirmed=True).count()
+                unsub = 0
+                try:
+                    unsub = db.session.query(MarketBriefSubscriber).filter_by(unsubscribed=True).count()
+                except Exception:
+                    pass
+                logger.warning(
+                    "Email send returned 0. Subscribers — total:%s confirmed:%s unsubscribed:%s. MAIL_SUPPRESS_SEND=%s, MAIL_DEFAULT_SENDER=%s",
+                    total, confirmed, unsub,
+                    (current_app.config.get("MAIL_SUPPRESS_SEND") if current_app else None),
+                    (current_app.config.get("MAIL_DEFAULT_SENDER") if current_app else None),
+                )
+            except Exception as e:
+                logger.warning(f"Could not introspect subscriber counts: {e}")
         
         logger.info(f"Market brief sent successfully to {success_count} confirmed subscribers")
         return success_count

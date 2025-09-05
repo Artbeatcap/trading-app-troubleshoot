@@ -49,6 +49,7 @@ from itertools import zip_longest
 from werkzeug.utils import secure_filename
 from flask_mail import Mail, Message
 from pathlib import Path
+from market_brief_generator import send_weekly_market_brief_to_subscribers
 
 # Allow OAuth over HTTP for local development
 if os.getenv('FLASK_ENV') == 'development' or os.getenv('OAUTHLIB_INSECURE_TRANSPORT') is None:
@@ -176,25 +177,42 @@ def google_login():
         
         if not user:
             print(f"User not found, creating new user with email: {email}")
-            # Check if username already exists
-            existing_username = User.query.filter_by(username=username).first()
-            if existing_username:
-                print(f"Username {username} already exists, adding random suffix")
-                username = f"{username}_{secrets.token_urlsafe(4)}"
             
-            # Auto-create user account
-            user = User(username=username, email=email)
-            # Set a random password
-            user.set_password(secrets.token_urlsafe(16))
+            # Generate a unique username
+            base_username = username
+            counter = 1
+            while User.query.filter_by(username=username).first():
+                print(f"Username {username} already exists, trying alternative")
+                username = f"{base_username}_{counter}"
+                counter += 1
+                if counter > 100:  # Prevent infinite loop
+                    username = f"{base_username}_{secrets.token_urlsafe(8)}"
+                    break
+            
+            # Auto-create user account with better error handling
             try:
+                user = User(username=username, email=email)
+                # Set a random password
+                user.set_password(secrets.token_urlsafe(16))
+                
                 print(f"Adding user to database: {username}")
                 db.session.add(user)
                 db.session.commit()
                 print("User created successfully")
+                
             except Exception as e:
                 db.session.rollback()
                 print(f"Database error creating user: {str(e)}")
-                flash("Error creating user account. Please try again.", "danger")
+                print(f"Full error details: {type(e).__name__}: {e}")
+                
+                # More specific error messages
+                if "duplicate key" in str(e).lower() or "unique" in str(e).lower():
+                    flash("An account with this email already exists. Please try logging in instead.", "warning")
+                elif "not null" in str(e).lower():
+                    flash("Missing required information. Please try again.", "danger")
+                else:
+                    flash("Error creating user account. Please try again or contact support.", "danger")
+                
                 return redirect(url_for("login"))
         else:
             print(f"User found: {user.username}")
@@ -213,12 +231,22 @@ def google_login():
         if viewport_width and int(viewport_width) <= 768:
             is_mobile = True
         
+        # Additional mobile detection
+        if request.args.get('mobile') == '1' or request.args.get('force_mobile') == '1':
+            is_mobile = True
+        
         if is_mobile:
             print("Mobile device detected, ensuring mobile layout")
             # Store mobile preference in session
             session['mobile_preference'] = True
-            # Redirect to dashboard with mobile context and force mobile layout
-            return redirect(url_for("dashboard", mobile=1, force_mobile=1))
+            
+            # For mobile, redirect to a simpler page first to avoid OAuth redirect issues
+            try:
+                return redirect(url_for("dashboard", mobile=1, force_mobile=1))
+            except Exception as redirect_error:
+                print(f"Redirect error on mobile: {redirect_error}")
+                # Fallback to index page
+                return redirect(url_for("index", mobile=1))
         else:
             return redirect(url_for("dashboard"))
         
@@ -2696,9 +2724,7 @@ def weekly_brief():
     """Serve the latest weekly brief from static files"""
     from pathlib import Path
     
-    # For now, use the same daily brief as weekly
-    brief_file = Path('static/uploads/brief_latest.html')
-    date_file = Path('static/uploads/brief_latest_date.txt')
+    brief_file = Path('static/uploads/brief_weekly_latest.html')
     
     if not brief_file.exists():
         return "No weekly brief available", 404
@@ -2708,13 +2734,95 @@ def weekly_brief():
         with open(brief_file, 'r', encoding='utf-8') as f:
             html_content = f.read()
         
-        # Modify the title to indicate it's a weekly brief
-        html_content = html_content.replace('Morning Market Brief', 'Weekly Market Brief')
-        
         return html_content, 200, {'Content-Type': 'text/html; charset=utf-8'}
         
     except Exception as e:
         return f"Error reading weekly brief: {str(e)}", 500
+
+# --- Weekly brief page & admin trigger ---
+
+@app.route("/weekly-brief")
+def weekly_brief_public():
+    """
+    Serves the last generated weekly brief HTML.
+    """
+    try:
+        with open("static/uploads/brief_weekly_latest.html", "r", encoding="utf-8") as f:
+            html = f.read()
+    except Exception:
+        html = "<p>No weekly brief has been generated yet.</p>"
+    return html
+
+@app.route("/admin/send_weekly_brief")
+def admin_send_weekly_brief():
+    """
+    Triggers the weekly brief generation.
+    Only runs on Sunday (NY). To override, pass ?force=1
+    """
+    from market_brief_generator import send_weekly_market_brief_to_subscribers
+    force = request.args.get("force") == "1"
+    path_or_msg = send_weekly_market_brief_to_subscribers(force=force)
+    return jsonify({"result": path_or_msg})
+
+@app.route("/admin/email-diagnostics")
+@login_required
+def email_diagnostics():
+    if current_user.email != 'support@optionsplunge.com':
+        return jsonify({"error": "Access denied"}), 403
+
+    out = {}
+    try:
+        # Config presence (no secrets)
+        out["MAIL_SERVER"] = bool(app.config.get("MAIL_SERVER"))
+        out["MAIL_PORT"] = app.config.get("MAIL_PORT")
+        out["MAIL_USE_TLS"] = app.config.get("MAIL_USE_TLS")
+        out["MAIL_USE_SSL"] = app.config.get("MAIL_USE_SSL")
+        out["MAIL_DEFAULT_SENDER"] = bool(app.config.get("MAIL_DEFAULT_SENDER"))
+        out["MAIL_SUPPRESS_SEND"] = app.config.get("MAIL_SUPPRESS_SEND")
+
+        # Popular providers
+        out["SENDGRID_API_KEY"] = bool(os.getenv("SENDGRID_API_KEY") or os.getenv("SENDGRID_KEY"))
+        out["MAILGUN_CONFIG"] = bool(os.getenv("MAILGUN_DOMAIN") and os.getenv("MAILGUN_API_KEY"))
+        out["SES_CONFIG"] = bool(os.getenv("AWS_SES_ACCESS_KEY_ID") and os.getenv("AWS_SES_SECRET_ACCESS_KEY"))
+
+        # Subscriber counts
+        from models import MarketBriefSubscriber, db
+        out["subs_total"] = db.session.query(MarketBriefSubscriber).count()
+        try:
+            out["subs_confirmed"] = db.session.query(MarketBriefSubscriber).filter_by(confirmed=True).count()
+        except Exception:
+            out["subs_confirmed"] = "unknown"
+        try:
+            out["subs_unsubscribed"] = db.session.query(MarketBriefSubscriber).filter_by(unsubscribed=True).count()
+        except Exception:
+            out["subs_unsubscribed"] = "unknown"
+
+        return jsonify(out)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/admin/email-test", methods=["POST"])
+@login_required
+def email_test():
+    """Sends a minimal test email through the SAME function used by daily sends."""
+    if current_user.email != 'support@optionsplunge.com':
+        return jsonify({"error": "Access denied"}), 403
+
+    test_to = request.json.get("to") if request.is_json else None
+    if not test_to:
+        test_to = os.getenv("TEST_EMAIL")
+    if not test_to:
+        return jsonify({"error": "Provide JSON {'to': 'you@example.com'} or set TEST_EMAIL"}), 400
+
+    try:
+        # Reuse the direct sender your daily job uses
+        from emails import send_daily_brief_direct
+        html = "<h3>OptionsPlunge Email Health Check</h3><p>If you received this, SMTP/provider config works.</p>"
+        ok = send_daily_brief_direct(html)  # Fallback signature without recipients
+        return jsonify({"sent": bool(ok), "to": test_to})
+    except Exception as e:
+        return jsonify({"sent": False, "error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)
