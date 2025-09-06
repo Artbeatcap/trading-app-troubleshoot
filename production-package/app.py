@@ -1685,6 +1685,11 @@ def create_analytics_charts(df):
 
     # P&L over time
     df_sorted = df.sort_values("date")
+    # Normalize to date-only for consistent x-axis granularity
+    try:
+        df_sorted["date"] = pd.to_datetime(df_sorted["date"]).dt.date
+    except Exception:
+        pass
     df_sorted["cumulative_pnl"] = df_sorted["pnl"].cumsum()
 
     charts["pnl_over_time"] = {
@@ -1700,7 +1705,7 @@ def create_analytics_charts(df):
         ],
         "layout": {
             "title": "Cumulative P&L Over Time",
-            "xaxis": {"title": "Date"},
+            "xaxis": {"title": "Date", "type": "date", "tickformat": "%Y-%m-%d"},
             "yaxis": {"title": "Cumulative P&L ($)"},
             "height": 400,
         },
