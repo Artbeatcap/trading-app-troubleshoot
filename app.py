@@ -359,6 +359,49 @@ def market_brief():
             else:
                 flash('Error sending confirmation email. Please try again.', 'danger')
 
+    # Demo: serve structured brief for layout testing
+    if request.args.get("demo") == "1":
+        brief = {
+            "date_str": datetime.now().strftime("%A, %B %d, %Y"),
+            "executive_summary": "Market conditions appear stable with ranges tightening into key data.",
+            "headlines": [
+                {"title": "Federal Reserve signals potential rate adjustments",
+                 "source": "Market News",
+                 "summary": "Fed officials discuss the economic outlook and possible policy direction into year-end."},
+                {"title": "Market volatility increases ahead of key data",
+                 "source": "Economic Data",
+                 "summary": "Traders prepare for CPI and jobs data; intraday ranges may expand into the print."}
+            ],
+            "technical_analysis": "SPY consolidating below resistance; watch the opening drive against overnight highs/lows for continuation or fade setups.",
+            "sentiment_outlook": "Risk sentiment remains balanced; breadth neutral, options positioning modestly defensive.",
+            "key_levels": {
+                "SPY": {"last": "647.24", "S": ["631.06","642.98","638.71"], "R": ["663.42","651.86","656.47"], "weekly_S": ["641.25","637.46"], "weekly_R": ["649.16","653.28"]},
+                "QQQ": {"last": "576.06", "S": ["558.78","571.35","566.65"], "R": ["593.34","580.94","585.83"], "weekly_S": ["566.63","562.85"], "weekly_R": ["576.09","581.77"]},
+                "VIX": {"last": "15.38"}
+            },
+            "gappers_note": "🚀 Gapping Stocks"
+        }
+
+        latest_daily_brief = None
+        latest_weekly_brief = None
+        historical_daily_briefs = []
+        historical_weekly_briefs = []
+
+        return render_template(
+            "market_brief.html",
+            form=form,
+            subscribed=subscribed,
+            latest_daily_brief=latest_daily_brief,
+            latest_weekly_brief=latest_weekly_brief,
+            historical_daily_briefs=historical_daily_briefs,
+            historical_weekly_briefs=historical_weekly_briefs,
+            show_pro_upsell=False,
+            show_demo_data=True,
+            feature_name=None,
+            limitations=None,
+            brief=brief,
+        )
+
     # Load briefs from database
     from models import MarketBrief
     from datetime import date, timedelta
@@ -993,10 +1036,51 @@ def register():
     if form.validate_on_submit():
         user = User(username=form.username.data, email=form.email.data)
         user.set_password(form.password.data)
+        # Auto-subscribe defaults for new users: weekly yes (free tier), daily no
+        try:
+            user.is_subscribed_weekly = True
+            user.is_subscribed_daily = False
+        except Exception:
+            # Fields may not exist in older schemas; proceed without failing
+            pass
         db.session.add(user)
         db.session.commit()
         login_user(user)
         flash("Welcome to Options Plunge!", "success")
+        # Auto-enroll new user to Market Brief subscribers (confirmed & active)
+        try:
+            existing = MarketBriefSubscriber.query.filter_by(email=user.email).first()
+            if not existing:
+                sub = MarketBriefSubscriber(email=user.email, name=user.username)
+                sub.confirmed = True
+                sub.is_active = True
+                db.session.add(sub)
+                db.session.commit()
+                try:
+                    from emails import send_welcome_email, send_welcome_on_register
+                    # Send legacy subscriber welcome + account welcome summary
+                    send_welcome_email(sub)
+                    send_welcome_on_register(user)
+                except Exception as e:
+                    app.logger.warning(f"Welcome emails failed for {user.email}: {e}")
+            else:
+                # Ensure active + confirmed for existing record
+                updated = False
+                if not existing.confirmed:
+                    existing.confirmed = True
+                    updated = True
+                if hasattr(existing, 'is_active') and not existing.is_active:
+                    existing.is_active = True
+                    updated = True
+                if updated:
+                    db.session.commit()
+                try:
+                    from emails import send_welcome_on_register
+                    send_welcome_on_register(user)
+                except Exception as e:
+                    app.logger.warning(f"Welcome summary failed for {user.email}: {e}")
+        except Exception as e:
+            app.logger.warning(f"Market Brief auto-enroll failed for {user.email}: {e}")
         
         # Check if there's a pending trade to save
         if 'pending_trade' in session:
@@ -1049,6 +1133,36 @@ def dashboard():
                 user_id=current_user.id, journal_date=date.today()
             ).first()
 
+            # Onboarding/checklist state
+            has_trade = stats["total_trades"] > 0
+            has_journal = TradingJournal.query.filter_by(user_id=current_user.id).count() > 0
+            has_analysis = stats["trades_analyzed"] > 0
+            next_url = None
+            if not has_trade:
+                next_url = url_for("add_trade")
+            elif not has_journal:
+                next_url = url_for("add_edit_journal")
+            elif not has_analysis:
+                next_url = url_for("bulk_analysis")
+
+            onboarding = {
+                "has_trade": has_trade,
+                "has_journal": has_journal,
+                "has_analysis": has_analysis,
+                "next_url": next_url,
+            }
+
+            # Dismissal state (session + per-user persisted flag)
+            onboarding_dismissed = bool(session.get('onboarding_dismissed'))
+            try:
+                if current_user.is_authenticated:
+                    dismiss_dir = os.path.join(app.instance_path, 'onboarding_dismissed')
+                    dismiss_path = os.path.join(dismiss_dir, f"{current_user.id}.flag")
+                    if os.path.exists(dismiss_path):
+                        onboarding_dismissed = True
+            except Exception:
+                pass
+
             return render_template(
                 "dashboard.html",
                 recent_trades=recent_trades,
@@ -1056,6 +1170,8 @@ def dashboard():
                 recent_journals=recent_journals,
                 today_journal=today_journal,
                 mobile_preference=mobile_preference,
+                onboarding=onboarding,
+                onboarding_dismissed=onboarding_dismissed,
             )
         else:
             # Show aggregate stats for guests using all available trades
@@ -1085,6 +1201,15 @@ def dashboard():
                 .all()
             )
 
+            onboarding = {
+                "has_trade": False,
+                "has_journal": False,
+                "has_analysis": False,
+                "next_url": url_for("add_trade"),
+            }
+
+            onboarding_dismissed = bool(session.get('onboarding_dismissed'))
+
             return render_template(
                 "dashboard.html",
                 recent_trades=recent_trades,
@@ -1092,6 +1217,8 @@ def dashboard():
                 recent_journals=recent_journals,
                 today_journal=None,
                 mobile_preference=mobile_preference,
+                onboarding=onboarding,
+                onboarding_dismissed=onboarding_dismissed,
             )
     except Exception as e:
         # Log the error for debugging
@@ -1102,6 +1229,26 @@ def dashboard():
         
         # Return a more specific error message
         return render_template("500.html", error_message=str(e)), 500
+
+
+@app.route("/onboarding/dismiss", methods=["POST"])
+def dismiss_onboarding():
+    """Dismiss the onboarding checklist (session + per-user persistent flag)."""
+    try:
+        session['onboarding_dismissed'] = True
+        if current_user.is_authenticated:
+            dismiss_dir = os.path.join(app.instance_path, 'onboarding_dismissed')
+            try:
+                os.makedirs(dismiss_dir, exist_ok=True)
+                dismiss_path = os.path.join(dismiss_dir, f"{current_user.id}.flag")
+                with open(dismiss_path, 'w') as f:
+                    f.write('1')
+            except Exception as e:
+                app.logger.warning(f"Failed to persist onboarding dismissal: {e}")
+        return jsonify({"ok": True})
+    except Exception as e:
+        app.logger.error(f"Dismiss onboarding failed: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 @app.route("/trades")
@@ -1616,7 +1763,7 @@ def analytics():
         # Check if user has real trades for analytics
         user_trades = Trade.query.filter_by(user_id=current_user.id).filter(Trade.exit_price.isnot(None)).all()
         
-        if len(user_trades) >= 3:  # Need at least 3 completed trades for meaningful analytics
+        if len(user_trades) >= 1:  # Show analytics with at least 1 completed trade
             # User has enough real trades - show real analytics
             df = pd.DataFrame([
                 {

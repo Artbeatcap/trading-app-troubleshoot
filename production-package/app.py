@@ -1580,7 +1580,7 @@ def analytics():
         # Check if user has real trades for analytics
         user_trades = Trade.query.filter_by(user_id=current_user.id).filter(Trade.exit_price.isnot(None)).all()
         
-        if len(user_trades) >= 3:  # Need at least 3 completed trades for meaningful analytics
+        if len(user_trades) >= 1:  # Show analytics with at least 1 completed trade
             # User has enough real trades - show real analytics
             df = pd.DataFrame([
                 {
