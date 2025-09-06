@@ -1889,7 +1889,7 @@ def create_analytics_charts(df):
         "layout": {
             "title": "Cumulative P&L Over Time",
             "xaxis": {"title": "Date", "type": "date", "tickformat": "%Y-%m-%d"},
-            "yaxis": {"title": "Cumulative P&L ($)"},
+            "yaxis": {"title": "Cumulative P&L ($)", "rangemode": "tozero", "zeroline": True},
             "height": 400,
         },
     }
