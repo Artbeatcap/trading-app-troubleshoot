@@ -6,13 +6,14 @@ Integrates with existing stock news email logic and sends to subscribers
 import os
 import requests
 import json
+import hashlib
+import time
 from datetime import datetime, timedelta
 from datetime import date
 import sys
 from typing import List, Dict, Any
 import math
 from typing import Optional
-from datetime import time
 import pytz
 from pathlib import Path
 from openai import OpenAI
@@ -24,6 +25,145 @@ import logging
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# ----- Tiny on-disk JSON cache (60–120s) -----
+CACHE_DIR = Path(os.getenv("OP_CACHE_DIR", Path(__file__).resolve().parent / "cache"))
+AV_CACHE_TTL = int(os.getenv("AV_CACHE_TTL", "90"))     # Alpha Vantage default 90s
+FH_CACHE_TTL = int(os.getenv("FH_CACHE_TTL", "120"))    # Finnhub default 120s
+
+def _cache_file(key: str) -> Path:
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    return CACHE_DIR / (hashlib.sha1(key.encode("utf-8")).hexdigest() + ".json")
+
+def _cache_get_json(key: str, ttl: int) -> Dict[str, Any] | None:
+    p = _cache_file(key)
+    try:
+        if p.exists() and (time.time() - p.stat().st_mtime) <= ttl:
+            return json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    return None
+
+def _cache_put_json(key: str, data: Dict[str, Any]) -> None:
+    p = _cache_file(key)
+    try:
+        p.write_text(json.dumps(data), encoding="utf-8")
+    except Exception:
+        pass
+
+def _fh_api_key() -> str | None:
+    """Get Finnhub API key from config or environment."""
+    return (current_app.config.get('FINNHUB_TOKEN') if current_app else None) or os.getenv('FINNHUB_TOKEN')
+
+def fetch_economic_calendar_today() -> List[Dict[str, str]]:
+    """Fetch today's economic calendar events from Finnhub with caching."""
+    token = _fh_api_key()
+    if token:
+        try:
+            today = datetime.now(tz=NY).date().isoformat()
+            url = "https://finnhub.io/api/v1/calendar/economic"
+            cache_key = f"fh:econ:{today}"
+            cached = _cache_get_json(cache_key, FH_CACHE_TTL)
+            if cached is not None:
+                data = cached.get("economicCalendar", [])
+            else:
+                r = requests.get(url, params={"from": today, "to": today, "token": token}, timeout=12)
+                raw = r.json() if r.status_code == 200 else {}
+                data = (raw or {}).get("economicCalendar", [])
+                if raw:
+                    _cache_put_json(cache_key, raw)
+            key_terms = ("cpi","ppi","payroll","employment","claims","pmi","ism","gdp","confidence","inventories","fomc","minutes","retail sales")
+            out: List[Dict[str, str]] = []
+            for ev in data:
+                name = (ev.get("event") or "").strip()
+                if not name:
+                    continue
+                if any(k in name.lower() for k in key_terms):
+                    why = (
+                        "Rates trajectory"
+                        if any(x in name.lower() for x in ("cpi","inflation","ppi","gdp","payroll","employment","claims","fed","fomc"))
+                        else "Growth/sentiment signal"
+                    )
+                    out.append({
+                        "time_et": ev.get("time") or ev.get("time_utc") or "",
+                        "event": name,
+                        "estimate": ev.get("estimate") or ev.get("actual") or "",
+                        "previous": ev.get("previous") or "",
+                        "impact": ev.get("impact") or "",
+                        "why": why,
+                    })
+            if out:
+                return out
+        except Exception:
+            pass
+    # FALLBACK → AV inference
+    return fetch_economic_catalysts_today_av()
+
+def fetch_economic_catalysts_today_av() -> List[Dict[str, str]]:
+    """Fallback: Fetch economic catalysts using Alpha Vantage inference."""
+    # This is a placeholder for the Alpha Vantage fallback
+    # In a real implementation, this would use Alpha Vantage API
+    return []
+
+def _av_api_key() -> str | None:
+    """Get Alpha Vantage API key from environment."""
+    return os.getenv('ALPHA_VANTAGE_API_KEY')
+
+def _av_get(params: Dict[str, Any], timeout: int = 12) -> Dict[str, Any]:
+    """Tiny helper for Alpha Vantage GETs with caching."""
+    base = "https://www.alphavantage.co/query"
+    apikey = _av_api_key()
+    if not apikey:
+        return {}
+    try:
+        # Build a stable cache key that ignores the secret but varies by query
+        key_pairs = "&".join(f"{k}={params[k]}" for k in sorted(params))
+        cache_key = f"av:{key_pairs}"
+        cached = _cache_get_json(cache_key, AV_CACHE_TTL)
+        if cached is not None:
+            return cached
+        q = {**params, "apikey": apikey}
+        r = requests.get(base, params=q, timeout=timeout)
+        data = r.json() if r.status_code == 200 else {}
+        if data:
+            _cache_put_json(cache_key, data)
+        return data
+    except Exception:
+        return {}
+
+def fetch_top_movers_av() -> List[Dict[str, Any]]:
+    """Fetch top movers using Alpha Vantage TOP_GAINERS_LOSERS API with caching."""
+    try:
+        data = _av_get({"function": "TOP_GAINERS_LOSERS"})
+        if not data or "Error Message" in data or "Note" in data:
+            return []
+        
+        movers = []
+        # Process top gainers
+        for item in data.get("top_gainers", [])[:5]:  # Limit to top 5
+            movers.append({
+                "ticker": item.get("ticker", ""),
+                "change_percent": item.get("change_percentage", ""),
+                "price": item.get("price", ""),
+                "change": item.get("change_amount", ""),
+                "volume": item.get("volume", ""),
+                "direction": "up"
+            })
+        
+        # Process top losers
+        for item in data.get("top_losers", [])[:5]:  # Limit to top 5
+            movers.append({
+                "ticker": item.get("ticker", ""),
+                "change_percent": item.get("change_percentage", ""),
+                "price": item.get("price", ""),
+                "change": item.get("change_amount", ""),
+                "volume": item.get("volume", ""),
+                "direction": "down"
+            })
+        
+        return movers
+    except Exception:
+        return []
 
 # Environment variables (resolved at runtime to allow config overrides)
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')

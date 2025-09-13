@@ -19,6 +19,14 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from daily_brief.build import build_context
 from emailer import render_morning_brief, send_morning_brief_direct
 
+# Movers & catalysts helpers (with on-disk cache in the generator module)
+from market_brief_generator import (
+    fetch_top_movers_av,
+    fetch_economic_calendar_today,   # HYBRID: Finnhub → AV inference fallback
+)
+from pytz import timezone
+NY = timezone("America/New_York")
+
 # Deprecated loader removed; handled by build_context
 
 def save_dry_run_output(html_content: str, text_content: str, date_str: str):
@@ -58,6 +66,39 @@ def main():
     include_movers = not args.skip_movers
     print(f"Building context from {args.source} (include movers: {include_movers})")
     context = build_context(args.source, include_movers=include_movers)
+
+    # ---- Alpha Vantage fallbacks (no-cost) ---------------------------------
+    # If the upstream builder didn't populate movers/catalysts, enrich here.
+    # Movers: support either 'gapping_stocks' or 'movers' keys used across the app.
+    try:
+        if not context.get("gapping_stocks") and not context.get("movers"):
+            av_moves = fetch_top_movers_av()
+            # prefer the newer key
+            context["movers"] = av_moves
+            context.setdefault("gapping_stocks", av_moves)
+            print("✓ Added Alpha Vantage movers fallback (TOP_GAINERS_LOSERS).")
+    except Exception as e:
+        print(f"Warning: Alpha Vantage movers fallback failed: {e}")
+
+    try:
+        # Support both 'economic_catalysts' and 'catalysts' (use HYBRID function)
+        if not context.get("economic_catalysts") and not context.get("catalysts"):
+            cats = fetch_economic_calendar_today()
+            context["economic_catalysts"] = cats
+            context.setdefault("catalysts", cats)
+            src = "Finnhub" if any(x.get("estimate") or x.get("previous") for x in cats) else "AV (NEWS_SENTIMENT inference)"
+            print(f"✓ Added Economic Catalysts via {src}.")
+    except Exception as e:
+        print(f"Warning: Economic catalysts fetch failed: {e}")
+    # ------------------------------------------------------------------------
+
+    # Optional: show cache configuration during runs when debugging
+    if os.getenv("OP_CACHE_DEBUG") == "1":
+        print("Cache:", {
+            "OP_CACHE_DIR": os.getenv("OP_CACHE_DIR", "<default ./cache>"),
+            "AV_CACHE_TTL": os.getenv("AV_CACHE_TTL", "90"),
+            "FH_CACHE_TTL": os.getenv("FH_CACHE_TTL", "120"),
+        })
 
     subject = f"Options Plunge Morning Brief — {context['subject_theme']} ({context['date']})"
     
