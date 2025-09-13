@@ -35,16 +35,29 @@ def send_daily_brief():
 
 
 def check_and_send_daily():
-    """Trigger send precisely at 08:00 America/New_York regardless of server timezone."""
+    """Send at or after 08:00 ET on weekdays, once per day (prevents misses)."""
+    global last_sent_date_et
     now_et = datetime.now(eastern_tz)
-    if now_et.hour == 8 and now_et.minute == 0:
+
+    # Only Monday (0) through Friday (4)
+    if now_et.weekday() > 4:
+        return
+
+    today_et = now_et.date()
+
+    # Already sent today
+    if last_sent_date_et == today_et:
+        return
+
+    # If time is 08:00 or later ET, send the brief
+    if (now_et.hour > 8) or (now_et.hour == 8 and now_et.minute >= 0):
         send_daily_brief()
 
 
 def setup_schedule():
-    """Setup a minute-level scheduler and gate to 08:00 ET inside the task."""
+    """Setup a minute-level scheduler and gate to >= 08:00 ET on weekdays inside the task."""
     schedule.every().minute.do(check_and_send_daily)
-    logger.info("Daily market brief schedule set to check every minute; will send at 8:00 AM ET only")
+    logger.info("Daily brief checks every minute; sends once after 8:00 AM ET Mon-Fri")
 
 
 def run_scheduler():

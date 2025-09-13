@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, flash, redirect, url_for, jsonify, session
+from flask import Flask, render_template, request, flash, redirect, url_for, jsonify, session, current_app
 from flask_login import (
     LoginManager,
     login_user,
@@ -556,6 +556,30 @@ def admin_morning_brief():
     
     return render_template("admin/morning_brief.html")
 
+@app.route("/admin/generate/daily-noemail", methods=["POST"]) 
+@login_required
+def admin_generate_daily_noemail():
+    if current_user.email != 'support@optionsplunge.com':
+        return jsonify({"error": "Access denied"}), 403
+    try:
+        from market_brief_generator import generate_daily_brief_file_only
+        path = generate_daily_brief_file_only()
+        return jsonify({"ok": True, "path": path})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+@app.route("/admin/generate/weekly-noemail", methods=["POST"]) 
+@login_required
+def admin_generate_weekly_noemail():
+    if current_user.email != 'support@optionsplunge.com':
+        return jsonify({"error": "Access denied"}), 403
+    try:
+        from market_brief_generator import generate_weekly_brief_file_only
+        path = generate_weekly_brief_file_only(force=True)
+        return jsonify({"ok": True, "path": path})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
 @app.route("/admin/preview/morning-brief", methods=["POST"])
 @login_required
 def preview_morning_brief():
@@ -1044,6 +1068,10 @@ def register():
     if form.validate_on_submit():
         user = User(username=form.username.data, email=form.email.data)
         user.set_password(form.password.data)
+        
+        # Generate email verification token
+        token = user.generate_email_verification_token()
+        
         # Auto-subscribe defaults for new users: weekly yes (free tier), daily no
         try:
             user.is_subscribed_weekly = True
@@ -1053,8 +1081,16 @@ def register():
             pass
         db.session.add(user)
         db.session.commit()
+        
+        # Send verification email
+        try:
+            from emails import send_verification_email
+            send_verification_email(user, token)
+        except Exception as e:
+            app.logger.warning(f"Failed to send verification email to {user.email}: {e}")
+        
         login_user(user)
-        flash("Welcome to Options Plunge!", "success")
+        flash("Welcome to Options Plunge! Please check your email to verify your account and start receiving market briefs.", "success")
         # Auto-enroll new user to Market Brief subscribers (confirmed & active)
         try:
             existing = MarketBriefSubscriber.query.filter_by(email=user.email).first()
@@ -1094,7 +1130,7 @@ def register():
         if 'pending_trade' in session:
             return redirect(url_for("add_trade"))
             
-        return redirect(url_for("dashboard"))
+        return redirect(url_for("verify_email_required"))
 
     return render_template("register.html", form=form, hide_sidebar=True)
 
@@ -2890,23 +2926,24 @@ def latest_brief():
     """Serve the latest market brief from static files"""
     from pathlib import Path
     
-    # Get the path to the static brief file
-    brief_file = Path('static/uploads/brief_latest.html')
-    date_file = Path('static/uploads/brief_latest_date.txt')
+    # Resolve paths relative to the Flask app root to avoid CWD issues
+    base_dir = Path(current_app.root_path)
+    brief_file = base_dir / 'static' / 'uploads' / 'brief_latest.html'
+    date_file = base_dir / 'static' / 'uploads' / 'brief_latest_date.txt'
     
     if not brief_file.exists():
         return "No brief available", 404
     
     try:
-        # Read the brief content
         with open(brief_file, 'r', encoding='utf-8') as f:
             html_content = f.read()
         
-        # Read the date
-        date_str = "Unknown"
+        # Date is optional; kept for potential future use
         if date_file.exists():
-            with open(date_file, 'r') as f:
-                date_str = f.read().strip()
+            try:
+                _ = date_file.read_text(encoding='utf-8').strip()
+            except Exception:
+                pass
         
         return html_content, 200, {'Content-Type': 'text/html; charset=utf-8'}
         
@@ -2915,18 +2952,24 @@ def latest_brief():
 
 @app.route("/brief/weekly")
 def weekly_brief():
-    """Serve the latest weekly brief from static files"""
+    """Serve the latest weekly brief from static files, fallback to daily if missing."""
     from pathlib import Path
     
-    brief_file = Path('static/uploads/brief_weekly_latest.html')
+    base_dir = Path(current_app.root_path)
+    weekly_file = base_dir / 'static' / 'uploads' / 'brief_weekly_latest.html'
+    daily_file = base_dir / 'static' / 'uploads' / 'brief_latest.html'
     
-    if not brief_file.exists():
+    target_file = weekly_file if weekly_file.exists() else (daily_file if daily_file.exists() else None)
+    if target_file is None:
         return "No weekly brief available", 404
     
     try:
-        # Read the brief content
-        with open(brief_file, 'r', encoding='utf-8') as f:
+        with open(target_file, 'r', encoding='utf-8') as f:
             html_content = f.read()
+        
+        # If we fell back to daily, adjust the heading so the UI reads correctly
+        if target_file == daily_file:
+            html_content = html_content.replace('Morning Market Brief', 'Weekly Market Brief')
         
         return html_content, 200, {'Content-Type': 'text/html; charset=utf-8'}
         
@@ -3017,6 +3060,62 @@ def email_test():
         return jsonify({"sent": bool(ok), "to": test_to})
     except Exception as e:
         return jsonify({"sent": False, "error": str(e)}), 500
+
+
+@app.route("/verify_email/<token>")
+def verify_email(token):
+    """Verify user email with token"""
+    user = User.query.filter_by(email_verification_token=token).first()
+    
+    if not user:
+        flash("Invalid or expired verification link", "danger")
+        return redirect(url_for("login"))
+    
+    if user.verify_email(token):
+        db.session.commit()
+        flash("Email verified successfully! You will now receive market briefs.", "success")
+        return redirect(url_for("dashboard"))
+    else:
+        flash("Verification link has expired. Please request a new one.", "danger")
+        return redirect(url_for("resend_verification"))
+    
+    return redirect(url_for("login"))
+
+
+@app.route("/resend_verification", methods=["GET", "POST"])
+@login_required
+def resend_verification():
+    """Resend email verification"""
+    if current_user.email_verified:
+        flash("Your email is already verified", "info")
+        return redirect(url_for("dashboard"))
+    
+    if request.method == "POST":
+        try:
+            # Generate new verification token
+            token = current_user.generate_email_verification_token()
+            db.session.commit()
+            
+            # Send verification email
+            from emails import send_verification_email
+            if send_verification_email(current_user, token):
+                flash("Verification email sent! Please check your inbox.", "success")
+            else:
+                flash("Failed to send verification email. Please try again.", "danger")
+        except Exception as e:
+            flash(f"Error sending verification email: {str(e)}", "danger")
+    
+    return render_template("resend_verification.html")
+
+
+@app.route("/verify_email_required")
+@login_required
+def verify_email_required():
+    """Show email verification required page"""
+    if current_user.email_verified:
+        return redirect(url_for("dashboard"))
+    return render_template("verify_email_required.html")
+
 
 if __name__ == "__main__":
     app.run(debug=True)

@@ -28,6 +28,32 @@ instance/
 .DS_Store
 Thumbs.db
 
+# Environment files (sensitive)
+.env
+.env.*
+*.env
+env_*.txt
+googenv.txt
+
 # Deployment scripts (sensitive)
 deploy_correct_version.ps1
-deploy_correct_version.sh 
+deploy_correct_version.sh
+deploy_comprehensive_update.ps1
+deploy_*.ps1
+deploy_*.sh
+
+# Backup files
+*.tar.gz
+*.zip
+
+# Output directories with sensitive data
+out/
+instance/
+
+# Test files that might contain sensitive data
+test_*.py
+*_test.py
+
+# Logs and temporary files
+*.log
+*.tmp 

@@ -11,7 +11,7 @@ from sendgrid.helpers.mail import (
     TrackingSettings,
     ClickTracking,
 )
-from models import MarketBriefSubscriber
+from models import MarketBriefSubscriber, User
 from datetime import datetime
 import logging
 
@@ -136,14 +136,14 @@ def send_confirmation_email_direct(subscriber):
         return False
 
 def send_daily_brief_to_subscribers(brief_html, date_str=None):
-    """Send daily brief to all confirmed subscribers"""
+    """Send daily brief only to Pro users (active or trialing) who opted into daily emails"""
     if not date_str:
         date_str = datetime.now().strftime('%Y-%m-%d')
     
-    # Get all confirmed and active subscribers
-    subscribers = MarketBriefSubscriber.query.filter_by(
-        confirmed=True, 
-        is_active=True
+    # Select only Pro users who opted in to daily brief
+    subscribers = User.query.filter(
+        User.is_subscribed_daily == True,
+        User.subscription_status.in_(['active', 'trialing'])
     ).all()
     
     if not subscribers:
@@ -192,10 +192,8 @@ def send_daily_brief_to_subscribers(brief_html, date_str=None):
                               sender=app.config['MAIL_DEFAULT_SENDER'])
                 mail.send(msg)
             
-            # Update last_brief_sent timestamp
-            subscriber.last_brief_sent = datetime.utcnow()
-            from app import db
-            db.session.commit()
+            # For User model we do not update MarketBriefSubscriber.last_brief_sent here
+            # Consider persisting via EmailDelivery separately
             
             success_count += 1
             logger.info(f"Daily brief sent to {subscriber.email}")
@@ -204,18 +202,18 @@ def send_daily_brief_to_subscribers(brief_html, date_str=None):
             logger.error(f"Error sending daily brief to {subscriber.email}: {str(e)}")
             continue
     
-    logger.info(f"Daily brief sent to {success_count}/{len(subscribers)} subscribers")
+    logger.info(f"Daily brief sent to {success_count}/{len(subscribers)} Pro users")
     return success_count
 
 def send_daily_brief_direct(brief_html, date_str=None):
-    """Send daily brief using direct SendGrid (no Flask context)"""
+    """Send daily brief to Pro users using direct SendGrid (no Flask context)"""
     if not date_str:
         date_str = datetime.now().strftime('%Y-%m-%d')
     
-    # Get all confirmed and active subscribers
-    subscribers = MarketBriefSubscriber.query.filter_by(
-        confirmed=True, 
-        is_active=True
+    # Select only Pro users who opted in to daily brief
+    subscribers = User.query.filter(
+        User.is_subscribed_daily == True,
+        User.subscription_status.in_(['active', 'trialing'])
     ).all()
     
     if not subscribers:
@@ -269,11 +267,6 @@ def send_daily_brief_direct(brief_html, date_str=None):
             
             response = sg.send(sg_mail)
             if response.status_code in (200, 202):
-                # Update last_brief_sent timestamp
-                subscriber.last_brief_sent = datetime.utcnow()
-                from app import db
-                db.session.commit()
-                
                 success_count += 1
                 logger.info(f"Daily brief sent to {subscriber.email}")
             else:
@@ -283,7 +276,7 @@ def send_daily_brief_direct(brief_html, date_str=None):
             logger.error(f"Error sending daily brief to {subscriber.email}: {str(e)}")
             continue
     
-    logger.info(f"Daily brief sent to {success_count}/{len(subscribers)} subscribers")
+    logger.info(f"Daily brief sent to {success_count}/{len(subscribers)} Pro users")
     return success_count
 
 def send_welcome_email(subscriber):
@@ -420,3 +413,74 @@ Date: {subscriber.subscribed_at.strftime('%Y-%m-%d %H:%M:%S')}
     except Exception as e:
         logger.error(f"Error sending admin notification: {str(e)}")
         return False 
+
+
+def send_verification_email(user, token):
+    """Send email verification email to user"""
+    try:
+        # Create verification URL
+        domain = app.config.get('SERVER_NAME', 'optionsplunge.com')
+        scheme = app.config.get('PREFERRED_URL_SCHEME', 'https')
+        verify_url = f"{scheme}://{domain}/verify_email/{token}"
+        
+        # Create verification email HTML
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <title>Verify Your Account</title>
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h1 style="color: #2c3e50;">Verify Your Options Plunge Account</h1>
+                <p>Hi {user.username},</p>
+                <p>Welcome to Options Plunge! To complete your registration and start receiving market briefs, please verify your email address.</p>
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="{verify_url}" style="background-color: #3498db; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">Verify Email Address</a>
+                </div>
+                <p>Or copy and paste this link into your browser:</p>
+                <p style="word-break: break-all; color: #666;">{verify_url}</p>
+                <p>This link will expire in 24 hours for security reasons.</p>
+                <p>If you didn't create an account with Options Plunge, you can safely ignore this email.</p>
+                <p>Best regards,<br>Options Plunge Team</p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Send via SendGrid
+        sendgrid_key = app.config.get('SENDGRID_KEY') or os.getenv('SENDGRID_KEY')
+        if sendgrid_key:
+            try:
+                sg = SendGridAPIClient(api_key=sendgrid_key)
+                from_email_name, from_email_addr = app.config.get('MAIL_DEFAULT_SENDER', (None, None))
+                from_email = SGEmail(from_email_addr or 'support@optionsplunge.com', from_email_name or 'Options Plunge Support')
+                to_email = SGTo(user.email)
+                subject = 'Verify your Options Plunge account'
+                content = SGContent("text/html", html_content)
+                sg_mail = SGMail(from_email, to_email, subject, content)
+                response = sg.send(sg_mail)
+                if response.status_code not in (200, 202):
+                    raise RuntimeError(f"SendGrid non-2xx status: {response.status_code}")
+                logger.info(f"Verification email sent via SendGrid to {user.email}")
+                return True
+            except Exception as sg_err:
+                logger.warning(f"SendGrid failed for {user.email}: {sg_err}. Falling back to SMTP.")
+                msg = Message('Verify your Options Plunge account',
+                              recipients=[user.email], html=html_content,
+                              sender=app.config['MAIL_DEFAULT_SENDER'])
+                mail.send(msg)
+                logger.info(f"Verification email sent via SMTP to {user.email}")
+                return True
+        else:
+            msg = Message('Verify your Options Plunge account',
+                          recipients=[user.email], html=html_content,
+                          sender=app.config['MAIL_DEFAULT_SENDER'])
+            mail.send(msg)
+            logger.info(f"Verification email sent to {user.email}")
+            return True
+        
+    except Exception as e:
+        logger.error(f"Error sending verification email to {user.email}: {str(e)}")
+        return False

@@ -2,6 +2,13 @@ import os
 import textwrap
 from typing import Dict, Any
 
+"""Lightweight GPT summary wrapper with safe fallbacks.
+
+Avoids initializing the OpenAI client at import time to prevent runtime
+errors during app/module import (e.g., proxy incompatibilities or console
+encoding issues). The client is created lazily inside summarize_brief.
+"""
+
 # Check if OpenAI is available
 try:
     from openai import OpenAI
@@ -9,20 +16,9 @@ try:
 except ImportError:
     OPENAI_AVAILABLE = False
 
-MODEL = os.getenv("SUMMARY_MODEL", "gpt-5-nano")  # default
+MODEL = os.getenv("SUMMARY_MODEL", "gpt-4o-mini")  # default
 
-# Initialize client only if API key is available
-CLIENT = None
-if OPENAI_AVAILABLE:
-    api_key = os.getenv("OPENAI_API_KEY")
-    if api_key:
-        try:
-            # Try to create client without any proxy settings
-            CLIENT = OpenAI(api_key=api_key)
-            print("✅ OpenAI client initialized successfully")
-        except Exception as e:
-            print(f"⚠️ OpenAI client initialization failed: {e}")
-            CLIENT = None
+CLIENT = None  # Lazily initialized
 
 SYSTEM = (
     "You are a pro market writer. Summarize for retail traders at ~8th–10th grade "
@@ -67,9 +63,24 @@ Constraints:
 - Never include sub-$1 or illiquid tickers
 """
 
+def _ensure_client() -> None:
+    """Create the OpenAI client if possible; stay silent on failure."""
+    global CLIENT
+    if CLIENT is not None or not OPENAI_AVAILABLE:
+        return
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        return
+    try:
+        CLIENT = OpenAI(api_key=api_key)
+    except Exception:
+        CLIENT = None
+
+
 def summarize_brief(brief: Dict[str, Any]) -> Dict[str, str]:
     """Returns {'subscriber_summary': markdown, 'preheader': str}"""
-    # Check if OpenAI is available and API key is set
+    # Lazily initialize client and check availability
+    _ensure_client()
     if not OPENAI_AVAILABLE or not CLIENT:
         # Fallback: rule-based summary
         fallback_summary = (
@@ -85,14 +96,14 @@ def summarize_brief(brief: Dict[str, Any]) -> Dict[str, str]:
     
     try:
         msg = _prompt(brief)
-        resp = CLIENT.chat.completions.create(  # Using chat.completions for compatibility
+        resp = CLIENT.chat.completions.create(
             model=MODEL,
             messages=[
                 {"role": "system", "content": SYSTEM},
                 {"role": "user", "content": msg}
             ],
-            temperature=0.5,
-            max_tokens=500,
+            temperature=1.0,
+            max_completion_tokens=500,
         )
         
         summary_text = resp.choices[0].message.content.strip()

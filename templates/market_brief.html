@@ -39,7 +39,7 @@
                                 <span class="text-muted small" id="brief-date">Loading...</span>
                             </div>
                             <div class="card-body">
-                                {% if brief %}
+                                {% if brief and brief.headlines %}
                                 <div class="market-brief">
                                     <style>
                                     /* Market Brief spacing and wrapping */
@@ -155,11 +155,12 @@
                                   const root = document.getElementById('brief-preview');
                                   if (!root) return;
 
-                                  fetch('{{ url_for('latest_brief') }}', { credentials: 'same-origin' })
+                                  fetch("{{ url_for('latest_brief') }}", { credentials: 'same-origin' })
                                     .then(r => r.text())
                                     .then(html => {
+                                      // First show the raw HTML so users see something immediately
                                       root.innerHTML = html;
-                                      // Try to set date label from first <p>
+                                      // Try to set date label from first <p> in the loaded content
                                       try {
                                         const p = root.querySelector('p');
                                         if (p && p.textContent.trim()) {
@@ -194,7 +195,15 @@
                                         return raw.slice(i + label.length, j).trim();
                                       }
 
-                                      const exec  = sliceBetween('Executive Summary');
+                                      function sliceFirst(labels) {
+                                        for (const lbl of labels) {
+                                          const txt = sliceBetween(lbl);
+                                          if (txt) return txt;
+                                        }
+                                        return '';
+                                      }
+
+                                      const exec  = sliceFirst(['Executive Summary','Market Overview','Summary']);
                                       const move  = sliceBetween("What's moving");
                                       const heads = sliceBetween('Key Market Headlines');
                                       const tech  = sliceBetween('Technical Analysis & Daily Range Insights');
@@ -223,13 +232,14 @@
 
                                       function formatHeadlines(text) {
                                         if (!text) return '';
-                                        const parts = text
-                                          .replace(/\s+/g, ' ')
-                                          .split(/\s(?=\d+\.\s)/g)
+                                        const normalized = text.replace(/\u00A0/g, ' ').replace(/\s+/g, ' ').trim();
+                                        // Capture segments like "1. ..." "2. ..." (including the very first at start)
+                                        const segments = normalized.match(/\d+\.\s[^]+?(?=(?:\s\d+\.\s)|$)/g) || [];
+                                        const items = (segments.length ? segments : [normalized])
                                           .map(s => s.replace(/^\d+\.\s*/, '').trim())
                                           .filter(Boolean);
-                                        if (!parts.length) return `<p>${text}</p>`;
-                                        const li = parts.map(h => {
+                                        if (!items.length) return `<p>${text}</p>`;
+                                        const li = items.map(h => {
                                           const m = h.match(/(.*?)(?:\s+Source:\s*([^]+?)\s+Summary:\s*([^]+))?$/i);
                                           if (!m) return `<li>${h}</li>`;
                                           const [, headline, source, summary] = m;
@@ -264,7 +274,7 @@
                                         return rows.length ? `<div class="levels-card">${rows.join('')}</div>` : `<p>${text}</p>`;
                                       }
 
-                                      const html =
+                                      const structuredHtml =
                                         (preservedHeader || '') +
                                         section('Executive Summary', exec ? `<p>${exec}</p>` : '') +
                                         section("What's moving — After-hours & Premarket", move ? `<p>${move}</p>` : '') +
@@ -273,8 +283,9 @@
                                         section('Market Sentiment & Outlook', senti ? `<p>${senti}</p>` : '') +
                                         section('Key Levels to Watch', formatLevels(levels));
 
-                                      if (html.replace(/\s+/g,'').length) {
-                                        root.innerHTML = html;
+                                      // If we successfully built a structured version, replace the raw HTML
+                                      if (structuredHtml.replace(/\s+/g,'').length) {
+                                        root.innerHTML = structuredHtml;
                                         root.classList.add('brief-structured');
                                       }
                                     })
@@ -287,22 +298,7 @@
                             </div>
                         </div>
 
-                        <script>
-                        function updateBriefDate() {
-                            // Try to get the date from the brief content
-                            const iframe = document.getElementById('brief-iframe');
-                            try {
-                                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-                                const dateElement = iframeDoc.querySelector('p');
-                                if (dateElement && dateElement.textContent.includes('2025')) {
-                                    document.getElementById('brief-date').textContent = dateElement.textContent;
-                                }
-                            } catch (e) {
-                                // Cross-origin restrictions, use fallback
-                                document.getElementById('brief-date').textContent = 'Latest';
-                            }
-                        }
-                        </script>
+                        
                     {% else %}
                     <div class="card text-center mb-4">
                         <div class="card-body">
@@ -337,34 +333,170 @@
                         </div>
                         <div class="card-body">
                             <div class="alert alert-success mb-3"><strong>Free for Everyone</strong></div>
-                            <div class="ratio ratio-16x9" style="min-height: 600px;">
-                                <iframe
-                                    id="weekly-brief-iframe"
-                                    style="border:0; width:100%; height:100%;"
-                                    loading="lazy"
+                            <iframe id="weekly-brief-iframe"
                                     src="{{ url_for('weekly_brief') }}"
-                                    onload="updateWeeklyBriefDate()">
-                                </iframe>
-                            </div>
+                                    title="Weekly Market Brief"
+                                    style="width: 100%; min-height: 650px; border: 1px solid #eee; border-radius: 8px; background: #fff; margin-bottom: 12px;"
+                                    loading="lazy"></iframe>
+                            <script>
+                              (function () {
+                                const iframe = document.getElementById('weekly-brief-iframe');
+                                if (!iframe) return;
+                                iframe.addEventListener('load', function () {
+                                  try {
+                                    const doc = iframe.contentDocument || iframe.contentWindow.document;
+                                    const header = doc && doc.querySelector('.header p');
+                                    if (header && header.textContent.trim()) {
+                                      const el = document.getElementById('weekly-brief-date');
+                                      if (el) el.textContent = header.textContent.trim();
+                                    }
+                                  } catch (_) {}
+                                });
+                              })();
+                            </script>
+                            <div id="weekly-brief-preview" class="brief-preview" style="max-height: 600px; overflow: auto; border: 1px solid #eee; border-radius: 8px; padding: 12px; background: #fff;"></div>
+
+                            <style>
+                              .mb-section { margin: 1rem 0 1.25rem; }
+                              .mb-section h3 {
+                                font-size: 1.05rem; font-weight: 700; margin: 0 0 .5rem;
+                                padding-bottom: .25rem; border-bottom: 2px solid rgba(13,110,253,.15); color: #0d6efd;
+                              }
+                              ol.mb-headlines { padding-left: 1.25rem; margin-bottom: 0; }
+                              ol.mb-headlines li + li { margin-top: .35rem; }
+                              .levels-card {
+                                background: #fff7e6; border: 1px solid #ffe4b5; border-left: 4px solid #f0ad4e;
+                                border-radius: .5rem; padding: .75rem .9rem;
+                              }
+                              .levels-card .ticker { font-weight: 700; margin-right: .25rem; }
+                              .levels-card .s { color: #198754; font-weight: 600; }
+                              .levels-card .r { color: #dc3545; font-weight: 600; }
+                              .brief-structured .source { color:#6c757d; font-size:.875rem; display:block; }
+                            </style>
+
+                            <script>
+                            (function () {
+                              const root = document.getElementById('weekly-brief-preview');
+                              if (!root) return;
+
+                              fetch("{{ url_for('weekly_brief') }}", { credentials: 'same-origin' })
+                                .then(r => r.text())
+                                .then(html => {
+                                  // Show raw HTML immediately
+                                  root.innerHTML = html;
+                                  try {
+                                    // Look for the date in the header section
+                                    const header = root.querySelector('.header p');
+                                    if (header && header.textContent.trim()) {
+                                      const el = document.getElementById('weekly-brief-date');
+                                      if (el) el.textContent = header.textContent.trim();
+                                    }
+                                  } catch (e) {}
+
+                                  if (root.classList.contains('brief-structured')) return;
+                                  const raw = (root.innerText || '').replace(/\u00A0/g, ' ').trim();
+                                  if (!raw) return;
+
+                                  function sliceBetween(label) {
+                                    const titles = [
+                                      'Executive Summary',
+                                      'Key Market Headlines',
+                                      'Technical Analysis & Daily Range Insights',
+                                      'Market Sentiment & Outlook',
+                                      'Key Levels to Watch'
+                                    ];
+                                    const lower = raw.toLowerCase();
+                                    const i = lower.indexOf(label.toLowerCase());
+                                    if (i < 0) return '';
+                                    let j = raw.length;
+                                    for (const t of titles) {
+                                      const k = lower.indexOf(t.toLowerCase(), i + label.length);
+                                      if (k > -1) j = Math.min(j, k);
+                                    }
+                                    return raw.slice(i + label.length, j).trim();
+                                  }
+
+                                  function sliceFirst(labels) {
+                                    for (const lbl of labels) {
+                                      const txt = sliceBetween(lbl);
+                                      if (txt) return txt;
+                                    }
+                                    return '';
+                                  }
+
+                                  function section(title, html) {
+                                    if (!html) return '';
+                                    return `\n      <section class=\"mb-section\">\n        <h3>${title}</h3>\n        <div>${html}</div>\n      </section>`;
+                                  }
+
+                                  function formatHeadlines(text) {
+                                    if (!text) return '';
+                                    const normalized = text.replace(/\u00A0/g, ' ').replace(/\s+/g, ' ').trim();
+                                    const segments = normalized.match(/\d+\.\s[^]+?(?=(?:\s\d+\.\s)|$)/g) || [];
+                                    const items = (segments.length ? segments : [normalized])
+                                      .map(s => s.replace(/^\d+\.\s*/, '').trim())
+                                      .filter(Boolean);
+                                    if (!items.length) return `<p>${text}</p>`;
+                                    const li = items.map(h => {
+                                      const m = h.match(/(.*?)(?:\s+Source:\s*([^]+?)\s+Summary:\s*([^]+))?$/i);
+                                      if (!m) return `<li>${h}</li>`;
+                                      const [, headline, source, summary] = m;
+                                      return `<li><div>${headline}</div>${
+                                        source ? `<span class=\"source\">Source: ${source}</span>` : ''
+                                      }${
+                                        summary ? `<div class=\"small text-muted mt-1\">${summary}</div>` : ''
+                                      }</li>`;
+                                    }).join('');
+                                    return `<ol class=\"mb-headlines\">${li}</ol>`;
+                                  }
+
+                                  function formatLevels(text) {
+                                    if (!text) return '';
+                                    const lines = text.split(/\n| - /g).map(s => s.trim()).filter(Boolean);
+                                    const rows = [];
+                                    lines.forEach(line => {
+                                      const m = line.match(/^([A-Z.\-]{2,6})\s*[—-]\s*(.*)$/);
+                                      if (!m) return;
+                                      const [, ticker, rest] = m;
+                                      const grab = (label) => {
+                                        const mm = rest.match(new RegExp(label + '\\s*:\\s*([^;]+)', 'i'));
+                                        return mm ? mm[1].trim() : '';
+                                      };
+                                      const dailyS = grab('Daily\\s*S'), dailyR = grab('R');
+                                      const weeklyS = grab('Weekly\\s*S');
+                                      const allR = rest.match(/R:\\s*([^;]+)/gi);
+                                      const weeklyR = allR && allR[1] ? allR[1].replace(/^R:\\s*/i,'').trim() : '';
+
+                                      rows.push(`\n        <div class=\"mb-1\">\n          <span class=\"ticker\">${ticker}</span> —\n          <span class=\"s\">S:</span> ${dailyS}${weeklyS ? `; <span class=\"s\">Weekly S:</span> ${weeklyS}` : ''}\n          ; <span class=\"r\">R:</span> ${dailyR}${weeklyR ? `; <span class=\"r\">Weekly R:</span> ${weeklyR}` : ''}\n        </div>\n      `);
+                                    });
+                                    return rows.length ? `<div class=\"levels-card\">${rows.join('')}</div>` : `<p>${text}</p>`;
+                                  }
+
+                                  const exec  = sliceFirst(['Executive Summary','Market Overview','Summary']);
+                                  const heads = sliceBetween('Key Market Headlines');
+                                  const tech  = sliceBetween('Technical Analysis & Daily Range Insights');
+                                  const senti = sliceBetween('Market Sentiment & Outlook');
+                                  const levels= sliceBetween('Key Levels to Watch');
+
+                                  const html =
+                                    section('Executive Summary', exec ? `<p>${exec}</p>` : '') +
+                                    section('Key Market Headlines', formatHeadlines(heads)) +
+                                    section('Technical Analysis & Daily Range Insights', tech ? `<p>${tech}</p>` : '') +
+                                    section('Market Sentiment & Outlook', senti ? `<p>${senti}</p>` : '') +
+                                    section('Key Levels to Watch', formatLevels(levels));
+
+                                  if (html.replace(/\s+/g,'').length) {
+                                    root.innerHTML = html;
+                                    root.classList.add('brief-structured');
+                                  }
+                                })
+                                .catch(() => {
+                                  root.innerHTML = '<div class="text-muted">Unable to load the weekly brief.</div>';
+                                });
+                            })();
+                            </script>
                         </div>
                     </div>
-
-                    <script>
-                    function updateWeeklyBriefDate() {
-                        // Try to get the date from the brief content
-                        const iframe = document.getElementById('weekly-brief-iframe');
-                        try {
-                            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-                            const dateElement = iframeDoc.querySelector('p');
-                            if (dateElement && dateElement.textContent.includes('2025')) {
-                                document.getElementById('weekly-brief-date').textContent = dateElement.textContent;
-                            }
-                        } catch (e) {
-                            // Cross-origin restrictions, use fallback
-                            document.getElementById('weekly-brief-date').textContent = 'Latest';
-                        }
-                    }
-                    </script>
                 </div>
             </div><!-- end tab-content -->
         </div><!-- /col-12 main -->

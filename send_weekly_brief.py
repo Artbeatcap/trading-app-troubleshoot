@@ -55,23 +55,17 @@ def load_weekly_brief(source_path: str) -> WeeklyBrief:
 def get_weekly_subscribers() -> List[str]:
     """Get list of users subscribed to weekly emails."""
     try:
-        from sqlalchemy import create_engine, text
+        # Use Flask ORM instead of raw SQL to avoid connection issues
+        from app import app, db
+        from models import User
         
-        database_url = os.getenv('DATABASE_URL')
-        if not database_url:
-            logger.error("❌ DATABASE_URL environment variable not set")
-            return []
-        
-        engine = create_engine(database_url)
-        
-        with engine.connect() as conn:
-            result = conn.execute(text("""
-                SELECT email FROM users 
-                WHERE is_subscribed_weekly = TRUE 
-                AND email_verified = TRUE
-            """))
+        with app.app_context():
+            subscribers = User.query.filter(
+                User.is_subscribed_weekly == True,
+                User.email_verified == True
+            ).all()
             
-            emails = [row[0] for row in result.fetchall()]
+            emails = [user.email for user in subscribers]
             logger.info(f"📧 Found {len(emails)} weekly subscribers")
             return emails
             
@@ -82,25 +76,19 @@ def get_weekly_subscribers() -> List[str]:
 def save_delivery_log(user_id: int, kind: str, subject: str, provider_id: Optional[str] = None):
     """Log email delivery to database."""
     try:
-        from sqlalchemy import create_engine, text
+        # Use Flask ORM instead of raw SQL
+        from app import app, db
+        from models import EmailDelivery
         
-        database_url = os.getenv('DATABASE_URL')
-        if not database_url:
-            return
-        
-        engine = create_engine(database_url)
-        
-        with engine.connect() as conn:
-            conn.execute(text("""
-                INSERT INTO email_deliveries (user_id, kind, subject, provider_id)
-                VALUES (:user_id, :kind, :subject, :provider_id)
-            """), {
-                'user_id': user_id,
-                'kind': kind,
-                'subject': subject,
-                'provider_id': provider_id
-            })
-            conn.commit()
+        with app.app_context():
+            delivery = EmailDelivery(
+                user_id=user_id,
+                kind=kind,
+                subject=subject,
+                provider_id=provider_id
+            )
+            db.session.add(delivery)
+            db.session.commit()
             
     except Exception as e:
         logger.warning(f"⚠️ Could not log delivery: {e}")
@@ -129,6 +117,13 @@ def save_dry_run_output(html: str, text: str, date_str: str):
 
 def main():
     """Main function to send weekly brief."""
+    # Environment diagnostics
+    logger.info("🔍 Environment check:")
+    logger.info(f"  DATABASE_URL: {'SET' if os.getenv('DATABASE_URL') else 'NOT SET'}")
+    logger.info(f"  SENDGRID_API_KEY: {'SET' if os.getenv('SENDGRID_API_KEY') else 'NOT SET'}")
+    logger.info(f"  SENDGRID_KEY: {'SET' if os.getenv('SENDGRID_KEY') else 'NOT SET'}")
+    logger.info(f"  CONFIRM_SEND: {os.getenv('CONFIRM_SEND', 'NOT SET')}")
+    
     parser = argparse.ArgumentParser(description="Send Weekly Market Brief")
     parser.add_argument(
         "--source", 
@@ -223,6 +218,7 @@ def main():
     if not os.getenv('CONFIRM_SEND'):
         logger.error("❌ CONFIRM_SEND environment variable not set. Set to '1' to confirm sending.")
         logger.info("💡 Run with --dry-run to preview emails first")
+        logger.info("💡 Set CONFIRM_SEND=1 in your environment or scheduler")
         sys.exit(1)
     
     # Get subscribers

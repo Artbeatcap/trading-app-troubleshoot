@@ -69,7 +69,7 @@ Constraints:
 - Never include sub-$1 or illiquid tickers
 """
 
-def call_openai_api_directly(api_key: str, messages: list, model: str = "gpt-4o-mini") -> str:
+def call_openai_api_directly(api_key: str, messages: list, model: str = "gpt-5-nano") -> str:
     """Call OpenAI API directly using requests to bypass client issues"""
     try:
         headers = {

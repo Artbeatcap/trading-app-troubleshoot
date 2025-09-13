@@ -43,7 +43,7 @@ class Config:
 
     # App Configuration
     TRADES_PER_PAGE = 20
-    ANALYSIS_MODEL = 'gpt-5-nano'  # Default AI model for analysis
+    ANALYSIS_MODEL = 'gpt-4o-mini'  # Default AI model for analysis
 
     # URL Configuration for email links
     # For local development, don't set SERVER_NAME to allow all hosts

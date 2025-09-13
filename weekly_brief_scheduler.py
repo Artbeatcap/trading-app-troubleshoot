@@ -2,7 +2,7 @@
 """
 Weekly Market Brief Scheduler
 
-Runs every Sunday at 12:00 PM ET to send the weekly market brief.
+Runs every Sunday at 08:00 AM ET to send the weekly market brief.
 """
 
 import os
@@ -34,12 +34,12 @@ def start_weekly_brief_scheduler():
         # Create scheduler
         scheduler = BackgroundScheduler(timezone=tz)
         
-        # Add weekly brief job - Sundays at 12:00 PM ET
+        # Add weekly brief job - Sundays at 08:00 AM ET
         scheduler.add_job(
             func=send_weekly_brief_job,
             trigger=CronTrigger(
                 day_of_week="sun",
-                hour=12,
+                hour=8,
                 minute=0,
                 timezone=tz
             ),
@@ -53,7 +53,7 @@ def start_weekly_brief_scheduler():
         # Start scheduler
         scheduler.start()
         logger.info("✅ Weekly brief scheduler started")
-        logger.info("📅 Scheduled: Sundays at 12:00 PM ET")
+        logger.info("📅 Scheduled: Sundays at 08:00 AM ET")
         
         return scheduler
         
@@ -87,7 +87,7 @@ def send_weekly_brief_job():
 def main():
     """Main function to run the scheduler."""
     print("📅 Starting Weekly Market Brief Scheduler...")
-    print("⏰ Scheduled: Sundays at 12:00 PM ET")
+    print("⏰ Scheduled: Sundays at 08:00 AM ET")
     print("📧 Source: weekly_brief_sample.json")
     print("🔄 Press Ctrl+C to stop")
     

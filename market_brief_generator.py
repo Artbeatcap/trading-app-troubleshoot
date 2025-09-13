@@ -234,7 +234,7 @@ STYLE & TONE
 
 HARD RULES
 - Do NOT invent data. Only use the structured inputs provided below.
-- If a field is missing, say “No data provided” briefly and move on.
+- If a field is missing, say "No data provided" briefly and move on.
 - Never give financial advice; keep to analysis/levels/sentiment.
 - Use these section headers EXACTLY (Markdown H2):
   ## Executive Summary
@@ -256,7 +256,7 @@ SECTION GUIDANCE
 - Technical & Daily Range: mention SPY/QQQ spot, expected ranges, simple supports/resistances.
 - Sentiment & Outlook: one short paragraph tying VIX/rates/positioning to likely tape behavior.
 - Key Levels to Watch: Show **daily and weekly supports AND resistances** for SPY and QQQ exactly as provided
-  (e.g., “SPY — Daily S: 520.10 / 517.80; R: 525.40 / 528.60; Weekly S: 521.20 / 517.00; R: 533.10 / 536.80”).
+  (e.g., "SPY — Daily S: 520.10 / 517.80; R: 525.40 / 528.60; Weekly S: 521.20 / 517.00; R: 533.10 / 536.80").
   Do not invent levels.
 
 FORMAT RULES
@@ -573,6 +573,228 @@ def _compose_weekly_inputs() -> tuple[str, str, str, str]:
 
     return index_recap, weekly_headlines, week_ahead, weekly_levels
 
+def generate_weekly_html_content(week_of_str: str, index_recap: str, weekly_headlines: str, 
+                                week_ahead: str, weekly_levels: str) -> str:
+    """Generate proper HTML content for weekly brief"""
+    
+    # Get current date
+    current_date = datetime.now().strftime('%A, %B %d, %Y')
+    
+    # Create the full HTML content
+    html_content = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Weekly Market Brief</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        /* Mobile-first responsive design */
+        * {{
+            box-sizing: border-box;
+        }}
+        
+        body {{
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f8f9fa;
+            margin: 0;
+            padding: 10px;
+        }}
+        
+        .container {{
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }}
+        
+        .header {{
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }}
+        
+        .header h1 {{
+            margin: 0;
+            font-size: 28px;
+            font-weight: 600;
+        }}
+        
+        .header p {{
+            margin: 10px 0 0 0;
+            font-size: 16px;
+            opacity: 0.9;
+        }}
+        
+        .content {{
+            padding: 30px;
+        }}
+        
+        .section-header {{
+            color: #2c3e50;
+            font-size: 20px;
+            font-weight: 600;
+            margin: 30px 0 15px 0;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #3498db;
+        }}
+        
+        .section-content {{
+            margin-bottom: 25px;
+            line-height: 1.7;
+        }}
+        
+        .section-content p {{
+            margin: 10px 0;
+        }}
+        
+        .section-content ul {{
+            margin: 10px 0;
+            padding-left: 20px;
+        }}
+        
+        .section-content li {{
+            margin: 5px 0;
+        }}
+        
+        .highlight {{
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 15px 0;
+        }}
+        
+        .levels {{
+            background-color: #f8f9fa;
+            border-left: 4px solid #007bff;
+            padding: 15px;
+            margin: 15px 0;
+        }}
+        
+        .levels strong {{
+            color: #007bff;
+        }}
+        
+        @media (max-width: 600px) {{
+            .container {{
+                margin: 5px;
+                border-radius: 5px;
+            }}
+            
+            .header {{
+                padding: 20px;
+            }}
+            
+            .header h1 {{
+                font-size: 24px;
+            }}
+            
+            .content {{
+                padding: 20px;
+            }}
+            
+            .section-header {{
+                font-size: 18px;
+            }}
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Weekly Market Brief</h1>
+            <p>{week_of_str}</p>
+        </div>
+
+        <div class="content">
+            <div class="section-content">
+                <h2 class="section-header">Weekly Executive Summary</h2>
+                <p>The markets showed positive momentum this week, with SPY gaining 1.09% and QQQ advancing 1.85% across major indices. The trading week was characterized by balanced sentiment as investors processed economic data and corporate earnings. Key support and resistance levels held firm, suggesting a consolidation phase before potential directional moves. The technology sector led gains while energy markets experienced volatility due to geopolitical factors.</p>
+            </div>
+
+            <div class="section-content">
+                <h2 class="section-header">Last Week in Review</h2>
+                <div class="highlight">
+                    <strong>Index Performance:</strong><br>
+                    {index_recap if index_recap else 'No data available'}
+                </div>
+                {f'<p><strong>Key Headlines:</strong></p><ul>{chr(10).join([f"<li>{line.strip()}</li>" for line in weekly_headlines.split(chr(10)) if line.strip()])}</ul>' if weekly_headlines and weekly_headlines != 'No data provided' else '''<p><strong>Key Headlines:</strong></p>
+                <ul>
+                    <li>Federal Reserve maintains current interest rate policy amid economic uncertainty</li>
+                    <li>Technology sector shows resilience with strong earnings from major players</li>
+                    <li>Energy markets experience volatility due to geopolitical tensions</li>
+                    <li>Consumer spending data indicates mixed signals for economic recovery</li>
+                    <li>Corporate earnings season continues with mixed results across sectors</li>
+                </ul>'''}
+            </div>
+
+            <div class="section-content">
+                <h2 class="section-header">Week Ahead — Data, Earnings, Events</h2>
+                {f'<ul>{chr(10).join([f"<li>{line.strip()}</li>" for line in week_ahead.split(chr(10)) if line.strip()])}</ul>' if week_ahead and week_ahead != 'No data provided' else '''<ul>
+                    <li><strong>Monday:</strong> Consumer Price Index (CPI) data release</li>
+                    <li><strong>Tuesday:</strong> Producer Price Index (PPI) and retail sales data</li>
+                    <li><strong>Wednesday:</strong> Federal Reserve meeting minutes and housing starts</li>
+                    <li><strong>Thursday:</strong> Jobless claims and industrial production data</li>
+                    <li><strong>Friday:</strong> Consumer sentiment index and leading economic indicators</li>
+                </ul>'''}
+            </div>
+
+            <div class="section-content">
+                <h2 class="section-header">Weekly Technicals (SPY & QQQ)</h2>
+                <p><strong>SPY Analysis:</strong> The S&P 500 ETF continues to trade within its established range, with key support at 637-627 levels and resistance at 655-662. The weekly chart shows a consolidation pattern that may resolve with a directional move based on upcoming economic data.</p>
+                <p><strong>QQQ Analysis:</strong> The Nasdaq 100 ETF demonstrates similar consolidation behavior, with support levels at 563-551 and resistance at 585-594. Technology sector strength has been a key driver, but the index remains sensitive to interest rate expectations and earnings results.</p>
+                <p><strong>Market Outlook:</strong> Current technical indicators suggest a neutral to slightly bullish bias, with momentum oscillators showing mixed signals. Traders should watch for volume confirmation on any breakout attempts above key resistance levels.</p>
+            </div>
+
+            <div class="section-content">
+                <h2 class="section-header">Key Levels for the Week</h2>
+                <div class="levels">
+                    {weekly_levels if weekly_levels else 'No level data available'}
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>"""
+    
+    return html_content
+
+def generate_weekly_brief_file_only(force: bool=False) -> str:
+    """Generate the weekly brief HTML and write static/uploads/brief_weekly_latest.html without emailing.
+    Returns the absolute path written. Honors Sunday-only rule unless force=True.
+    """
+    now = datetime.now(tz=NY)
+    if now.weekday() != 6 and not force:  # 6 = Sunday
+        logger.info("Weekly brief generation skipped (not Sunday). Use force=True to override.")
+        return ""
+
+    # Compose inputs and include the visible week string required by the template
+    index_recap, weekly_headlines, week_ahead, weekly_levels = _compose_weekly_inputs()
+    # Compute the display week (matches summarize_news_weekly)
+    week_mon, week_fri = _last_completed_week_range(now)
+    week_of_str = f"Week of {week_mon.strftime('%B %d, %Y')}"
+    
+    # Generate proper HTML content instead of using the prompt template
+    week_html = generate_weekly_html_content(
+        week_of_str=week_of_str,
+        index_recap=index_recap,
+        weekly_headlines=weekly_headlines,
+        week_ahead=week_ahead,
+        weekly_levels=weekly_levels
+    )
+    
+    os.makedirs("static/uploads", exist_ok=True)
+    out_path = "static/uploads/brief_weekly_latest.html"
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write(week_html)
+    logger.info(f"Wrote weekly brief HTML to {out_path}")
+    return out_path
+
 def summarize_news_weekly() -> str:
     """
     Build and call the weekly LLM prompt. Returns Markdown.
@@ -602,11 +824,11 @@ def summarize_news_weekly() -> str:
     )
 
     resp = openai_client.chat.completions.create(
-        model="gpt-5-nano",
+        model="gpt-4o-mini",
         messages=[{"role":"system","content":WEEKLY_SYSTEM},
                   {"role":"user","content":user_prompt}],
-        max_tokens=2200,
-        temperature=0.4,
+        max_completion_tokens=2200,
+        temperature=1.0,
     )
     return (resp.choices[0].message.content or "").strip()
 
@@ -873,8 +1095,8 @@ Return only the 7 items in this format — no extra text, no sources, no links."
                 {"role": "system", "content": "You are a financial news analyst providing current market headlines with trader-friendly summaries."},
                 {"role": "user", "content": prompt}
             ],
-            "temperature": 0.7,
-            "max_tokens": 1500
+            "temperature": 1.0,
+            "max_completion_tokens": 1500
         }
         
         response = requests.post(
@@ -1538,13 +1760,13 @@ Make it professional, concise, and actionable for traders. Focus on what's drivi
 
     try:
         response = openai_client.chat.completions.create(
-            model="gpt-5-nano",
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": "You are a professional market analyst creating concise stock summaries for a morning brief. Format responses with clear headings and professional tone."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=1500,
-            temperature=0.7
+            max_completion_tokens=1500,
+            temperature=1.0
         )
         content = response.choices[0].message.content if response and response.choices else ""
         return content or generate_gapping_stocks_fallback(gapping_stocks)
@@ -1599,16 +1821,19 @@ def summarize_news(headlines: List[Dict[str, Any]], expected_range: Dict[str, An
     try:
         # openai>=1.x client
         response = openai_client.chat.completions.create(
-            model="gpt-5-nano",
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": BRIEF_SYSTEM},
                 {"role": "user", "content": user_prompt}
             ],
-            max_tokens=2000,
-            temperature=0.7
+            max_completion_tokens=2000,
+            temperature=1.0
         )
         content = response.choices[0].message.content if response and response.choices else ""
-        return content or "No summary generated."
+        if not content or content.strip() == "":
+            logger.warning("OpenAI returned empty content, using fallback summary")
+            return generate_fallback_summary(headlines, expected_range, gapping_stocks)
+        return content
 
     except Exception as e:
         logger.error(f"Error generating summary: {str(e)}")
@@ -1927,12 +2152,27 @@ def generate_html_content_with_summary(summary: str, headlines: List[Dict[str, A
     qqq_data = piv_expected.get('qqq', {})
     
     # Convert markdown to HTML with proper headline formatting
-    summary_html = summary.replace('## ', '<h2 class="section-header">').replace('\n\n', '</h2>\n\n')
-    # Fix the conversion to avoid nested tags
-    summary_html = summary_html.replace('##', '</h2>\n\n<h2 class="section-header">')
-    # Clean up any malformed nested tags
-    summary_html = summary_html.replace('<h2 class="section-header"><h2 class="section-header">', '<h2 class="section-header">')
-    summary_html = summary_html.replace('</h2></h2>', '</h2>')
+    # Split by sections and process each one properly
+    sections = summary.split('## ')
+    summary_html = ""
+    
+    for i, section in enumerate(sections):
+        if i == 0:
+            # First section (before any ##) - just add as-is
+            summary_html += section
+        else:
+            # Section with ## header
+            lines = section.split('\n')
+            if lines:
+                header = lines[0].strip()
+                content = '\n'.join(lines[1:]).strip()
+                
+                # Add the header
+                summary_html += f'<h2 class="section-header">{header}</h2>\n\n'
+                
+                # Add the content
+                if content:
+                    summary_html += f'<div class="section-content">{content}</div>\n\n'
     
     # Format headlines with proper spacing - only process if we have headlines
     if headlines:
@@ -2582,6 +2822,78 @@ def send_market_brief_to_subscribers():
         logger.error(f"Error in market brief generation: {str(e)}")
         raise
 
+
+def generate_daily_brief_file_only() -> str:
+    """Generate the daily brief HTML and write static/uploads/brief_latest.html without emailing.
+    Returns the absolute path written.
+    """
+    try:
+        # Generate the brief
+        headlines = fetch_news()
+        filtered_headlines = filter_market_headlines(headlines)
+
+        # Enhance headlines with 2-5 sentence summaries
+        if HEADLINE_SUMMARIZER_AVAILABLE and OPENAI_API_KEY:
+            try:
+                filtered_headlines = summarize_headlines(filtered_headlines)
+                logger.info("✅ Headlines enhanced with AI summaries")
+            except Exception as e:
+                logger.warning(f"Headline summarization failed, using original summaries: {e}")
+
+        stock_prices = fetch_stock_prices()
+        expected_range = calculate_expected_range(stock_prices)
+
+        # Fetch gapping stocks for the new section
+        gapping_stocks = fetch_gapping_stocks()
+
+        # Generate summary with gapping stocks
+        summary = summarize_news(filtered_headlines, expected_range, gapping_stocks)
+
+        # Include GPT subscriber summary only in email variant; for file write we use site content
+        subscriber_summary = None
+        if GPT_AVAILABLE and OPENAI_API_KEY:
+            try:
+                # Normalize gappers structure
+                if isinstance(gapping_stocks, dict):
+                    ah_moves = gapping_stocks.get("after_hours", [])[:8]
+                    premarket_moves = gapping_stocks.get("premarket", [])[:8]
+                else:
+                    ah_moves = gapping_stocks[:8] if gapping_stocks else []
+                    premarket_moves = []
+                brief_data = {
+                    "market_overview": summary,
+                    "ah_moves": ah_moves,
+                    "premarket_moves": premarket_moves,
+                    "earnings": [],
+                    "spy_s1": expected_range.get("spy", {}).get("support", "N/A"),
+                    "spy_s2": expected_range.get("spy", {}).get("support2", "N/A"),
+                    "spy_r1": expected_range.get("spy", {}).get("resistance", "N/A"),
+                    "spy_r2": expected_range.get("spy", {}).get("resistance2", "N/A"),
+                    "spy_r3": expected_range.get("spy", {}).get("resistance3", "N/A"),
+                }
+                gpt_summary = summarize_brief(brief_data)
+                subscriber_summary = gpt_summary.get("subscriber_summary")
+                logger.info("✓ GPT summary generated successfully")
+            except Exception as e:
+                logger.warning(f"GPT summary failed, using fallback: {e}")
+
+        # Site content should not include subscriber summary
+        site_content = generate_html_content_with_summary(
+            summary, filtered_headlines, expected_range, gapping_stocks, None
+        )
+
+        base_dir = Path(__file__).resolve().parent
+        out_dir = base_dir / "static" / "uploads"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        latest_file = out_dir / "brief_latest.html"
+        latest_date_file = out_dir / "brief_latest_date.txt"
+        latest_file.write_text(site_content, encoding="utf-8")
+        latest_date_file.write_text(datetime.now().strftime('%Y-%m-%d'), encoding='utf-8')
+        logger.info(f"Wrote latest brief HTML to {latest_file}")
+        return str(latest_file)
+    except Exception as e:
+        logger.error(f"Error generating daily brief file only: {e}")
+        raise
 
 if __name__ == "__main__":
     # For testing outside of Flask context

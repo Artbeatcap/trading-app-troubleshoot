@@ -12,9 +12,10 @@ def register_brief_routes(app):
     @app.route("/brief/latest")
     def latest_brief():
         """Serve the latest market brief from static files"""
-        # Get the path to the static brief file
-        brief_file = Path('static/uploads/brief_latest.html')
-        date_file = Path('static/uploads/brief_latest_date.txt')
+        # Build absolute paths relative to the Flask application's root
+        base_dir = Path(current_app.root_path)
+        brief_file = base_dir / 'static' / 'uploads' / 'brief_latest.html'
+        date_file = base_dir / 'static' / 'uploads' / 'brief_latest_date.txt'
         
         if not brief_file.exists():
             return "No brief available", 404
@@ -39,8 +40,9 @@ def register_brief_routes(app):
     def weekly_brief():
         """Serve the latest weekly brief from static files"""
         # For now, use the same daily brief as weekly
-        brief_file = Path('static/uploads/brief_latest.html')
-        date_file = Path('static/uploads/brief_latest_date.txt')
+        base_dir = Path(current_app.root_path)
+        brief_file = base_dir / 'static' / 'uploads' / 'brief_weekly_latest.html'
+        date_file = base_dir / 'static' / 'uploads' / 'brief_latest_date.txt'
         
         if not brief_file.exists():
             return "No weekly brief available", 404

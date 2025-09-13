@@ -6,7 +6,7 @@ import json
 
 logger = logging.getLogger(__name__)
 
-MODEL = os.getenv("SUMMARY_MODEL", "gpt-5-nano")
+MODEL = os.getenv("SUMMARY_MODEL", "gpt-4o-mini")
 
 # Check if OpenAI is available
 try:
@@ -15,18 +15,22 @@ try:
 except ImportError:
     OPENAI_AVAILABLE = False
 
-# Initialize client only if API key is available
-CLIENT = None
-if OPENAI_AVAILABLE:
+CLIENT = None  # Lazily initialized to avoid import-time failures
+
+def _ensure_client():
+    """Create the OpenAI client if possible; stay silent on failure.
+    This avoids noisy proxy-related warnings and lets us fall back to REST.
+    """
+    global CLIENT
+    if CLIENT is not None or not OPENAI_AVAILABLE:
+        return
     api_key = os.getenv("OPENAI_API_KEY")
-    if api_key:
-        try:
-            # Try to create client with minimal parameters to avoid proxy issues
-            CLIENT = OpenAI(api_key=api_key)
-            logger.info("✅ OpenAI client initialized successfully for headline summarizer")
-        except Exception as e:
-            logger.warning(f"⚠️ OpenAI client initialization failed: {e}")
-            CLIENT = None
+    if not api_key:
+        return
+    try:
+        CLIENT = OpenAI(api_key=api_key)
+    except Exception:
+        CLIENT = None
 
 SYSTEM = (
     "You are a professional day trader content creator market writer. For each headline, write a concise 2–5 "
@@ -54,8 +58,8 @@ def call_openai_api_directly(api_key: str, messages: list, model: str = "gpt-5-n
         data = {
             "model": model,
             "messages": messages,
-            "temperature": 0.4,
-            "max_tokens": 300
+            "temperature": 1.0,
+            "max_completion_tokens": 300
         }
         response = requests.post(
             "https://api.openai.com/v1/chat/completions",
@@ -86,7 +90,8 @@ def summarize_single_headline(headline_dict: Dict[str, Any]) -> Dict[str, Any]:
     if not title:
         return {**headline_dict, "summary_2to5": seed_summary}
     
-    # Try OpenAI client first
+    # Try OpenAI client first (lazy init)
+    _ensure_client()
     if CLIENT:
         try:
             messages = [
@@ -96,8 +101,8 @@ def summarize_single_headline(headline_dict: Dict[str, Any]) -> Dict[str, Any]:
             resp = CLIENT.chat.completions.create(
                 model=MODEL,
                 messages=messages,
-                temperature=0.4,
-                max_tokens=300,
+                temperature=1.0,
+                max_completion_tokens=300,
             )
             summary_text = resp.choices[0].message.content.strip()
             
@@ -107,8 +112,9 @@ def summarize_single_headline(headline_dict: Dict[str, Any]) -> Dict[str, Any]:
             
             return {**headline_dict, "summary_2to5": summary_text}
             
-        except Exception as e:
-            logger.warning(f"OpenAI client failed for headline summarization, trying direct API: {e}")
+        except Exception:
+            # Quietly fall back to REST without noisy warnings
+            pass
     
     # Try direct API call as fallback
     try:
