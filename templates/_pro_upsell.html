@@ -24,14 +24,8 @@
             {% endif %}
             
             <div class="d-flex flex-wrap gap-2">
-                <a href="{{ url_for('pricing') }}" class="btn btn-outline-primary btn-sm">
-                    <i class="fas fa-crown me-1"></i>See Pro Plans
-                </a>
                 <button type="button" class="btn btn-primary btn-sm" onclick="startProCheckout('monthly')">
-                    <i class="fas fa-rocket me-1"></i>Start Pro (Monthly)
-                </button>
-                <button type="button" class="btn btn-success btn-sm" onclick="startProCheckout('annual')">
-                    <i class="fas fa-calendar me-1"></i>Start Pro (Annual)
+                    <i class="fas fa-crown me-1"></i>Upgrade to Pro
                 </button>
             </div>
         </div>
@@ -39,17 +33,16 @@
     </div>
 </div>
 
+{% endif %}
+
 <script>
 async function startProCheckout(plan) {
     try {
         const response = await fetch('/api/billing/create-checkout-session', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ plan: plan })
         });
-        
         if (response.ok) {
             const data = await response.json();
             window.location.href = data.checkout_url;
@@ -63,5 +56,4 @@ async function startProCheckout(plan) {
     }
 }
 </script>
-{% endif %}
 

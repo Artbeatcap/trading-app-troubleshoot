@@ -47,11 +47,8 @@ def test_env_loading():
             # Test API call
             print("\n5. Testing API call:")
             response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "user", "content": "Say 'API is working!' in one sentence."}
-                ],
-                max_tokens=20
+                model="gpt-5-nano",
+                messages=[{"role": "user", "content": "Say 'Hello'"}],
             )
             result = response.choices[0].message.content
             print(f"✅ API call successful: {result}")

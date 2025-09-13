@@ -36,3 +36,6 @@ Write-Host "[INFO] Checking status..." -ForegroundColor Blue
 ssh ${REMOTE_USER}@${REMOTE_HOST} "systemctl is-active trading-analysis"
 
 Write-Host "🎉 Deployment Complete!" -ForegroundColor Green
+
+
+

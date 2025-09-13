@@ -55,6 +55,9 @@
                 z-index: 1050;
                 width: 280px;
                 transition: left 0.3s ease;
+                /* Allow mobile scrolling within sidebar */
+                height: 100dvh;
+                overflow-y: auto;
             }
             
             .sidebar.show {
@@ -536,7 +539,7 @@
                                 <small class="d-block text-white-50">AI Trading Analysis</small>
                             </h5>
                         </a>
-                        <small class="text-light">Welcome, {{ current_user.username if current_user.is_authenticated else 'Guest' }}</small>
+                        <small class="text-light">Welcome, {{ (current_user.display_name or current_user.username) if current_user.is_authenticated else 'Guest' }}</small>
                     </div>
                     
                     <ul class="nav flex-column">

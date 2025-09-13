@@ -39,15 +39,251 @@
                                 <span class="text-muted small" id="brief-date">Loading...</span>
                             </div>
                             <div class="card-body">
-                                <div class="ratio ratio-16x9" style="min-height: 600px;">
-                                    <iframe
-                                        id="brief-iframe"
-                                        style="border:0; width:100%; height:100%;"
-                                        loading="lazy"
-                                        src="{{ url_for('latest_brief') }}"
-                                        onload="updateBriefDate()">
-                                    </iframe>
+                                {% if brief %}
+                                <div class="market-brief">
+                                    <style>
+                                    /* Market Brief spacing and wrapping */
+                                    .market-brief section + section { margin-top: 1.25rem; }
+                                    .market-brief ol.list-group { margin-bottom: 0; }
+                                    .market-brief .list-group-item { padding: .75rem 1rem; }
+                                    .market-brief p { white-space: normal; word-break: break-word; }
+                                    </style>
+                                    <div class="space-y-6">
+                                      <header class="border-b pb-3">
+                                        <h1 class="h4 mb-1">Morning Market Brief</h1>
+                                        <div class="text-muted small">{{ brief.date_str }}</div>
+                                      </header>
+                                      <section>
+                                        <h2 class="h5 mb-2">Executive Summary</h2>
+                                        <p class="mb-0">{{ brief.executive_summary }}</p>
+                                      </section>
+                                      <section>
+                                        <h2 class="h5 mb-3">Key Market Headlines</h2>
+                                        <ol class="list-group list-group-numbered">
+                                          {% for h in brief.headlines %}
+                                          <li class="list-group-item">
+                                            <div class="d-flex flex-column">
+                                              <strong class="mb-1">{{ h.title }}</strong>
+                                              {% if h.source %}
+                                                <span class="text-muted small mb-1">Source: {{ h.source }}</span>
+                                              {% endif %}
+                                              <p class="mb-0">{{ h.summary }}</p>
+                                            </div>
+                                          </li>
+                                          {% endfor %}
+                                        </ol>
+                                      </section>
+                                      <section>
+                                        <h2 class="h5 mb-2">Technical Analysis &amp; Daily Range Insights</h2>
+                                        <p class="mb-0">{{ brief.technical_analysis }}</p>
+                                      </section>
+                                      <section>
+                                        <h2 class="h5 mb-2">Market Sentiment &amp; Outlook</h2>
+                                        <p class="mb-0">{{ brief.sentiment_outlook }}</p>
+                                      </section>
+                                      <section>
+                                        <h2 class="h5 mb-3">Key Levels to Watch</h2>
+                                        <div class="row g-3">
+                                          {% if brief.key_levels.SPY %}
+                                          <div class="col-md-6">
+                                            <div class="card h-100">
+                                              <div class="card-body">
+                                                <h3 class="h6 mb-2">SPY <span class="text-muted small">Last: {{ brief.key_levels.SPY.last }}</span></h3>
+                                                <div class="mb-2"><strong>Daily S:</strong> {{ brief.key_levels.SPY.S|join(' / ') }}</div>
+                                                <div class="mb-2"><strong>Daily R:</strong> {{ brief.key_levels.SPY.R|join(' / ') }}</div>
+                                                <div class="mb-2"><strong>Weekly S:</strong> {{ brief.key_levels.SPY.weekly_S|join(' / ') }}</div>
+                                                <div><strong>Weekly R:</strong> {{ brief.key_levels.SPY.weekly_R|join(' / ') }}</div>
+                                              </div>
+                                            </div>
+                                          </div>
+                                          {% endif %}
+                                          {% if brief.key_levels.QQQ %}
+                                          <div class="col-md-6">
+                                            <div class="card h-100">
+                                              <div class="card-body">
+                                                <h3 class="h6 mb-2">QQQ <span class="text-muted small">Last: {{ brief.key_levels.QQQ.last }}</span></h3>
+                                                <div class="mb-2"><strong>Daily S:</strong> {{ brief.key_levels.QQQ.S|join(' / ') }}</div>
+                                                <div class="mb-2"><strong>Daily R:</strong> {{ brief.key_levels.QQQ.R|join(' / ') }}</div>
+                                                <div class="mb-2"><strong>Weekly S:</strong> {{ brief.key_levels.QQQ.weekly_S|join(' / ') }}</div>
+                                                <div><strong>Weekly R:</strong> {{ brief.key_levels.QQQ.weekly_R|join(' / ') }}</div>
+                                              </div>
+                                            </div>
+                                          </div>
+                                          {% endif %}
+                                          {% if brief.key_levels.VIX %}
+                                          <div class="col-md-6">
+                                            <div class="card h-100">
+                                              <div class="card-body">
+                                                <h3 class="h6 mb-2">VIX</h3>
+                                                <div><strong>Last:</strong> {{ brief.key_levels.VIX.last }}</div>
+                                              </div>
+                                            </div>
+                                          </div>
+                                          {% endif %}
+                                        </div>
+                                      </section>
+                                      {% if brief.gappers_note %}
+                                      <section>
+                                        <h2 class="h5 mb-0">{{ brief.gappers_note }}</h2>
+                                      </section>
+                                      {% endif %}
+                                    </div>
                                 </div>
+                                {% else %}
+                                <div id="brief-preview" class="brief-preview" style="max-height: 600px; overflow: auto; border: 1px solid #eee; border-radius: 8px; padding: 12px; background: #fff;"></div>
+
+                                <style>
+                                  .mb-section { margin: 1rem 0 1.25rem; }
+                                  .mb-section h3 {
+                                    font-size: 1.05rem; font-weight: 700; margin: 0 0 .5rem;
+                                    padding-bottom: .25rem; border-bottom: 2px solid rgba(13,110,253,.15); color: #0d6efd;
+                                  }
+                                  ol.mb-headlines { padding-left: 1.25rem; margin-bottom: 0; }
+                                  ol.mb-headlines li + li { margin-top: .35rem; }
+                                  .levels-card {
+                                    background: #fff7e6; border: 1px solid #ffe4b5; border-left: 4px solid #f0ad4e;
+                                    border-radius: .5rem; padding: .75rem .9rem;
+                                  }
+                                  .levels-card .ticker { font-weight: 700; margin-right: .25rem; }
+                                  .levels-card .s { color: #198754; font-weight: 600; }
+                                  .levels-card .r { color: #dc3545; font-weight: 600; }
+                                  .brief-structured .source { color:#6c757d; font-size:.875rem; display:block; }
+                                </style>
+
+                                <script>
+                                (function () {
+                                  const root = document.getElementById('brief-preview');
+                                  if (!root) return;
+
+                                  fetch('{{ url_for('latest_brief') }}', { credentials: 'same-origin' })
+                                    .then(r => r.text())
+                                    .then(html => {
+                                      root.innerHTML = html;
+                                      // Try to set date label from first <p>
+                                      try {
+                                        const p = root.querySelector('p');
+                                        if (p && p.textContent.trim()) {
+                                          const el = document.getElementById('brief-date');
+                                          if (el) el.textContent = p.textContent.trim();
+                                        }
+                                      } catch (e) {}
+
+                                      if (root.classList.contains('brief-structured')) return;
+                                      const raw = (root.innerText || '').replace(/\u00A0/g, ' ').trim();
+                                      if (!raw) return;
+
+                                      function sliceBetween(label) {
+                                        const titles = [
+                                          'Executive Summary',
+                                          "What's moving",
+                                          'Key Market Headlines',
+                                          'Technical Analysis & Daily Range Insights',
+                                          'Market Sentiment & Outlook',
+                                          'Key Levels to Watch',
+                                          'Gapping Stocks',
+                                          'Saturday','Sunday','Monday','Tuesday','Wednesday','Thursday','Friday'
+                                        ];
+                                        const lower = raw.toLowerCase();
+                                        const i = lower.indexOf(label.toLowerCase());
+                                        if (i < 0) return '';
+                                        let j = raw.length;
+                                        for (const t of titles) {
+                                          const k = lower.indexOf(t.toLowerCase(), i + label.length);
+                                          if (k > -1) j = Math.min(j, k);
+                                        }
+                                        return raw.slice(i + label.length, j).trim();
+                                      }
+
+                                      const exec  = sliceBetween('Executive Summary');
+                                      const move  = sliceBetween("What's moving");
+                                      const heads = sliceBetween('Key Market Headlines');
+                                      const tech  = sliceBetween('Technical Analysis & Daily Range Insights');
+                                      const senti = sliceBetween('Market Sentiment & Outlook');
+                                      const levels= sliceBetween('Key Levels to Watch');
+
+                                      const preservedHeader = (() => {
+                                        const clone = root.cloneNode(true);
+                                        const walker = document.createTreeWalker(clone, NodeFilter.SHOW_ELEMENT, null);
+                                        let firstBlock = null;
+                                        while (walker.nextNode()) {
+                                          const n = walker.currentNode;
+                                          const style = window.getComputedStyle ? window.getComputedStyle(n) : null;
+                                          const display = style ? style.display : '';
+                                          if (['block','flex','grid'].includes(display) || /^H[1-6]$/.test(n.tagName)) { firstBlock = n; break; }
+                                        }
+                                        const headerWrap = document.createElement('div');
+                                        if (firstBlock) headerWrap.appendChild(firstBlock.cloneNode(true));
+                                        return headerWrap.innerHTML;
+                                      })();
+
+                                      function section(title, html) {
+                                        if (!html) return '';
+                                        return `\n      <section class="mb-section">\n        <h3>${title}</h3>\n        <div>${html}</div>\n      </section>`;
+                                      }
+
+                                      function formatHeadlines(text) {
+                                        if (!text) return '';
+                                        const parts = text
+                                          .replace(/\s+/g, ' ')
+                                          .split(/\s(?=\d+\.\s)/g)
+                                          .map(s => s.replace(/^\d+\.\s*/, '').trim())
+                                          .filter(Boolean);
+                                        if (!parts.length) return `<p>${text}</p>`;
+                                        const li = parts.map(h => {
+                                          const m = h.match(/(.*?)(?:\s+Source:\s*([^]+?)\s+Summary:\s*([^]+))?$/i);
+                                          if (!m) return `<li>${h}</li>`;
+                                          const [, headline, source, summary] = m;
+                                          return `<li><div>${headline}</div>${
+                                            source ? `<span class="source">Source: ${source}</span>` : ''
+                                          }${
+                                            summary ? `<div class="small text-muted mt-1">${summary}</div>` : ''
+                                          }</li>`;
+                                        }).join('');
+                                        return `<ol class="mb-headlines">${li}</ol>`;
+                                      }
+
+                                      function formatLevels(text) {
+                                        if (!text) return '';
+                                        const lines = text.split(/\n| - /g).map(s => s.trim()).filter(Boolean);
+                                        const rows = [];
+                                        lines.forEach(line => {
+                                          const m = line.match(/^([A-Z.\-]{2,6})\s*[—-]\s*(.*)$/);
+                                          if (!m) return;
+                                          const [, ticker, rest] = m;
+                                          const grab = (label) => {
+                                            const mm = rest.match(new RegExp(label + '\\s*:\\s*([^;]+)', 'i'));
+                                            return mm ? mm[1].trim() : '';
+                                          };
+                                          const dailyS = grab('Daily\\s*S'), dailyR = grab('R');
+                                          const weeklyS = grab('Weekly\\s*S');
+                                          const allR = rest.match(/R:\\s*([^;]+)/gi);
+                                          const weeklyR = allR && allR[1] ? allR[1].replace(/^R:\\s*/i,'').trim() : '';
+
+                                          rows.push(`\n        <div class="mb-1">\n          <span class="ticker">${ticker}</span> —\n          <span class="s">S:</span> ${dailyS}${weeklyS ? `; <span class="s">Weekly S:</span> ${weeklyS}` : ''}\n          ; <span class="r">R:</span> ${dailyR}${weeklyR ? `; <span class="r">Weekly R:</span> ${weeklyR}` : ''}\n        </div>\n      `);
+                                        });
+                                        return rows.length ? `<div class="levels-card">${rows.join('')}</div>` : `<p>${text}</p>`;
+                                      }
+
+                                      const html =
+                                        (preservedHeader || '') +
+                                        section('Executive Summary', exec ? `<p>${exec}</p>` : '') +
+                                        section("What's moving — After-hours & Premarket", move ? `<p>${move}</p>` : '') +
+                                        section('Key Market Headlines', formatHeadlines(heads)) +
+                                        section('Technical Analysis & Daily Range Insights', tech ? `<p>${tech}</p>` : '') +
+                                        section('Market Sentiment & Outlook', senti ? `<p>${senti}</p>` : '') +
+                                        section('Key Levels to Watch', formatLevels(levels));
+
+                                      if (html.replace(/\s+/g,'').length) {
+                                        root.innerHTML = html;
+                                        root.classList.add('brief-structured');
+                                      }
+                                    })
+                                    .catch(() => {
+                                      root.innerHTML = '<div class="text-muted">Unable to load the latest brief.</div>';
+                                    });
+                                })();
+                                </script>
+                                {% endif %}
                             </div>
                         </div>
 
@@ -136,6 +372,7 @@
         <!-- SIDEBAR WIDGETS -->
         <div class="col-12 col-lg-3">
             <!-- subscribe card -->
+            {% if not subscribed %}
             <div class="card mb-4">
                 <div class="card-body">
                     <h5 class="card-title"><i class="fas fa-envelope me-2"></i>Subscribe to Market Briefs</h5>
@@ -150,6 +387,7 @@
                     </form>
                 </div>
             </div>
+            {% endif %}
 
             <!-- benefits -->
             <div class="card mb-4">

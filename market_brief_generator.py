@@ -602,7 +602,7 @@ def summarize_news_weekly() -> str:
     )
 
     resp = openai_client.chat.completions.create(
-        model="gpt-4o-mini-2024-07-18",
+        model="gpt-5-nano",
         messages=[{"role":"system","content":WEEKLY_SYSTEM},
                   {"role":"user","content":user_prompt}],
         max_tokens=2200,
@@ -868,7 +868,7 @@ Focus on major market-moving news (Fed, economic data, earnings, commodities, yi
 Return only the 7 items in this format — no extra text, no sources, no links."""
         
         data = {
-            "model": "gpt-4o-mini",
+            "model": "gpt-5-nano",
             "messages": [
                 {"role": "system", "content": "You are a financial news analyst providing current market headlines with trader-friendly summaries."},
                 {"role": "user", "content": prompt}
@@ -1538,7 +1538,7 @@ Make it professional, concise, and actionable for traders. Focus on what's drivi
 
     try:
         response = openai_client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-5-nano",
             messages=[
                 {"role": "system", "content": "You are a professional market analyst creating concise stock summaries for a morning brief. Format responses with clear headings and professional tone."},
                 {"role": "user", "content": prompt}
@@ -1599,7 +1599,7 @@ def summarize_news(headlines: List[Dict[str, Any]], expected_range: Dict[str, An
     try:
         # openai>=1.x client
         response = openai_client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-5-nano",
             messages=[
                 {"role": "system", "content": BRIEF_SYSTEM},
                 {"role": "user", "content": user_prompt}

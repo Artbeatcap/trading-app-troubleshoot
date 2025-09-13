@@ -11,6 +11,8 @@ from datetime import datetime, timedelta
 import json
 import re
 from models import TradeAnalysis, db
+from io import BytesIO
+from PIL import Image
 
 
 class TradingAIAnalyzer:
@@ -19,7 +21,7 @@ class TradingAIAnalyzer:
     def __init__(self):
         """Initialize the AI analyzer without enforcing the API key."""
         self.api_key = os.getenv("OPENAI_API_KEY")
-        self.model = "gpt-4"  # Use GPT-4 for better analysis
+        self.model = "gpt-5-nano"  # Default AI model for analysis
         self.client = None
 
     def _ensure_api_key(self):
@@ -171,16 +173,67 @@ class TradingAIAnalyzer:
             # Generate analysis prompt
             prompt = self._create_trade_analysis_prompt(trade_data)
 
-            # Get AI analysis
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": self._get_system_prompt()},
-                    {"role": "user", "content": prompt},
-                ],
-                max_tokens=2000,
-                temperature=0.7,
-            )
+            # Try to include chart images if available
+            entry_image_filename = getattr(trade, "entry_chart_image", None)
+            exit_image_filename = getattr(trade, "exit_chart_image", None)
+
+            entry_data_url = None
+            exit_data_url = None
+
+            if entry_image_filename:
+                entry_data_url = self._prepare_image_data_url(entry_image_filename)
+            if exit_image_filename:
+                exit_data_url = self._prepare_image_data_url(exit_image_filename)
+
+            using_images = bool(entry_data_url or exit_data_url)
+
+            if using_images:
+                # Compose mixed content with images for a vision-capable model
+                content_parts = [
+                    {
+                        "type": "text",
+                        "text": (
+                            "You are a trading coach. Analyze the trade using BOTH the structured fields "
+                            "and the chart images if provided. Prioritize identifying timeframe, trend, key levels, patterns, "
+                            "indicator states, entry/exit quality, and improvements."
+                        ),
+                    },
+                    {"type": "text", "text": prompt},
+                ]
+
+                if entry_data_url:
+                    content_parts.append({
+                        "type": "image_url",
+                        "image_url": {"url": entry_data_url},
+                    })
+                if exit_data_url:
+                    content_parts.append({
+                        "type": "image_url",
+                        "image_url": {"url": exit_data_url},
+                    })
+
+                # Use a vision-capable model when images are present
+                vision_model = os.getenv("ANALYSIS_VISION_MODEL", "gpt-5-nano")
+                response = self.client.chat.completions.create(
+                    model=vision_model,
+                    messages=[
+                        {"role": "system", "content": self._get_system_prompt()},
+                        {"role": "user", "content": content_parts},
+                    ],
+                    max_tokens=2000,
+                    temperature=0.7,
+                )
+            else:
+                # Text-only analysis (existing behavior)
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": self._get_system_prompt()},
+                        {"role": "user", "content": prompt},
+                    ],
+                    max_tokens=2000,
+                    temperature=0.7,
+                )
 
             analysis_text = response.choices[0].message.content
 
@@ -221,6 +274,41 @@ class TradingAIAnalyzer:
         except Exception as e:
             print(f"DEBUG: Exception in analyze_trade: {str(e)}")
             print(f"DEBUG: Exception type: {type(e)}")
+            return None
+
+    def _prepare_image_data_url(self, filename: str) -> str | None:
+        """Load an uploaded image from static/uploads and return a base64 data URL.
+
+        If the image is wider than 1600px, downscale to 1280px width to reduce tokens.
+        Returns None if the file cannot be loaded.
+        """
+        try:
+            # Resolve absolute path in uploads
+            uploads_dir = os.path.join(os.getcwd(), "static", "uploads")
+            image_path = os.path.join(uploads_dir, filename)
+
+            if not os.path.exists(image_path):
+                print(f"DEBUG: Image not found at path: {image_path}")
+                return None
+
+            # Open and optionally downscale
+            with Image.open(image_path) as img:
+                img = img.convert("RGB")
+                width, height = img.size
+                if width and width > 1600:
+                    # Maintain aspect ratio; target max width 1280
+                    img.thumbnail((1280, int(1280 * height / max(width, 1))), Image.LANCZOS)
+
+                # Encode to PNG in-memory
+                buffer = BytesIO()
+                img.save(buffer, format="PNG", optimize=True)
+                buffer.seek(0)
+
+            import base64
+            b64 = base64.b64encode(buffer.read()).decode("utf-8")
+            return f"data:image/png;base64,{b64}"
+        except Exception as e:
+            print(f"DEBUG: Failed to prepare image data URL for {filename}: {e}")
             return None
 
     def analyze_daily_performance(self, journal_entry, trades):

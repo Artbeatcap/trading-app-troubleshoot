@@ -134,3 +134,6 @@ const isMobile = window.innerWidth <= 768 ||
 ---
 
 **🎉 The sidebar now behaves exactly as requested: hidden by default, only showing when the dropdown button is clicked, and staying hidden on new pages!**
+
+
+

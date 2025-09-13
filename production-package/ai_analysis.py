@@ -19,7 +19,7 @@ class TradingAIAnalyzer:
     def __init__(self):
         """Initialize the AI analyzer without enforcing the API key."""
         self.api_key = os.getenv("OPENAI_API_KEY")
-        self.model = "gpt-4"  # Use GPT-4 for better analysis
+        self.model = "gpt-5-nano"  # Default AI model for analysis
         self.client = None
 
     def _ensure_api_key(self):

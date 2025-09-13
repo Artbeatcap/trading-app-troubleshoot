@@ -64,7 +64,7 @@ Focus on major market-moving news like:
 Make sure the headlines are current and relevant to today's market conditions. Return only the formatted headlines, no additional text."""
 
         data = {
-            "model": "gpt-4o-mini",
+            "model": "gpt-5-nano",
             "messages": [
                 {"role": "system", "content": "You are a financial news analyst providing current market headlines."},
                 {"role": "user", "content": prompt}

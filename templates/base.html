@@ -58,7 +58,8 @@
                 z-index: 1050;
                 width: 280px;
                 transition: left 0.3s ease;
-                height: 100vh;
+                /* Use dynamic viewport height to avoid iOS/Android URL bar issues */
+                height: 100dvh;
                 overflow-y: auto;
                 -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
                 scrollbar-width: thin; /* Firefox */
@@ -109,7 +110,8 @@
                 flex: 1;
                 overflow-y: auto;
                 padding-top: 10px;
-                padding-bottom: 20px;
+                /* Extra bottom padding so bottom links like Logout are not cut off */
+                padding-bottom: 32px;
                 -webkit-overflow-scrolling: touch;
             }
             
@@ -568,6 +570,15 @@
                 opacity: 1;
                 visibility: visible;
             }
+            
+            /* CRITICAL: Completely disable overlay on desktop */
+            @media (min-width: 769px) {
+                .oauth-redirect-fix {
+                    display: none !important;
+                    opacity: 0 !important;
+                    visibility: hidden !important;
+                }
+            }
         }
         /* Dark mode overrides */
         body.dark-mode {
@@ -642,7 +653,7 @@
                                 <small class="d-block text-white-50">AI Trading Analysis</small>
                             </h5>
                         </a>
-                        <small class="text-light">Welcome, {{ current_user.username if current_user.is_authenticated else 'Guest' }}</small>
+                        <small class="text-light">Welcome, {{ (current_user.display_name or current_user.username) if current_user.is_authenticated else 'Guest' }}</small>
                     </div>
                     
                     <!-- Scrollable navigation content -->
@@ -813,6 +824,23 @@
             const mainContent = document.querySelector('.main-content');
             const oauthRedirectFix = document.getElementById('oauthRedirectFix');
             
+            // IMMEDIATE: Force hide any stuck overlay on page load
+            if (oauthRedirectFix) {
+                oauthRedirectFix.classList.remove('show');
+                oauthRedirectFix.style.opacity = '0';
+                oauthRedirectFix.style.visibility = 'hidden';
+                console.log('Immediate cleanup: hiding any stuck OAuth overlay');
+            }
+
+            // Clear stale mobile preference when on auth pages in desktop view
+            const authPageDesktop = (window.location.pathname === '/login' || window.location.pathname === '/register' || window.location.pathname === '/logout') && window.innerWidth > 768;
+            if (authPageDesktop) {
+                if (sessionStorage.getItem('mobile_preference') === 'true') {
+                    console.log('Clearing stale mobile_preference flag for desktop auth page');
+                    sessionStorage.removeItem('mobile_preference');
+                }
+            }
+            
             // Ensure sidebar is hidden on page load (mobile only)
             if (window.innerWidth <= 768) {
                 if (sidebar) {
@@ -980,45 +1008,52 @@
             function handleMobileOAuthRedirect() {
                 const isMobile = window.innerWidth <= 768;
                 const urlParams = new URLSearchParams(window.location.search);
-                // More specific OAuth redirect detection
+                
+                // STRICT OAuth redirect detection - only for actual Google OAuth flows
                 const hasOAuthCode = urlParams.has('code') && urlParams.get('code').length > 20; // OAuth codes are typically long
-                const isGoogleLoginPath = window.location.pathname.includes('/login/google/') || window.location.pathname.includes('/google_login');
-                const isOAuthRedirect = hasOAuthCode || isGoogleLoginPath;
-                const mobilePreference = sessionStorage.getItem('mobile_preference') === 'true';
+                const isGoogleOAuthPath = window.location.pathname.includes('/login/google/authorized') || 
+                                         window.location.pathname.includes('/google/authorized') ||
+                                         window.location.pathname.includes('/oauth2callback');
+                const isOAuthRedirect = hasOAuthCode && isGoogleOAuthPath;
                 
-                // Additional check: ensure we're not on regular login/register pages
-                const isRegularAuthPage = window.location.pathname === '/login' || window.location.pathname === '/register';
+                // Additional checks to prevent false positives
+                const isRegularAuthPage = window.location.pathname === '/login' || 
+                                         window.location.pathname === '/register' ||
+                                         window.location.pathname === '/google_login';
+                const isAuthenticated = document.body.hasAttribute('data-user-authenticated');
                 
-                if (isMobile || mobilePreference) {
-                    ensureMobileViewport();
-                    
-                    // Store mobile preference
-                    sessionStorage.setItem('mobile_preference', 'true');
-                    
-                    // Handle OAuth redirect on mobile - only show for actual OAuth flows
-                    // AND not on regular auth pages
-                    if (isOAuthRedirect && isMobile && (hasOAuthCode || isGoogleLoginPath) && !isRegularAuthPage) {
-                        console.log('OAuth redirect detected on mobile, showing loading overlay');
-                        if (oauthRedirectFix) {
-                            oauthRedirectFix.classList.add('show');
-                            
-                            // Hide overlay after a delay to allow page to load
-                            setTimeout(() => {
-                                oauthRedirectFix.classList.remove('show');
-                            }, 2000);
-                        }
-                    } else {
-                        // Ensure overlay is hidden if not in OAuth flow
-                        if (oauthRedirectFix && oauthRedirectFix.classList.contains('show')) {
-                            oauthRedirectFix.classList.remove('show');
-                        }
-                    }
-                } else {
-                    // Not on mobile, ensure overlay is hidden
+                // CRITICAL: Never show overlay on desktop
+                if (!isMobile) {
                     if (oauthRedirectFix && oauthRedirectFix.classList.contains('show')) {
+                        console.log('Desktop detected, hiding OAuth overlay');
                         oauthRedirectFix.classList.remove('show');
                     }
+                    return; // Exit early on desktop
                 }
+                
+                // Only proceed on mobile
+                ensureMobileViewport();
+                sessionStorage.setItem('mobile_preference', 'true');
+                
+                            // Show overlay ONLY for actual OAuth redirects on mobile
+            // AND only if we have a valid OAuth code AND are on the correct path
+            if (isOAuthRedirect && isMobile && !isRegularAuthPage && !isAuthenticated && hasOAuthCode && isGoogleOAuthPath) {
+                console.log('OAuth redirect detected on mobile, showing loading overlay');
+                if (oauthRedirectFix) {
+                    oauthRedirectFix.classList.add('show');
+                    
+                    // Hide overlay after a delay to allow page to load
+                    setTimeout(() => {
+                        oauthRedirectFix.classList.remove('show');
+                    }, 2000);
+                }
+            } else {
+                // Ensure overlay is hidden in all other cases
+                if (oauthRedirectFix && oauthRedirectFix.classList.contains('show')) {
+                    console.log('Hiding OAuth overlay - not in OAuth flow');
+                    oauthRedirectFix.classList.remove('show');
+                }
+            }
             }
             
             // Check if we're on mobile and ensure proper viewport
@@ -1042,12 +1077,56 @@
             // Handle OAuth redirects
             handleMobileOAuthRedirect();
             
+            // CRITICAL: Force hide overlay on desktop immediately
+            if (window.innerWidth > 768) {
+                if (oauthRedirectFix && oauthRedirectFix.classList.contains('show')) {
+                    console.log('Desktop detected, immediately hiding OAuth overlay');
+                    oauthRedirectFix.classList.remove('show');
+                }
+                // Completely disable overlay functionality on desktop
+                if (oauthRedirectFix) {
+                    oauthRedirectFix.style.display = 'none';
+                    oauthRedirectFix.style.pointerEvents = 'none';
+                }
+            }
+            
+            // ADDITIONAL: Force hide overlay if no OAuth conditions are met
+            const urlParams = new URLSearchParams(window.location.search);
+            const hasOAuthCode = urlParams.has('code') && urlParams.get('code').length > 20;
+            const isGoogleOAuthPath = window.location.pathname.includes('/login/google/authorized') || 
+                                     window.location.pathname.includes('/google/authorized') ||
+                                     window.location.pathname.includes('/oauth2callback');
+            
+            if (!hasOAuthCode && !isGoogleOAuthPath) {
+                if (oauthRedirectFix && oauthRedirectFix.classList.contains('show')) {
+                    console.log('No OAuth conditions met, hiding overlay');
+                    oauthRedirectFix.classList.remove('show');
+                }
+                // Completely disable overlay when not in OAuth flow
+                if (oauthRedirectFix) {
+                    oauthRedirectFix.style.pointerEvents = 'none';
+                    oauthRedirectFix.style.opacity = '0';
+                    oauthRedirectFix.style.visibility = 'hidden';
+                }
+            }
+            
             // Additional check: hide overlay if user is already authenticated
             // This prevents the overlay from showing after successful login
             const isAuthenticated = document.body.classList.contains('authenticated') || 
                                    document.querySelector('[data-user-authenticated="true"]') !== null;
             if (isAuthenticated && oauthRedirectFix && oauthRedirectFix.classList.contains('show')) {
                 console.log('User is authenticated, hiding OAuth overlay');
+                oauthRedirectFix.classList.remove('show');
+            }
+            
+            // CRITICAL: Hide overlay on logout and unauthenticated pages
+            const isOnAuthPage = window.location.pathname === '/login' || 
+                                 window.location.pathname === '/register' ||
+                                 window.location.pathname === '/logout' ||
+                                 window.location.pathname === '/';
+            
+            if (isOnAuthPage && oauthRedirectFix && oauthRedirectFix.classList.contains('show')) {
+                console.log('On auth/logout page, hiding OAuth overlay');
                 oauthRedirectFix.classList.remove('show');
             }
             
@@ -1084,6 +1163,22 @@
             // Re-apply fixes on window resize
             window.addEventListener('resize', function() {
                 setTimeout(fixMobileOAuthIssues, 100);
+                
+                // Handle overlay visibility on resize
+                if (window.innerWidth > 768) {
+                    // Desktop - disable overlay
+                    if (oauthRedirectFix) {
+                        oauthRedirectFix.style.display = 'none';
+                        oauthRedirectFix.style.pointerEvents = 'none';
+                        oauthRedirectFix.classList.remove('show');
+                    }
+                } else {
+                    // Mobile - re-enable overlay if needed
+                    if (oauthRedirectFix) {
+                        oauthRedirectFix.style.display = 'flex';
+                        oauthRedirectFix.style.pointerEvents = 'auto';
+                    }
+                }
             });
             
             // Handle page visibility changes (for OAuth redirects)
@@ -1162,8 +1257,12 @@
                     const isMobile = window.innerWidth <= 768;
                     const urlParams = new URLSearchParams(window.location.search);
                     const hasOAuthCode = urlParams.has('code') && urlParams.get('code').length > 20;
-                    const isGoogleLoginPath = window.location.pathname.includes('/login/google/') || window.location.pathname.includes('/google_login');
-                    const isRegularAuthPage = window.location.pathname === '/login' || window.location.pathname === '/register';
+                    const isGoogleOAuthPath = window.location.pathname.includes('/login/google/authorized') || 
+                                             window.location.pathname.includes('/google/authorized') ||
+                                             window.location.pathname.includes('/oauth2callback');
+                    const isRegularAuthPage = window.location.pathname === '/login' || 
+                                             window.location.pathname === '/register' ||
+                                             window.location.pathname === '/google_login';
                     const isAuthenticated = document.body.hasAttribute('data-user-authenticated');
                     
                     // Hide overlay if conditions are no longer met
@@ -1171,8 +1270,55 @@
                         console.log('Periodic check: hiding OAuth overlay due to changed conditions');
                         oauthRedirectFix.classList.remove('show');
                     }
+                    
+                    // ADDITIONAL: Hide overlay if no OAuth code in URL (logout scenario)
+                    if (!hasOAuthCode && oauthRedirectFix.classList.contains('show')) {
+                        console.log('No OAuth code in URL, hiding overlay (logout scenario)');
+                        oauthRedirectFix.classList.remove('show');
+                    }
                 }
-            }, 5000); // Check every 5 seconds
+            }, 2000); // Check every 2 seconds for faster response
+            
+            // Additional safety: hide overlay on any page navigation
+            let navPath = window.location.pathname;
+            setInterval(() => {
+                if (window.location.pathname !== navPath) {
+                    navPath = window.location.pathname;
+                    if (oauthRedirectFix && oauthRedirectFix.classList.contains('show')) {
+                        console.log('Page navigation detected, hiding OAuth overlay');
+                        oauthRedirectFix.classList.remove('show');
+                    }
+                }
+            }, 1000);
+            
+            // CRITICAL: Comprehensive cleanup for logout and auth pages
+            function forceHideOverlay() {
+                if (oauthRedirectFix) {
+                    oauthRedirectFix.classList.remove('show');
+                    oauthRedirectFix.style.opacity = '0';
+                    oauthRedirectFix.style.visibility = 'hidden';
+                    console.log('Force hiding OAuth overlay');
+                }
+            }
+            
+            // Run cleanup on page load
+            forceHideOverlay();
+            
+            // Run cleanup after DOM is fully loaded
+            document.addEventListener('DOMContentLoaded', forceHideOverlay);
+            
+            // Run cleanup after window load
+            window.addEventListener('load', forceHideOverlay);
+            
+            // Run cleanup on beforeunload (when leaving page)
+            window.addEventListener('beforeunload', forceHideOverlay);
+            
+            // Run cleanup on page visibility change
+            document.addEventListener('visibilitychange', function() {
+                if (document.hidden) {
+                    forceHideOverlay();
+                }
+            });
         });
         
         // Auto-hide alerts after 5 seconds

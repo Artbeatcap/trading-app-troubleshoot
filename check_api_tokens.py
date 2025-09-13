@@ -65,9 +65,8 @@ def check_api_tokens():
             from openai import OpenAI
             client = OpenAI(api_key=openai_token)
             response = client.chat.completions.create(
-                model="gpt-4o-mini",
+                model="gpt-5-nano",
                 messages=[{"role": "user", "content": "test"}],
-                max_tokens=5
             )
             print("✅ Token is valid!")
         except Exception as e:

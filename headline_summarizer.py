@@ -6,7 +6,7 @@ import json
 
 logger = logging.getLogger(__name__)
 
-MODEL = os.getenv("SUMMARY_MODEL", "gpt-4o-mini")
+MODEL = os.getenv("SUMMARY_MODEL", "gpt-5-nano")
 
 # Check if OpenAI is available
 try:
@@ -44,7 +44,7 @@ def _prompt(title: str, seed_summary: str = None) -> str:
     )
     return base
 
-def call_openai_api_directly(api_key: str, messages: list, model: str = "gpt-4o-mini") -> str:
+def call_openai_api_directly(api_key: str, messages: list, model: str = "gpt-5-nano") -> str:
     """Call OpenAI API directly using requests to bypass client issues"""
     try:
         headers = {

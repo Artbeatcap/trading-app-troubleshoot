@@ -64,9 +64,8 @@ def test_apis():
             from openai import OpenAI
             client = OpenAI(api_key=openai_token)
             response = client.chat.completions.create(
-                model="gpt-4o-mini",
+                model="gpt-5-nano",
                 messages=[{"role": "user", "content": "Say 'test'"}],
-                max_tokens=5
             )
             print("✅ OpenAI API working!")
         except Exception as e:

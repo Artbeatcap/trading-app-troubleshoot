@@ -340,7 +340,7 @@ class SettingsForm(FlaskForm):
         ('America/Chicago', 'America/Chicago'),
         ('America/Denver', 'America/Denver'),
         ('America/Los_Angeles', 'America/Los_Angeles')
-    ])
+    ], validate_choice=False, default='UTC')
     
     # API and account settings
     api_key = StringField('API Key', validators=[Optional(), Length(max=64)],
@@ -353,11 +353,13 @@ class SettingsForm(FlaskForm):
     
     # Analysis preferences
     auto_analyze_trades = BooleanField('Auto-analyze closed trades')
-    analysis_detail_level = SelectField('Analysis Detail Level', choices=[
-        ('brief', 'Brief'),
-        ('detailed', 'Detailed'),
-        ('comprehensive', 'Comprehensive')
-    ])
+    analysis_detail_level = SelectField(
+        'Analysis Detail Level',
+        choices=[('brief', 'Brief'), ('detailed', 'Detailed'), ('comprehensive', 'Comprehensive')],
+        validators=[Optional()],
+        validate_choice=False,
+        default='detailed'
+    )
     
     # Risk management
     max_daily_loss = FloatField('Max Daily Loss ($)', validators=[Optional(), NumberRange(min=0)],
@@ -366,12 +368,14 @@ class SettingsForm(FlaskForm):
                                   render_kw={"step": "0.01", "placeholder": "Optional position limit"})
     
     # Display preferences
-    trades_per_page = SelectField('Trades Per Page', choices=[
-        (10, '10'),
-        (20, '20'),
-        (50, '50'),
-        (100, '100')
-    ], coerce=int)
+    trades_per_page = SelectField(
+        'Trades Per Page',
+        choices=[(10, '10'), (20, '20'), (50, '50'), (100, '100')],
+        coerce=int,
+        validators=[Optional()],
+        validate_choice=False,
+        default=20
+    )
     
     submit = SubmitField('Save Changes')
 

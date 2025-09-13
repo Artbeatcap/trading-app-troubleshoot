@@ -145,7 +145,13 @@
                             </tr>
                             <tr>
                                 <td class="text-muted">Implied Volatility:</td>
-                                <td>{{ "%.1f"|format(trade.implied_volatility) }}% if trade.implied_volatility else 'N/A' }}</td>
+                                <td>
+                                    {% if trade.implied_volatility %}
+                                        {{ "%.1f"|format(trade.implied_volatility) }}%
+                                    {% else %}
+                                        N/A
+                                    {% endif %}
+                                </td>
                             </tr>
                             <tr>
                                 <td class="text-muted">Moneyness:</td>

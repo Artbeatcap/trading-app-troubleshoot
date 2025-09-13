@@ -1,56 +1,83 @@
 #!/usr/bin/env python3
 """
-Check database tables
+Script to check database tables
 """
 
 import os
 import sys
+from datetime import datetime
 
-# Add the current directory to Python path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# Add the current directory to the Python path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from app import app, db
+from sqlalchemy import text
 
 def check_database_tables():
     """Check what tables exist in the database"""
-    try:
-        print("🔍 Checking Database Tables...")
-        print("=" * 40)
+    
+    with app.app_context():
+        print("Checking database tables...")
+        print("=" * 50)
         
-        # Import Flask app
-        from app import app
-        
-        # Run within application context
-        with app.app_context():
-            from models import db
-            from sqlalchemy import inspect
-            
-            inspector = inspect(db.engine)
-            tables = inspector.get_table_names()
-            
-            print(f"Found {len(tables)} tables:")
-            for table in sorted(tables):
-                print(f"  ✅ {table}")
-            
-            # Check for market brief related tables
-            market_brief_tables = [t for t in tables if 'market' in t.lower() or 'brief' in t.lower()]
-            print(f"\n📧 Market brief related tables ({len(market_brief_tables)}):")
-            for table in market_brief_tables:
-                print(f"  ✅ {table}")
-            
-            # Check if market_brief_subscriber table exists
-            if 'market_brief_subscriber' in tables:
-                print("\n✅ market_brief_subscriber table exists")
-            else:
-                print("\n❌ market_brief_subscriber table is missing")
-                print("   This table is needed for the market brief functionality")
-        
-        return True
-        
-    except Exception as e:
-        print(f"❌ Error checking database tables: {e}")
-        return False
+        try:
+            # Get all tables
+            with db.engine.connect() as conn:
+                result = conn.execute(text("""
+                    SELECT table_name 
+                    FROM information_schema.tables 
+                    WHERE table_schema = 'public' 
+                    ORDER BY table_name;
+                """))
+                
+                print("Tables in database:")
+                tables = []
+                for row in result:
+                    tables.append(row[0])
+                    print(f"  {row[0]}")
+                
+                print(f"\nTotal tables: {len(tables)}")
+                
+                # Check if user_settings table exists
+                if 'user_settings' in tables:
+                    print("\n✅ user_settings table exists")
+                    
+                    # Check table structure
+                    result = conn.execute(text("""
+                        SELECT column_name, data_type, is_nullable
+                        FROM information_schema.columns 
+                        WHERE table_name = 'user_settings'
+                        ORDER BY ordinal_position;
+                    """))
+                    
+                    print("\nuser_settings table structure:")
+                    for row in result:
+                        print(f"  {row[0]}: {row[1]} ({'NULL' if row[2] == 'YES' else 'NOT NULL'})")
+                        
+                else:
+                    print("\n❌ user_settings table does not exist")
+                    
+                # Check if users table exists and has dark_mode column
+                if 'users' in tables:
+                    print("\n✅ users table exists")
+                    
+                    # Check if dark_mode column exists
+                    result = conn.execute(text("""
+                        SELECT column_name, data_type
+                        FROM information_schema.columns 
+                        WHERE table_name = 'users' AND column_name = 'dark_mode';
+                    """))
+                    
+                    if result.fetchone():
+                        print("✅ dark_mode column exists in users table")
+                    else:
+                        print("❌ dark_mode column does not exist in users table")
+                        
+        except Exception as e:
+            print(f"❌ Error checking database: {e}")
+            import traceback
+            traceback.print_exc()
 
 if __name__ == "__main__":
-    success = check_database_tables()
-    if not success:
-        sys.exit(1)
+    check_database_tables()
 

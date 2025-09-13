@@ -3,6 +3,41 @@
 {% block title %}Dashboard - Options Plunge{% endblock %}
 
 {% block content %}
+{% if onboarding and not onboarding_dismissed and (not onboarding.has_trade or not onboarding.has_journal or not onboarding.has_analysis) %}
+<div class="alert alert-light border d-flex align-items-start mb-3 no-auto-hide" role="alert">
+    <div class="me-3">
+        <i class="fas fa-rocket text-primary"></i>
+    </div>
+    <div class="flex-grow-1">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <strong>First 2 minutes checklist</strong>
+            <span class="badge bg-primary">
+                {{ (onboarding.has_trade|int + onboarding.has_journal|int + onboarding.has_analysis|int) }}/3
+            </span>
+        </div>
+        <ul class="list-unstyled mb-0">
+            <li class="mb-2">
+                <i class="far fa-circle me-2 {% if onboarding.has_trade %}text-success fas fa-check-circle{% endif %}"></i>
+                <a href="{{ url_for('add_trade') }}" class="text-decoration-none">Add your first trade</a>
+            </li>
+            <li class="mb-2">
+                <i class="far fa-circle me-2 {% if onboarding.has_journal %}text-success fas fa-check-circle{% endif %}"></i>
+                <a href="{{ url_for('add_edit_journal') }}" class="text-decoration-none">Add journal entry</a>
+            </li>
+            <li>
+                <i class="far fa-circle me-2 {% if onboarding.has_analysis %}text-success fas fa-check-circle{% endif %}"></i>
+                <a href="{{ url_for('bulk_analysis') }}" class="text-decoration-none">Run AI analysis</a>
+            </li>
+        </ul>
+    </div>
+    <div class="ms-3 d-flex gap-2">
+        {% if onboarding.next_url %}
+        <a class="btn btn-sm btn-primary" href="{{ onboarding.next_url }}">Next</a>
+        {% endif %}
+        <button class="btn btn-sm btn-outline-secondary" id="dismissOnboardingBtn" type="button">Dismiss</button>
+    </div>
+</div>
+{% endif %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2">
         <i class="fas fa-tachometer-alt text-primary me-2"></i>
@@ -201,3 +236,34 @@
     </div>
 </div>
 {% endblock %} 
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+    const btn = document.getElementById('dismissOnboardingBtn');
+    if (!btn) return;
+    btn.addEventListener('click', async function(){
+        try {
+            const res = await fetch("{{ url_for('dismiss_onboarding') }}", {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            });
+            // Regardless of result, hide the checklist optimistically
+            const alertEl = btn.closest('.alert');
+            if (alertEl) {
+                alertEl.remove();
+            }
+        } catch (e) {
+            const alertEl = btn.closest('.alert');
+            if (alertEl) {
+                alertEl.remove();
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

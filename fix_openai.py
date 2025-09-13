@@ -33,7 +33,7 @@ def fix_openai_client():
         
         # Test API call
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-5-nano",
             messages=[{"role": "user", "content": "Say 'Hello'"}],
             max_tokens=10
         )
@@ -67,7 +67,7 @@ def fix_openai_client():
             
             # Test API call
             response = client.chat.completions.create(
-                model="gpt-4o-mini",
+                model="gpt-5-nano",
                 messages=[{"role": "user", "content": "Say 'Hello'"}],
                 max_tokens=10
             )
@@ -104,7 +104,7 @@ def fix_openai_client():
         
         # Test API call
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-5-nano",
             messages=[{"role": "user", "content": "Say 'Hello'"}],
             max_tokens=10
         )

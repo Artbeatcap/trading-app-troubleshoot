@@ -71,7 +71,7 @@ def check_env():
                 "Content-Type": "application/json"
             }
             data = {
-                "model": "gpt-4o-mini",
+                "model": "gpt-5-nano",
                 "messages": [{"role": "user", "content": "test"}],
                 "max_tokens": 5
             }

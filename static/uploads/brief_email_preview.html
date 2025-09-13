@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Morning Market Brief</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        /* Mobile-first responsive design */
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f8f9fa;
+            margin: 0;
+            padding: 10px;
+        }
+        
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 300;
+        }
+        
+        .header p {
+            margin: 10px 0 0 0;
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 20px;
+        }
+        
+        .section-header {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 8px;
+            margin: 20px 0 12px 0;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .market-snapshot {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border-left: 4px solid #3498db;
+        }
+        
+        .section-content {
+            background: #ffffff;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 12px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .subscriber-summary {
+            background: linear-gradient(135deg, #e8f4fd 0%, #d1ecf1 100%);
+            padding: 20px;
+            border-radius: 12px;
+            margin: 20px 0;
+            border-left: 5px solid #17a2b8;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        .summary-header-main {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            font-size: 20px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .summary-header-main i {
+            margin-right: 8px;
+            color: #17a2b8;
+        }
+        
+        .summary-content {
+            line-height: 1.6;
+        }
+        
+        .summary-header {
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 12px 0 6px 0;
+            font-size: 16px;
+        }
+        
+        .summary-list-item {
+            margin: 6px 0;
+            padding-left: 12px;
+            color: #495057;
+        }
+        
+        .summary-levels-header {
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 12px 0 6px 0;
+            font-size: 16px;
+        }
+        
+        .summary-level-item {
+            margin: 4px 0;
+            padding-left: 12px;
+            color: #495057;
+        }
+        
+        .summary-tomorrow {
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 12px 0 6px 0;
+            font-size: 16px;
+        }
+        
+        .summary-text {
+            margin: 6px 0;
+            color: #495057;
+        }
+        
+        .headline-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            border-left: 5px solid #3498db;
+            display: flex;
+            align-items: flex-start;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.08);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .headline-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 12px rgba(0,0,0,0.12);
+        }
+        
+        .headline-number {
+            color: #3498db;
+            font-weight: bold;
+            font-size: 18px;
+            margin-right: 12px;
+            min-width: 28px;
+            background: #e3f2fd;
+            padding: 6px 10px;
+            border-radius: 50%;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        
+        .headline-content {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .headline-title {
+            font-weight: bold;
+            color: #2c3e50;
+            font-size: 16px;
+            margin-bottom: 8px;
+            line-height: 1.4;
+        }
+        
+        .headline-summary {
+            color: #495057;
+            line-height: 1.6;
+            font-size: 14px;
+            margin-top: 6px;
+        }
+        
+        .gapping-stock-item {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 6px;
+            margin: 6px 0;
+            border-left: 3px solid #28a745;
+        }
+        
+        .ticker {
+            color: #2c3e50;
+            font-weight: bold;
+        }
+        
+        .move {
+            color: #28a745;
+            font-weight: 500;
+        }
+        
+        .why {
+            color: #6c757d;
+        }
+        
+        .key-levels {
+            background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border-left: 4px solid #ffc107;
+        }
+        
+        .level-item {
+            margin: 8px 0;
+            font-weight: 500;
+        }
+        
+        .support {
+            color: #28a745;
+        }
+        
+        .resistance {
+            color: #dc3545;
+        }
+        
+        /* Tablet and desktop styles */
+        @media (min-width: 768px) {
+            body {
+                padding: 20px;
+            }
+            
+            .container {
+                max-width: 800px;
+            }
+            
+            .header {
+                padding: 30px;
+            }
+            
+            .header h1 {
+                font-size: 28px;
+            }
+            
+            .header p {
+                font-size: 16px;
+            }
+            
+            .content {
+                padding: 30px;
+            }
+            
+            .section-header {
+                margin: 25px 0 15px 0;
+            }
+            
+            .market-snapshot {
+                padding: 20px;
+                margin: 20px 0;
+            }
+            
+            .section-content {
+                padding: 20px;
+                margin: 15px 0;
+            }
+            
+            .subscriber-summary {
+                padding: 25px;
+                margin: 25px 0;
+            }
+            
+            .summary-header-main {
+                margin-bottom: 20px;
+                font-size: 22px;
+            }
+            
+            .summary-header-main i {
+                margin-right: 10px;
+            }
+            
+            .summary-header {
+                margin: 15px 0 8px 0;
+            }
+            
+            .summary-list-item {
+                margin: 8px 0;
+                padding-left: 15px;
+            }
+            
+            .summary-levels-header {
+                margin: 15px 0 8px 0;
+            }
+            
+            .summary-level-item {
+                margin: 5px 0;
+                padding-left: 15px;
+            }
+            
+            .summary-tomorrow {
+                margin: 15px 0 8px 0;
+            }
+            
+            .summary-text {
+                margin: 8px 0;
+            }
+            
+            .headline-item {
+                padding: 25px;
+                margin: 25px 0;
+            }
+            
+            .headline-number {
+                font-size: 20px;
+                margin-right: 20px;
+                min-width: 30px;
+                padding: 8px 12px;
+            }
+            
+            .headline-title {
+                font-size: 17px;
+                margin-bottom: 10px;
+            }
+            
+            .headline-summary {
+                font-size: 15px;
+                margin-top: 8px;
+            }
+            
+            .gapping-stock-item {
+                padding: 12px;
+                margin: 8px 0;
+            }
+            
+            .key-levels {
+                padding: 20px;
+                margin: 20px 0;
+            }
+            
+            .level-item {
+                margin: 10px 0;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+
+        <div class="header">
+            <h1>Morning Market Brief</h1>
+            <p>Wednesday, September 03, 2025</p>
+        </div>
+
+        <div class="content">
+            
+        <div class="subscriber-summary">
+            <div class="summary-header-main">
+                <i class="fas fa-chart-line"></i>
+                <span>Subscriber Summary</span>
+            </div>
+            <div class="summary-content">
+                <div class="summary-header">**Today in one line**</div><div class="summary-list-item">- **SPY/QQQ** firm after mixed data; watch opening drive.</div><div class="summary-header">**AH & Premarket**</div><div class="summary-list-item">- **NVDA**: +2.1% — AI demand tailwind</div><div class="summary-list-item">- **TSLA**: -1.3% — margin concerns</div><div class="summary-header">**Levels to watch**</div><div class="summary-level-item">- Support: SPY S1/S2 from brief</div><div class="summary-level-item">- Resistance: SPY R1/R2 from brief</div><div class="summary-text">**Tomorrow**: Initial claims</div>
+            </div>
+        </div>
+        <hr style="margin: 30px 0; border: none; border-top: 2px solid #e9ecef;">
+        <p style="text-align: center; color: #6c757d; font-style: italic; font-size: 14px;">
+            This summary provides key market insights for active traders. For detailed analysis, visit our full market brief.
+        </p>
+
+            <div class="section-content">
+                
+<h2 class="section-header">Executive Summary
+Market conditions appear stable with key indices showing normal trading ranges. Focus on major economic catalysts and earnings reports for directional moves. The current market environment suggests a balanced risk-reward scenario for traders.
+<h2 class="section-header">What's moving — After-hours & Premarket</h2>
+
+</h2>
+
+<h2 class="section-header">Key Market Headlines
+1. Fed Signals Possible Rate Hike Pause
+   Source: Unknown
+   Summary: The Federal Reserve hinted that it may pause interest rate hikes as inflation shows signs of easing. This news boosted investor confidence, leading to a rally in tech stocks and a dip in bond yields, as traders assess the impact on economic growth.</h2>
+
+2. Oil Prices Surge Amid OPEC Production Cuts
+   Source: Unknown
+   Summary: Oil prices jumped after OPEC announced further production cuts, tightening supply in the market. This move is expected to support higher energy prices, impacting sectors like transportation and manufacturing.</h2>
+
+3. Major Tech Earnings Reports Beat Expectations
+   Source: Unknown
+   Summary: Several major tech companies reported earnings that exceeded analyst expectations, driving shares higher. Strong performance in cloud computing and advertising segments reassures investors about the tech sector’s resilience.</h2>
+
+4. Treasury Yields Climb on Economic Optimism
+   Source: Unknown
+   Summary: U.S. Treasury yields rose as investors reacted to positive economic data and potential Fed rate stability. Higher yields often indicate growing confidence in the economy, but they could also affect borrowing costs for consumers and businesses.</h2>
+
+5. Gold Prices Dip as Dollar Strengthens
+   Source: Unknown
+   Summary: Gold prices fell as the U.S. dollar gained strength against other currencies. A stronger dollar makes gold more expensive for foreign buyers, leading to decreased demand and lower prices in the precious metals market.</h2>
+
+</h2>
+
+<h2 class="section-header">Technical Analysis & Daily Range Insights
+Key support and resistance levels are being tested as markets consolidate. Monitor volume and momentum indicators for breakout signals. The expected trading ranges suggest moderate volatility with potential for directional moves on significant news.</h2>
+
+<h2 class="section-header">Market Sentiment & Outlook
+Risk sentiment remains balanced with mixed signals from various sectors. Traders should watch for sector rotation opportunities and prepare for potential market shifts based on upcoming economic data releases.</h2>
+
+<h2 class="section-header">Key Levels to Watch
+- SPY: $643.74 (Support: $627.65, Resistance: $659.83)
+- QQQ: $570.07 (Support: $552.97, Resistance: $587.17)
+- VIX: 16.72</h2>
+
+Note: This is a fallback summary. For AI-generated analysis, please check your OpenAI API configuration.
+
+            </div>
+
+            
+        <div class="section-content">
+            <h2 class="section-header">🚀 Gapping Stocks</h2></div>
+
+            <div class="key-levels">
+                <h3 style="margin-top: 0; color: #856404;">Key Levels to Watch</h3>
+                <div class="level-item">
+                    <strong>SPY:</strong> $659.83
+                    <span class="support">(Support: $627.65)</span>
+                    <span class="resistance">(Resistance: $659.83)</span>
+                </div>
+                <div class="level-item">
+                    <strong>QQQ:</strong> $587.17
+                    <span class="support">(Support: $552.97)</span>
+                    <span class="resistance">(Resistance: $587.17)</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

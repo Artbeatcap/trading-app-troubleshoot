@@ -62,3 +62,6 @@ echo "📝 Next steps:"
 echo "   1. Visit https://optionsplunge.com/tools/options-calculator"
 echo "   2. Test with a stock symbol (e.g., AAPL)"
 echo "   3. Verify the 500 error is resolved"
+
+
+

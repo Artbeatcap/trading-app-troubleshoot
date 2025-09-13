@@ -123,3 +123,6 @@ echo ""
 echo "📋 Rollback Instructions:"
 echo "   If needed, restore from backup:"
 echo "   ssh $REMOTE_USER@$REMOTE_HOST \"cp $REMOTE_TEMPLATE.backup.* $REMOTE_TEMPLATE\""
+
+
+

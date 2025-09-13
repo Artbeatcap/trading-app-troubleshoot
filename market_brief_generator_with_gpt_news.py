@@ -54,7 +54,7 @@ Focus on major market-moving news (Fed, economic data, earnings, commodities, yi
 Return only the 7 items in this format — no extra text, no sources, no links."""
 
         data = {
-            "model": "gpt-4o-mini",
+            "model": "gpt-5-nano",
             "messages": [
                 {"role": "system", "content": "You are a financial news analyst providing current market headlines."},
                 {"role": "user", "content": prompt}

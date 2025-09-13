@@ -317,6 +317,14 @@ def market_brief():
     """Landing page for the free morning market brief"""
     form = MarketBriefSignupForm()
     subscribed = False
+    # If logged in, determine if the user is already a confirmed subscriber
+    try:
+        from models import MarketBriefSubscriber as _MBSub
+        if current_user.is_authenticated:
+            _sub = _MBSub.query.filter_by(email=current_user.email).first()
+            subscribed = bool(_sub and _sub.confirmed)
+    except Exception:
+        pass
     
     # Check for preview mode query param
     preview_mode = request.args.get('preview') == '1'
@@ -335,9 +343,9 @@ def market_brief():
             if existing_subscriber.confirmed:
                 flash('You\'re already subscribed and confirmed! Check your inbox for the latest brief.', 'info')
             else:
-                # Resend confirmation email
-                from emails import send_confirmation_email_direct
-                if send_confirmation_email_direct(existing_subscriber):
+                # Resend confirmation email (prefer Flask-aware sender)
+                from emails import send_confirmation_email
+                if send_confirmation_email(existing_subscriber):
                     flash('Confirmation email resent! Please check your inbox and click the confirmation link.', 'info')
                 else:
                     flash('Error sending confirmation email. Please try again or contact support.', 'danger')
@@ -351,9 +359,9 @@ def market_brief():
             db.session.add(subscriber)
             db.session.commit()
 
-            # Send confirmation email
-            from emails import send_confirmation_email_direct, send_admin_notification
-            if send_confirmation_email_direct(subscriber):
+            # Send confirmation email (prefer Flask-aware sender)
+            from emails import send_confirmation_email, send_admin_notification
+            if send_confirmation_email(subscriber):
                 send_admin_notification(subscriber)  # Notify admin
                 flash('Check your email to confirm your subscription!', 'success')
             else:
@@ -1960,7 +1968,14 @@ def settings():
         except AttributeError:
             pass  # Skip if fields don't exist
 
-    if form.validate_on_submit():
+    # Accept valid POSTs even if validate_on_submit doesn't trigger for some reason
+    if request.method == 'POST':
+        try:
+            app.logger.info(f"Settings POST received: keys={list(request.form.keys())}")
+        except Exception:
+            pass
+    
+    if request.method == 'POST' and form.validate():
         # Update current_user fields from the form (only basic fields)
         current_user.display_name = form.display_name.data
         current_user.dark_mode = form.dark_mode.data
@@ -1991,6 +2006,15 @@ def settings():
         db.session.commit()
         flash('Settings updated successfully!', 'success')
         return redirect(url_for('settings'))
+    else:
+        # If POST but not valid, surface errors and log for troubleshooting
+        if request.method == 'POST':
+            try:
+                app.logger.warning(f"Settings form validation failed: {form.errors}")
+            except Exception:
+                pass
+            if form.errors:
+                flash('Could not save settings. Please fix the errors highlighted below.', 'error')
 
     # Prepare billing context for template
     from datetime import datetime, timezone
@@ -2036,12 +2060,30 @@ def bulk_analysis():
             'profit_loss': 500.00
         }
         
+        # Provide full fields expected by template to avoid 500s in preview mode
         sample_analysis = {
-            'summary': 'This was a well-executed long position on AAPL that captured a 3.3% move. The entry timing was good, entering on a pullback to support.',
-            'strengths': ['Good entry timing', 'Proper position sizing', 'Clear exit strategy'],
-            'improvements': ['Could have held longer for more profit', 'Consider trailing stops'],
-            'risk_management': 'Position size was appropriate at 2% of account. Stop loss was well-placed.',
-            'lessons': 'This trade demonstrates the importance of entering on pullbacks to key support levels.'
+            'overall_score': 8.5,
+            'entry_analysis': 'Entered on pullback to prior resistance acting as support with volume confirmation.',
+            'exit_analysis': 'Took profits into prior day high; conservative but aligned with plan.',
+            'risk_analysis': '2% risk with defined stop below support; position sizing appropriate.',
+            'market_context': 'Uptrend with strong sector bid; breadth supportive of continuation.',
+            'strengths': [
+                'Clear setup with confluence at support',
+                'Disciplined risk with predefined stop',
+                'Patience on entry to avoid chasing'
+            ],
+            'weaknesses': [
+                'Exited early relative to trend strength',
+                'Could improve scaling-out plan for runners'
+            ],
+            'key_lessons': [
+                'Pullbacks to structure offer favorable R:R',
+                'Define partial take-profit vs runner criteria'
+            ],
+            'recommendations': [
+                'Trail a portion using swing lows/EMA',
+                'Pre-plan scale-out triggers based on ATR'
+            ],
         }
         
         return render_template(

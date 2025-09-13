@@ -187,3 +187,6 @@ Write-Host "🔄 Rollback Instructions:" -ForegroundColor Yellow
 Write-Host "   If needed, restore from backup:" -ForegroundColor White
 Write-Host "   ssh $REMOTE_USER@$REMOTE_HOST 'cd /home/tradingapp && tar -xzf trading-analysis.backup.$timestamp.tar.gz'" -ForegroundColor Gray
 Write-Host "   ssh $REMOTE_USER@$REMOTE_HOST 'systemctl restart trading-analysis'" -ForegroundColor Gray
+
+
+

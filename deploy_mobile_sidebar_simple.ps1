@@ -114,3 +114,6 @@ Write-Host "   1. Visit the live app on a mobile device" -ForegroundColor White
 Write-Host "   2. Open the sidebar and test scrolling" -ForegroundColor White
 Write-Host "   3. Select a navigation option to test auto-hide" -ForegroundColor White
 Write-Host "   4. Test swipe gestures from the left edge" -ForegroundColor White
+
+
+

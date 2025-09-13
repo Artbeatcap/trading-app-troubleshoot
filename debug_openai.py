@@ -56,12 +56,10 @@ def debug_openai():
         # 6. Test API call
         print("\n6. Testing API call:")
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-5-nano",
             messages=[{"role": "user", "content": "Say 'Hello'"}],
-            max_tokens=10
         )
-        result = response.choices[0].message.content
-        print(f"✅ API call successful: {result}")
+        print("Response:", response.choices[0].message.content)
         
     except Exception as e:
         print(f"❌ Client creation failed: {e}")

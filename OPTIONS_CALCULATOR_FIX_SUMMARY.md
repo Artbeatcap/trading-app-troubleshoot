@@ -100,3 +100,6 @@ The `TRADIER_API_TOKEN` environment variable was not properly configured in the 
 - **Error Handling**: Comprehensive error handling with fallback messages
 
 The options calculator 500 error has been successfully resolved and the feature is now fully functional on the live application.
+
+
+

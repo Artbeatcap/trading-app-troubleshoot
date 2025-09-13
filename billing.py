@@ -144,6 +144,12 @@ def handle_checkout_completed(session):
         user.plan_type = plan_type
         user.stripe_customer_id = session.customer
         user.stripe_subscription_id = session.subscription
+        # Enable daily + weekly brief for Pro
+        try:
+            user.is_subscribed_daily = True
+            user.is_subscribed_weekly = True
+        except Exception:
+            pass
         
         # Set trial end date if trial exists
         if subscription.get("trial_end"):
@@ -167,6 +173,17 @@ def handle_subscription_updated(subscription):
         
         # Update subscription status
         user.subscription_status = subscription.status
+        # Keep brief subscriptions aligned with Pro status
+        try:
+            if subscription.status in ("active", "trialing"):
+                user.is_subscribed_daily = True
+                user.is_subscribed_weekly = True
+            elif subscription.status in ("canceled", "past_due", "unpaid", "incomplete_expired"):
+                # Keep weekly for free users, disable daily
+                user.is_subscribed_daily = False
+                user.is_subscribed_weekly = True
+        except Exception:
+            pass
         
         # Update trial end date if present
         if subscription.get("trial_end"):
@@ -192,6 +209,12 @@ def handle_subscription_canceled(subscription):
         
         user.subscription_status = "canceled"
         user.trial_end = None  # Clear trial end on cancellation
+        # On cancel, disable daily brief but keep weekly
+        try:
+            user.is_subscribed_daily = False
+            user.is_subscribed_weekly = True
+        except Exception:
+            pass
         db.session.commit()
         current_app.logger.info(f"User {user.id} subscription canceled")
         

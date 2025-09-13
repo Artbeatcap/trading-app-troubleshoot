@@ -51,7 +51,7 @@
 
                             <div class="mb-3">
                                 {{ form.entry_date.label(class="form-label") }}
-                                {{ form.entry_date(class="form-control", type="datetime-local") }}
+                                {{ form.entry_date(class="form-control", id="entry_date", placeholder="YYYY-MM-DD HH:MM") }}
                                 {% if form.entry_date.errors %}
                                     <div class="text-danger small">{{ form.entry_date.errors[0] }}</div>
                                 {% endif %}
@@ -80,7 +80,7 @@
                             
                             <div class="mb-3">
                                 {{ form.exit_date.label(class="form-label") }}
-                                {{ form.exit_date(class="form-control", type="datetime-local") }}
+                                {{ form.exit_date(class="form-control", id="exit_date", placeholder="YYYY-MM-DD HH:MM") }}
                                 {% if form.exit_date.errors %}
                                     <div class="text-danger small">{{ form.exit_date.errors[0] }}</div>
                                 {% endif %}
@@ -313,7 +313,29 @@
 {% endblock %}
 
 {% block scripts %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 {{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script>
+(function () {
+    function initPicker(sel, opts) {
+        var el = document.querySelector(sel);
+        if (!el) return;
+        if (el.dataset.pickerInit === '1') return;
+        flatpickr(el, Object.assign({
+            enableTime: true,
+            dateFormat: "Y-m-d H:i",
+            time_24hr: true,
+            minuteIncrement: 5
+        }, opts || {}));
+        el.dataset.pickerInit = '1';
+    }
+    document.addEventListener('DOMContentLoaded', function () {
+        initPicker('#entry_date');
+        initPicker('#exit_date');
+    });
+})();
+</script>
 <script>
 // Show/hide options fields based on trade type
 document.addEventListener('DOMContentLoaded', function() {

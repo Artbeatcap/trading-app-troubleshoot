@@ -3,7 +3,14 @@ import os
 from flask_mail import Message
 from app import mail, app
 from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail as SGMail, Email as SGEmail, To as SGTo, Content as SGContent
+from sendgrid.helpers.mail import (
+    Mail as SGMail,
+    Email as SGEmail,
+    To as SGTo,
+    Content as SGContent,
+    TrackingSettings,
+    ClickTracking,
+)
 from models import MarketBriefSubscriber
 from datetime import datetime
 import logging
@@ -283,20 +290,108 @@ def send_welcome_email(subscriber):
     """Send welcome email after confirmation"""
     try:
         html = render_template('email/welcome_brief.html', name=subscriber.name)
-        
+
+        # Prefer SendGrid if configured; fallback to SMTP
+        sendgrid_key = app.config.get('SENDGRID_KEY') or os.getenv('SENDGRID_KEY')
+        if sendgrid_key:
+            try:
+                sg = SendGridAPIClient(api_key=sendgrid_key)
+                from_name, from_addr = app.config.get('MAIL_DEFAULT_SENDER', (None, None))
+                from_email = SGEmail((from_addr or os.getenv('EMAIL_FROM') or 'no-reply@send.optionsplunge.com'), (from_name or 'Options Plunge'))
+                to_email = SGTo(subscriber.email)
+                subject = 'Welcome to the Morning Market Brief!'
+                content = SGContent('text/html', html)
+                sg_mail = SGMail(from_email, to_email, subject, content)
+                # Disable click tracking for clarity on links
+                ts = TrackingSettings()
+                ts.click_tracking = ClickTracking(False, False)
+                sg_mail.tracking_settings = ts
+                resp = sg.send(sg_mail)
+                if resp.status_code not in (200, 202):
+                    raise RuntimeError(f"SendGrid non-2xx status: {resp.status_code}")
+                logger.info(f"Welcome email sent via SendGrid to {subscriber.email}")
+                return True
+            except Exception as sg_err:
+                logger.warning(f"SendGrid failed for welcome {subscriber.email}: {sg_err}. Falling back to SMTP.")
+
         msg = Message(
             'Welcome to the Morning Market Brief!',
             recipients=[subscriber.email],
             html=html,
             sender=app.config['MAIL_DEFAULT_SENDER']
         )
-        
         mail.send(msg)
-        logger.info(f"Welcome email sent to {subscriber.email}")
+        logger.info(f"Welcome email sent via SMTP to {subscriber.email}")
         return True
         
     except Exception as e:
         logger.error(f"Error sending welcome email to {subscriber.email}: {str(e)}")
+        return False
+
+
+def send_welcome_on_register(user):
+    """Send a welcome confirmation on account registration.
+    - Free users: confirm weekly brief subscription; invite to upgrade for daily
+    - Pro users: confirm daily + weekly delivery
+    """
+    try:
+        name = getattr(user, 'display_name', None) or getattr(user, 'username', '') or 'Trader'
+        # Build pricing URL with safe fallback outside request context
+        pricing_url = '#'
+        # Hardcode public pricing URL to avoid any tracking/redirect issues
+        pricing_url = 'https://optionsplunge.com/pricing'
+        try:
+            logger.info(f"welcome_on_register pricing_url: {pricing_url}")
+        except Exception:
+            pass
+
+        ctx = {
+            'name': name,
+            'daily': bool(getattr(user, 'is_subscribed_daily', False)),
+            'weekly': bool(getattr(user, 'is_subscribed_weekly', True)),
+            'pricing_url': pricing_url
+        }
+
+        html = render_template('email/welcome_on_register.html', **ctx)
+        try:
+            logger.info(f"welcome_on_register rendered href: {ctx.get('pricing_url')}")
+        except Exception:
+            pass
+
+        # Prefer SendGrid if configured; fallback to SMTP
+        sendgrid_key = app.config.get('SENDGRID_KEY') or os.getenv('SENDGRID_KEY')
+        if sendgrid_key:
+            try:
+                sg = SendGridAPIClient(api_key=sendgrid_key)
+                from_name, from_addr = app.config.get('MAIL_DEFAULT_SENDER', (None, None))
+                from_email = SGEmail((from_addr or os.getenv('EMAIL_FROM') or 'no-reply@send.optionsplunge.com'), (from_name or 'Options Plunge'))
+                to_email = SGTo(user.email)
+                subject = 'Welcome to Options Plunge — Market Brief Preferences'
+                content = SGContent('text/html', html)
+                sg_mail = SGMail(from_email, to_email, subject, content)
+                # Disable click tracking so the button shows optionsplunge.com link directly
+                ts = TrackingSettings()
+                ts.click_tracking = ClickTracking(False, False)
+                sg_mail.tracking_settings = ts
+                resp = sg.send(sg_mail)
+                if resp.status_code not in (200, 202):
+                    raise RuntimeError(f"SendGrid non-2xx status: {resp.status_code}")
+                logger.info(f"Welcome-on-register email sent to {user.email}")
+                return True
+            except Exception as sg_err:
+                logger.warning(f"SendGrid failed for welcome-on-register {user.email}: {sg_err}. Falling back to SMTP.")
+
+        msg = Message(
+            'Welcome to Options Plunge — Market Brief Preferences',
+            recipients=[user.email],
+            html=html,
+            sender=app.config['MAIL_DEFAULT_SENDER']
+        )
+        mail.send(msg)
+        logger.info(f"Welcome-on-register email sent to {user.email}")
+        return True
+    except Exception as e:
+        logger.error(f"Error sending welcome-on-register to {getattr(user,'email', '<unknown>')}: {str(e)}")
         return False
 
 def send_admin_notification(subscriber):

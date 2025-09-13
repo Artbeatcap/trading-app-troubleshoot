@@ -1,45 +1,427 @@
-## Executive Summary
-Market conditions appear bullish with key indices showing positive trading ranges. Focus on major economic catalysts and earnings reports for directional moves. The current market environment suggests a balanced risk-reward scenario for traders.
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Morning Market Brief</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        /* Mobile-first responsive design */
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f8f9fa;
+            margin: 0;
+            padding: 10px;
+        }
+        
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 300;
+        }
+        
+        .header p {
+            margin: 10px 0 0 0;
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 20px;
+        }
+        
+        .section-header {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 8px;
+            margin: 20px 0 12px 0;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .market-snapshot {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border-left: 4px solid #3498db;
+        }
+        
+        .section-content {
+            background: #ffffff;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 12px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .subscriber-summary {
+            background: linear-gradient(135deg, #e8f4fd 0%, #d1ecf1 100%);
+            padding: 20px;
+            border-radius: 12px;
+            margin: 20px 0;
+            border-left: 5px solid #17a2b8;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        .summary-header-main {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            font-size: 20px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .summary-header-main i {
+            margin-right: 8px;
+            color: #17a2b8;
+        }
+        
+        .summary-content {
+            line-height: 1.6;
+        }
+        
+        .summary-header {
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 12px 0 6px 0;
+            font-size: 16px;
+        }
+        
+        .summary-list-item {
+            margin: 6px 0;
+            padding-left: 12px;
+            color: #495057;
+        }
+        
+        .summary-levels-header {
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 12px 0 6px 0;
+            font-size: 16px;
+        }
+        
+        .summary-level-item {
+            margin: 4px 0;
+            padding-left: 12px;
+            color: #495057;
+        }
+        
+        .summary-tomorrow {
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 12px 0 6px 0;
+            font-size: 16px;
+        }
+        
+        .summary-text {
+            margin: 6px 0;
+            color: #495057;
+        }
+        
+        .headline-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            border-left: 5px solid #3498db;
+            display: flex;
+            align-items: flex-start;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.08);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .headline-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 12px rgba(0,0,0,0.12);
+        }
+        
+        .headline-number {
+            color: #3498db;
+            font-weight: bold;
+            font-size: 18px;
+            margin-right: 12px;
+            min-width: 28px;
+            background: #e3f2fd;
+            padding: 6px 10px;
+            border-radius: 50%;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        
+        .headline-content {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .headline-title {
+            font-weight: bold;
+            color: #2c3e50;
+            font-size: 16px;
+            margin-bottom: 8px;
+            line-height: 1.4;
+        }
+        
+        .headline-summary {
+            color: #495057;
+            line-height: 1.6;
+            font-size: 14px;
+            margin-top: 6px;
+        }
+        
+        .gapping-stock-item {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 6px;
+            margin: 6px 0;
+            border-left: 3px solid #28a745;
+        }
+        
+        .ticker {
+            color: #2c3e50;
+            font-weight: bold;
+        }
+        
+        .move {
+            color: #28a745;
+            font-weight: 500;
+        }
+        
+        .why {
+            color: #6c757d;
+        }
+        
+        .key-levels {
+            background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border-left: 4px solid #ffc107;
+        }
+        
+        .level-item {
+            margin: 8px 0;
+            font-weight: 500;
+        }
+        
+        .support {
+            color: #28a745;
+        }
+        
+        .resistance {
+            color: #dc3545;
+        }
+        
+        /* Tablet and desktop styles */
+        @media (min-width: 768px) {
+            body {
+                padding: 20px;
+            }
+            
+            .container {
+                max-width: 800px;
+            }
+            
+            .header {
+                padding: 30px;
+            }
+            
+            .header h1 {
+                font-size: 28px;
+            }
+            
+            .header p {
+                font-size: 16px;
+            }
+            
+            .content {
+                padding: 30px;
+            }
+            
+            .section-header {
+                margin: 25px 0 15px 0;
+            }
+            
+            .market-snapshot {
+                padding: 20px;
+                margin: 20px 0;
+            }
+            
+            .section-content {
+                padding: 20px;
+                margin: 15px 0;
+            }
+            
+            .subscriber-summary {
+                padding: 25px;
+                margin: 25px 0;
+            }
+            
+            .summary-header-main {
+                margin-bottom: 20px;
+                font-size: 22px;
+            }
+            
+            .summary-header-main i {
+                margin-right: 10px;
+            }
+            
+            .summary-header {
+                margin: 15px 0 8px 0;
+            }
+            
+            .summary-list-item {
+                margin: 8px 0;
+                padding-left: 15px;
+            }
+            
+            .summary-levels-header {
+                margin: 15px 0 8px 0;
+            }
+            
+            .summary-level-item {
+                margin: 5px 0;
+                padding-left: 15px;
+            }
+            
+            .summary-tomorrow {
+                margin: 15px 0 8px 0;
+            }
+            
+            .summary-text {
+                margin: 8px 0;
+            }
+            
+            .headline-item {
+                padding: 25px;
+                margin: 25px 0;
+            }
+            
+            .headline-number {
+                font-size: 20px;
+                margin-right: 20px;
+                min-width: 30px;
+                padding: 8px 12px;
+            }
+            
+            .headline-title {
+                font-size: 17px;
+                margin-bottom: 10px;
+            }
+            
+            .headline-summary {
+                font-size: 15px;
+                margin-top: 8px;
+            }
+            
+            .gapping-stock-item {
+                padding: 12px;
+                margin: 8px 0;
+            }
+            
+            .key-levels {
+                padding: 20px;
+                margin: 20px 0;
+            }
+            
+            .level-item {
+                margin: 10px 0;
+            }
+        }
+    </style>
+</head>
+<body>
 
-## What's moving — After-hours & Premarket
+    <div class="container">
 
-No significant gapping stocks detected in premarket trading. Monitor major indices and key earnings reports for potential catalysts.
+        <div class="header">
+            <h1>Morning Market Brief</h1>
+            <p>Wednesday, September 03, 2025</p>
+        </div>
 
-## Key Market Headlines
-1. Federal Reserve signals potential rate adjustments in upcoming meetings
-   Source: Market News
-   Summary: Fed officials discuss economic outlook and monetary policy direction.
-2. Major tech earnings reports show mixed results for Q4
-   Source: Earnings Report
-   Summary: Technology sector performance varies as companies report quarterly results.
-3. Oil prices stabilize as OPEC+ maintains production targets
-   Source: Energy News
-   Summary: Energy markets respond to OPEC+ decision on oil production levels.
-4. Market volatility increases ahead of key economic data releases
-   Source: Economic Data
-   Summary: Traders prepare for upcoming CPI and jobs report announcements.
-5. Treasury yields fluctuate as investors assess inflation outlook
-   Source: Bond Market
-   Summary: Bond market reacts to changing expectations for interest rate policy.
-6. S&P 500 reaches new highs as earnings season progresses
-   Source: Market Update
-   Summary: Market momentum continues as corporate earnings exceed expectations.
-7. Cryptocurrency markets show increased volatility
-   Source: Crypto News
-   Summary: Digital asset prices fluctuate amid regulatory developments.
+        <div class="content">
+            
 
-## Technical Analysis & Daily Range Insights
-Key support and resistance levels are being tested as markets consolidate. Monitor volume and momentum indicators for breakout signals. The expected trading ranges suggest moderate volatility with potential for directional moves on significant news.
+            <div class="section-content">
+                
+<h2 class="section-header">Executive Summary
+Market conditions appear stable with key indices showing normal trading ranges. Focus on major economic catalysts and earnings reports for directional moves. The current market environment suggests a balanced risk-reward scenario for traders.
+<h2 class="section-header">What's moving — After-hours & Premarket</h2>
 
-## Market Sentiment & Outlook
-Risk sentiment remains balanced with mixed signals from various sectors. Traders should watch for sector rotation opportunities and prepare for potential market shifts based on upcoming economic data releases.
+</h2>
 
-## Key Levels to Watch
-- SPY: $450.50 (Support: $445.50, Resistance: $455.50)
-- QQQ: $380.25 (Support: $376.25, Resistance: $384.25)
-- VIX: 15.20
+<h2 class="section-header">Key Market Headlines
+1. Tech Stocks Rally After Strong Earnings Reports
+   Source: Unknown
+   Summary: Major tech companies, including Apple and Microsoft, reported better-than-expected earnings, sending their stock prices higher. This helped lift the overall tech sector, suggesting investors remain optimistic about growth in technology.</h2>
 
-## 🚀 Gapping Stocks
-- **SPY**: +0.5% - Futures positive
-- **QQQ**: +0.8% - Tech momentum
-- **IWM**: -0.2% - Small caps lagging
+2. Fed Signals Patience on Rate Hikes
+   Source: Unknown
+   Summary: The Federal Reserve indicated it will hold off on further interest rate increases for now, citing a need to assess the economy’s performance. This news helped boost investor confidence, leading to a rally in stock markets.</h2>
+
+3. Oil Prices Surge Amid Supply Concerns
+   Source: Unknown
+   Summary: Crude oil prices jumped as fears of supply disruptions in the Middle East increased. Traders are closely monitoring geopolitical tensions, which could further impact oil markets and global inflation.</h2>
+
+4. Gold Prices Drop as Dollar Strengthens
+   Source: Unknown
+   Summary: Gold prices fell as the U.S. dollar gained strength against other currencies. A stronger dollar typically makes gold more expensive for foreign buyers, leading to decreased demand and lower prices for the precious metal.</h2>
+
+</h2>
+
+<h2 class="section-header">Technical Analysis & Daily Range Insights
+Key support and resistance levels are being tested as markets consolidate. Monitor volume and momentum indicators for breakout signals. The expected trading ranges suggest moderate volatility with potential for directional moves on significant news.</h2>
+
+<h2 class="section-header">Market Sentiment & Outlook
+Risk sentiment remains balanced with mixed signals from various sectors. Traders should watch for sector rotation opportunities and prepare for potential market shifts based on upcoming economic data releases.</h2>
+
+<h2 class="section-header">Key Levels to Watch
+- SPY: $643.74 (Support: $627.65, Resistance: $659.83)
+- QQQ: $570.07 (Support: $552.97, Resistance: $587.17)
+- VIX: 16.72
+
+            </div>
+
+            
+        <div class="section-content">
+            <h2 class="section-header">🚀 Gapping Stocks</h2></div>
+
+            <div class="key-levels">
+                <h3 style="margin-top: 0; color: #856404;">Key Levels to Watch</h3>
+                <div class="level-item">
+                    <strong>SPY:</strong> $659.83
+                    <span class="support">(Support: $627.65)</span>
+                    <span class="resistance">(Resistance: $659.83)</span>
+                </div>
+                <div class="level-item">
+                    <strong>QQQ:</strong> $587.17
+                    <span class="support">(Support: $552.97)</span>
+                    <span class="resistance">(Resistance: $587.17)</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

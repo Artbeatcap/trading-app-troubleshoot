@@ -9,7 +9,7 @@ try:
 except ImportError:
     OPENAI_AVAILABLE = False
 
-MODEL = os.getenv("SUMMARY_MODEL", "gpt-4o-mini")  # default
+MODEL = os.getenv("SUMMARY_MODEL", "gpt-5-nano")  # default
 
 # Initialize client only if API key is available
 CLIENT = None

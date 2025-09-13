@@ -152,3 +152,6 @@ ssh root@167.88.43.61 "systemctl restart trading-analysis"
 ---
 
 **🎉 All local changes have been successfully deployed to the live app!**
+
+
+
