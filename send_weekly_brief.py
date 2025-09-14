@@ -35,13 +35,37 @@ def load_weekly_context_from_json(path: Path) -> dict:
         return json.load(f)
 
 def get_weekly_subscribers() -> List[str]:
-    """Get weekly subscriber list from environment or database fallback"""
-    # For now, use environment variable
-    weekly_to = os.getenv("WEEKLY_TO") or os.getenv("NEWSLETTER_TO")
-    if not weekly_to:
-        logger.error("No WEEKLY_TO or NEWSLETTER_TO configured")
-        return []
-    return [e.strip() for e in weekly_to.split(',') if e.strip()]
+    """Get weekly subscriber list from database (Pro users + weekly subscribers) or environment fallback"""
+    try:
+        # Try to get subscribers from database first
+        from app import app, db
+        from models import User
+        
+        with app.app_context():
+            # Get Pro users (active or trialing) + users with weekly subscription enabled
+            subscribers = User.query.filter(
+                db.or_(
+                    # Pro users should get weekly brief
+                    User.subscription_status.in_(['active', 'trialing']),
+                    # Users who explicitly subscribed to weekly
+                    User.is_subscribed_weekly == True
+                ),
+                User.email_verified == True
+            ).all()
+            
+            emails = [user.email for user in subscribers if user.email]
+            logger.info(f"📧 Found {len(emails)} weekly subscribers (Pro users + weekly subscribers)")
+            return emails
+            
+    except Exception as e:
+        logger.warning(f"Database query failed ({e}), falling back to environment variables")
+        
+        # Fallback to environment variable
+        weekly_to = os.getenv("WEEKLY_TO") or os.getenv("NEWSLETTER_TO")
+        if not weekly_to:
+            logger.error("No WEEKLY_TO or NEWSLETTER_TO configured")
+            return []
+        return [e.strip() for e in weekly_to.split(',') if e.strip()]
 
 def render_weekly_email(context: dict) -> tuple[str, str]:
     """Render weekly email HTML and text via weekly templates (fallback to morning if needed)."""
