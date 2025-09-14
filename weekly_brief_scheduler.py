@@ -2,7 +2,8 @@
 """
 Weekly Market Brief Scheduler
 
-Runs every Sunday at 08:00 AM ET to send the weekly market brief.
+Default: Sundays at 08:00 AM ET.
+Override with env WEEKLY_CRON (e.g., "sun 08:00" or a full Quartz expression).
 """
 
 import os
@@ -34,26 +35,49 @@ def start_weekly_brief_scheduler():
         # Create scheduler
         scheduler = BackgroundScheduler(timezone=tz)
         
-        # Add weekly brief job - Sundays at 08:00 AM ET
-        scheduler.add_job(
-            func=send_weekly_brief_job,
-            trigger=CronTrigger(
-                day_of_week="sun",
-                hour=8,
-                minute=0,
-                timezone=tz
-            ),
-            id="weekly_brief_sunday_noon",
-            name="Weekly Market Brief",
-            replace_existing=True,
-            max_instances=1,
-            misfire_grace_time=3600  # 1 hour grace time
-        )
+        # Default: Sunday 08:00 ET
+        default_trigger = CronTrigger(day_of_week='sun', hour=8, minute=0, timezone=tz)
+        # Allow override via WEEKLY_CRON (e.g., "sun 08:00")
+        cron_expr = os.getenv("WEEKLY_CRON", "").strip()
+        trigger = default_trigger
+        if cron_expr:
+            try:
+                # Accept formats like "sun 08:00" or full "0 15 18 ? * FRI *"
+                if " " in cron_expr and ":" in cron_expr and cron_expr.count(" ") == 1:
+                    dow, hm = cron_expr.split(" ")
+                    hh, mm = hm.split(":")
+                    trigger = CronTrigger(day_of_week=dow, hour=int(hh), minute=int(mm), timezone=tz)
+                else:
+                    # Assume Quartz-style expression
+                    trigger = CronTrigger.from_crontab(cron_expr, timezone=tz)
+            except Exception as e:
+                print(f"WEEKLY_CRON invalid ({e}); using default Sunday 08:00 ET.")
+        
+        # Add weekly brief job
+        scheduler.add_job(func=send_weekly_brief_job,
+                          trigger=trigger,
+                          id="weekly_brief_job",
+                          name="Weekly Market Brief",
+                          replace_existing=True,
+                          max_instances=1,
+                          misfire_grace_time=3600)
         
         # Start scheduler
         scheduler.start()
+        
+        # --- Self-check: print the next scheduled run in ET ---
+        try:
+            job = scheduler.get_job("weekly_brief_job")
+            if job and job.next_run_time:
+                # Ensure we display ET even if APScheduler returns another tz
+                next_et = job.next_run_time.astimezone(tz)
+                print(f"🕒 Next Weekly Brief run scheduled for: {next_et.strftime('%Y-%m-%d %H:%M %Z')}")
+            else:
+                print("🕒 Next Weekly Brief run: (not yet computed)")
+        except Exception as e:
+            print(f"⚠️ Could not determine next run time: {e}")
+        
         logger.info("✅ Weekly brief scheduler started")
-        logger.info("📅 Scheduled: Sundays at 08:00 AM ET")
         
         return scheduler
         
@@ -69,12 +93,9 @@ def send_weekly_brief_job():
         # Set confirmation flag
         os.environ['CONFIRM_SEND'] = '1'
         
-        # Get source file path
-        source_file = os.getenv('WEEKLY_BRIEF_SOURCE', 'weekly_brief_sample.json')
-        
-        # Import and run the main function
+        # Import and run the main function (no source file needed - uses hybrid builder)
         import sys
-        sys.argv = ['send_weekly_brief.py', '--source', source_file]
+        sys.argv = ['send_weekly_brief.py']
         
         # Run the weekly brief sender
         send_weekly_brief()
@@ -86,26 +107,15 @@ def send_weekly_brief_job():
 
 def main():
     """Main function to run the scheduler."""
-    print("📅 Starting Weekly Market Brief Scheduler...")
-    print("⏰ Scheduled: Sundays at 08:00 AM ET")
-    print("📧 Source: weekly_brief_sample.json")
-    print("🔄 Press Ctrl+C to stop")
-    
-    # Start scheduler
-    scheduler = start_weekly_brief_scheduler()
-    
-    if not scheduler:
-        sys.exit(1)
-    
+    print("📅 Weekly Market Brief Scheduler starting… (default Sunday 08:00 ET)")
+    sched = start_weekly_brief_scheduler()
     try:
-        # Keep the script running
         while True:
             import time
-            time.sleep(60)  # Check every minute
-            
+            time.sleep(60)
     except KeyboardInterrupt:
         print("\n🛑 Stopping scheduler...")
-        scheduler.shutdown()
+        sched.shutdown()
         print("✅ Scheduler stopped")
 
 if __name__ == "__main__":

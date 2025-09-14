@@ -105,6 +105,137 @@ def fetch_economic_catalysts_today_av() -> List[Dict[str, str]]:
     # In a real implementation, this would use Alpha Vantage API
     return []
 
+def fetch_economic_calendar_range(days_ahead: int = 7, start: datetime | None = None) -> List[Dict[str, str]]:
+    """
+    PRIMARY (Finnhub): real economic calendar for a date range [start, start+days_ahead).
+    FALLBACK (Alpha Vantage): infer catalysts via NEWS_SENTIMENT (titles-only, no estimates).
+    """
+    token = _fh_api_key()
+    start_dt = (start or datetime.now(tz=NY)).date()
+    end_dt = start_dt + timedelta(days=days_ahead)
+    if token:
+        try:
+            url = "https://finnhub.io/api/v1/calendar/economic"
+            cache_key = f"fh:econ:{start_dt.isoformat()}:{end_dt.isoformat()}"
+            cached = _cache_get_json(cache_key, FH_CACHE_TTL)
+            if cached is not None:
+                raw = cached
+            else:
+                r = requests.get(url, params={"from": start_dt.isoformat(), "to": end_dt.isoformat(), "token": token}, timeout=12)
+                raw = r.json() if r.status_code == 200 else {}
+                if raw:
+                    _cache_put_json(cache_key, raw)
+            data = (raw or {}).get("economicCalendar", [])
+            key_terms = ("cpi","ppi","payroll","employment","claims","pmi","ism","gdp","confidence","inventories","fomc","minutes","retail sales")
+            out: List[Dict[str, str]] = []
+            for ev in data:
+                name = (ev.get("event") or "").strip()
+                if not name:
+                    continue
+                if any(k in name.lower() for k in key_terms):
+                    why = (
+                        "Rates trajectory"
+                        if any(x in name.lower() for x in ("cpi","inflation","ppi","gdp","payroll","employment","claims","fed","fomc"))
+                        else "Growth/sentiment signal"
+                    )
+                    out.append({
+                        "date": (ev.get("date") or start_dt.isoformat()),
+                        "time_et": ev.get("time") or ev.get("time_utc") or "",
+                        "event": name,
+                        "estimate": ev.get("estimate") or "",
+                        "previous": ev.get("previous") or "",
+                        "impact": ev.get("impact") or "",
+                        "why": why,
+                    })
+            return out
+        except Exception:
+            pass
+    # FALLBACK: AV inference (no dates/times/estimates guaranteed)
+    cats = fetch_economic_catalysts_today_av()
+    # Transform to week-ahead "best we can" list with today's date
+    d = datetime.now(tz=NY).date().isoformat()
+    return [{"date": d, "time_et": c.get("time_et","—"), "event": c.get("event",""), "why": c.get("why","")} for c in cats]
+
+def _week_bounds(dt: datetime | None = None) -> tuple[datetime, datetime]:
+    """Return (Mon, Fri) datetimes for the week containing dt (ET)."""
+    base = (dt or datetime.now(tz=NY)).date()
+    # Monday = 0 ... Sunday = 6
+    monday = base - timedelta(days=base.weekday())
+    friday = monday + timedelta(days=4)
+    return datetime.combine(monday, datetime.min.time(), tzinfo=NY), datetime.combine(friday, datetime.min.time(), tzinfo=NY)
+
+def build_weekly_brief() -> Dict[str, Any]:
+    """
+    Build a weekly brief context compatible with weekly_brief.html.jinja template:
+    - subject_theme, date_human, preheader
+    - recap (index_blurb, sector_blurb, movers_bullets, flow_blurb)
+    - levels (spy, qqq, iwm with s1, s2, r1, r2, r3)
+    - week_ahead (macro_bullets, earnings_bullets)
+    - swing_playbook_bullets
+    - cta_url, unsubscribe_url, preferences_url
+    """
+    mon, fri = _week_bounds()
+    cats = fetch_economic_calendar_range(days_ahead=7, start=mon)
+    movers = fetch_top_movers_av()
+    
+    # Format movers as bullet points
+    movers_bullets = []
+    for mover in movers[:5]:  # Top 5 movers
+        direction = "📈" if mover.get("direction") == "up" else "📉"
+        ticker = mover.get("ticker", "")
+        change = mover.get("change_percent", "")
+        movers_bullets.append(f"{direction} {ticker}: {change}")
+    
+    # Format catalysts as bullet points
+    macro_bullets = []
+    for cat in cats[:5]:  # Top 5 catalysts
+        event = cat.get("event", "")
+        why = cat.get("why", "")
+        macro_bullets.append(f"{event} ({why})")
+    
+    ctx = {
+        "subject_theme": "Market Analysis",
+        "date_human": f"Week of {mon.strftime('%B %d, %Y')}",
+        "preheader": "Weekly market recap and week-ahead outlook",
+        "recap": {
+            "index_blurb": "Markets showed mixed performance this week with key indices trading within established ranges.",
+            "sector_blurb": "Sector rotation continued with technology and healthcare leading gains while energy experienced volatility.",
+            "movers_bullets": movers_bullets,
+            "flow_blurb": "Options flow remained active with notable put/call ratios indicating cautious sentiment."
+        },
+        "levels": {
+            "spy": {"s1": "420", "s2": "415", "r1": "430", "r2": "435", "r3": "440"},
+            "qqq": {"s1": "380", "s2": "375", "r1": "390", "r2": "395", "r3": "400"},
+            "iwm": {"s1": "200", "s2": "195", "r1": "210", "r2": "215", "r3": "220"}
+        },
+        "week_ahead": {
+            "macro_bullets": macro_bullets,
+            "earnings_bullets": [
+                "Key earnings reports from major tech companies",
+                "Financial sector earnings continue this week",
+                "Retail earnings season begins"
+            ]
+        },
+        "swing_playbook_bullets": [
+            "Watch for breakout above key resistance levels",
+            "Monitor sector rotation opportunities",
+            "Prepare for potential volatility around economic data"
+        ],
+        "cta_url": "https://optionsplunge.com/dashboard",
+        "unsubscribe_url": "https://optionsplunge.com/unsubscribe",
+        "preferences_url": "https://optionsplunge.com/settings",
+        # Additional data for compatibility
+        "date_range": {
+            "monday": mon.strftime("%Y-%m-%d"),
+            "friday": fri.strftime("%Y-%m-%d"),
+            "label": f"Week of {mon.strftime('%Y-%m-%d')}",
+        },
+        "week_ahead_catalysts": cats,
+        "movers_snapshot": movers,
+        "generated_at": datetime.now(tz=NY).strftime("%Y-%m-%d %H:%M ET"),
+    }
+    return ctx
+
 def _av_api_key() -> str | None:
     """Get Alpha Vantage API key from environment."""
     return os.getenv('ALPHA_VANTAGE_API_KEY')
