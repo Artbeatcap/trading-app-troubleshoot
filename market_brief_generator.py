@@ -603,7 +603,6 @@ MANDATORY SECTION ORDER (Markdown H2)
 ## Trader Playbook — If/Then Scenarios
 ## Market Sentiment & Outlook
 ## Key Levels to Watch
-## Housekeeping
 
 SECTION GUIDANCE & FORMATS
 - Executive Summary: 3–5 bullets. Each bullet = [What changed] → [Why it matters] → [Watch X at Y level/time].
@@ -626,9 +625,6 @@ SECTION GUIDANCE & FORMATS
 - Market Sentiment & Outlook: 1 short paragraph tying VIX/rates/breadth/positioning to likely tape behavior.
 - Key Levels to Watch: Print **daily AND weekly supports/resistances** for SPY and QQQ exactly as provided
   (e.g., "SPY — Daily S: 520.10 / 517.80; R: 525.40 / 528.60; Weekly S: 521.20 / 517.00; R: 533.10 / 536.80").
-- Housekeeping (1–2 lines total):
-  - "Educational commentary. Not investment advice."
-  - Soft CTA: "If this helped your prep, share it with a trader friend or subscribe for the weekly recap."
 
 FORMATTING RULES
 - Plain Markdown. Bold tickers only on first mention in a section.
@@ -665,7 +661,6 @@ Using only the DATA FEED above, produce the morning brief with the exact section
 5) Trader Playbook — If/Then Scenarios (3–6 bullets; template: If <condition>, then <bias>, while <invalidation> (timeframe: <...>))
 6) Market Sentiment & Outlook (tie vol/rates/positioning to likely tape behavior; note missing data if any)
 7) Key Levels to Watch (print **Daily & Weekly S and R** for SPY and QQQ exactly as provided)
-8) Housekeeping (educational disclaimer + brief CTA to share/subscribe)
 """
 
 # ===== WEEKLY BRIEF: STABLE PROMPTS (for prompt caching) =====
