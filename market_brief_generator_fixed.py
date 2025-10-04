@@ -49,7 +49,7 @@ def fetch_news_with_gpt() -> List[Dict[str, Any]]:
 
 1. [Headline Title]
    Source: [News Source]
-   Summary: [Brief 1-2 sentence summary]
+   Summary: [Brief 3-5 sentence summary]
 
 Focus on major market-moving news like:
 - Federal Reserve announcements
@@ -61,16 +61,16 @@ Focus on major market-moving news like:
 - Technology sector news
 - International trade and geopolitical events
 
-Make sure the headlines are current and relevant to today's market conditions. Return only the formatted headlines, no additional text."""
+Make sure the headlines are current and relevant to today's market conditions. Return the formatted headlines, no additional text."""
 
         data = {
-            "model": "gpt-5-nano",
+            "model": "gpt-4o-mini",
             "messages": [
                 {"role": "system", "content": "You are a financial news analyst providing current market headlines."},
                 {"role": "user", "content": prompt}
             ],
             "temperature": 0.3,
-            "max_tokens": 1000
+            "max_completion_tokens": 1000
         }
         
         response = requests.post(
@@ -714,30 +714,30 @@ def send_market_brief_to_subscribers(summary: str, headlines: List[Dict[str, Any
 
 
 if __name__ == "__main__":
-    print("🚀 Starting Market Brief Generation with Improved Styling...")
+    print("Starting Market Brief Generation with Improved Styling...")
     print("=" * 70)
     
     # Fetch data
-    print("📊 Fetching market data...")
+    print("Fetching market data...")
     headlines = fetch_news()
     prices = fetch_stock_prices()
     
-    print(f"✅ Fetched {len(headlines)} headlines")
-    print(f"✅ Fetched prices for {len(prices)} symbols")
+    print(f"Fetched {len(headlines)} headlines")
+    print(f"Fetched prices for {len(prices)} symbols")
     
     # Check if we have sufficient data
     if not headlines:
-        print("\n❌ No market headlines available - cannot generate brief")
+        print("\nNo market headlines available - cannot generate brief")
         print("Please check OpenAI API key and try again")
         exit(1)
     
     if not prices:
-        print("\n❌ No market prices available - cannot generate brief")
+        print("\nNo market prices available - cannot generate brief")
         print("Please check Tradier API token and try again")
         exit(1)
     
     # Generate content
-    print("\n📝 Generating market summary...")
+    print("\nGenerating market summary...")
     summary = generate_market_summary(prices, headlines)
     expected_range = generate_expected_ranges(prices)
     
@@ -752,8 +752,8 @@ if __name__ == "__main__":
     ]
     
     # Send to subscribers
-    print("\n📧 Generating email content...")
+    print("\nGenerating email content...")
     send_market_brief_to_subscribers(summary, filtered_headlines, expected_range, gapping_stocks)
     
-    print("\n🎉 Market Brief Generation Complete!")
-    print("📊 Check: static/uploads/brief_latest.html")
+    print("\nMarket Brief Generation Complete!")
+    print("Check: static/uploads/brief_latest.html")
