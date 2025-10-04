@@ -39,11 +39,15 @@ class TradeForm(FlaskForm):
         ('credit_call_spread', 'Credit Call Spread (Bear Call)')
     ], validators=[DataRequired()])
     
-    entry_date = DateTimeField('Entry Date & Time', validators=[DataRequired()], 
+    # Planned trade flag
+    is_planned = BooleanField('Planned Trade (not entered yet)', 
+                             render_kw={"class": "form-check-input"})
+    
+    entry_date = DateTimeField('Entry Date & Time', validators=[Optional()], 
                               default=datetime.now, format='%Y-%m-%d %H:%M')
-    entry_price = FloatField('Entry Price ($)', validators=[DataRequired(), NumberRange(min=0.01)],
+    entry_price = FloatField('Entry Price ($)', validators=[Optional(), NumberRange(min=0.01)],
                             render_kw={"step": "0.01", "placeholder": "0.00"})
-    quantity = IntegerField('Quantity/Shares', validators=[DataRequired(), NumberRange(min=1)],
+    quantity = IntegerField('Quantity/Shares', validators=[Optional(), NumberRange(min=1)],
                            render_kw={"placeholder": "100"})
     
     # Options-specific fields
@@ -189,6 +193,32 @@ class TradeForm(FlaskForm):
                 raise ValidationError('Net credit is required for credit spread trades.')
             if net_credit.data <= 0:
                 raise ValidationError('Net credit must be positive for credit spreads.')
+    
+    def validate(self, extra_validators=None):
+        """Custom validation for planned vs actual trades"""
+        # Run standard validation first
+        ok = super().validate(extra_validators)
+        if not ok:
+            return False
+        
+        # For non-planned trades, entry fields are required
+        if not self.is_planned.data:
+            required_fields = []
+            if not self.entry_date.data:
+                required_fields.append(('entry_date', 'Entry date is required for actual trades'))
+            if not self.entry_price.data:
+                required_fields.append(('entry_price', 'Entry price is required for actual trades'))
+            if not self.quantity.data:
+                required_fields.append(('quantity', 'Quantity is required for actual trades'))
+            
+            # Add errors for missing required fields
+            for field_name, error_msg in required_fields:
+                field = getattr(self, field_name)
+                field.errors.append(error_msg)
+            
+            return len(required_fields) == 0
+        
+        return True
 
 class QuickTradeForm(FlaskForm):
     """Simplified form for quick trade entry"""

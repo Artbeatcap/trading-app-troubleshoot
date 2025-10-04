@@ -8,6 +8,10 @@
         <i class="fas fa-plus text-primary me-2"></i>
         Add New Trade
     </h1>
+    <p class="text-muted mb-3 text-center">
+        <i class="fas fa-info-circle me-2"></i>
+        Use this page to journal your existing or potential trades. Once the trades are saved, you can use the AI analysis to review the trade.
+    </p>
     <div class="btn-toolbar mb-2 mb-md-0">
         <a href="{{ url_for('trades') }}" class="btn btn-outline-secondary">
             <i class="fas fa-arrow-left me-1"></i>
@@ -26,6 +30,16 @@
                 </h5>
             </div>
             <div class="card-body">
+                <!-- Planned Trade Option -->
+                <div class="mb-4">
+                    <div class="form-check">
+                        {{ form.is_planned(class="form-check-input", id="is_planned") }}
+                        {{ form.is_planned.label(class="form-check-label", for="is_planned") }}
+                        <small class="form-text text-muted">
+                            Check this if you're planning a trade but haven't entered it yet. Entry price, quantity, and date will be optional.
+                        </small>
+                    </div>
+                </div>
                 {% if not current_user.is_authenticated %}
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle me-2"></i>
@@ -218,7 +232,7 @@
                     <!-- Entry Information -->
                     <h6 class="text-primary mb-3">
                         <i class="fas fa-sign-in-alt me-2"></i>
-                        Entry Information
+                        Entry Information <span id="entry-optional-text" class="text-muted" style="display: none;">(Optional for planned trades)</span>
                     </h6>
                     <div class="row mb-4">
                         <div class="col-md-4">
@@ -537,10 +551,18 @@
                     </div>
                     
                     <!-- Submit Buttons -->
-                    <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary" name="next_action" value="save">Save</button>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <button type="submit" class="btn btn-primary" name="next_action" value="save" id="save-btn">Save</button>
                         <button type="submit" class="btn btn-outline-primary" name="next_action" value="save_add">Save & Add Another</button>
                         <button type="submit" class="btn btn-outline-secondary" name="next_action" value="save_dup">Save & Duplicate</button>
+                        
+                        <!-- Planned trade buttons (hidden by default) -->
+                        <button type="submit" class="btn btn-success" name="next_action" value="save_planned" id="save-planned-btn" style="display: none;">
+                            <i class="fas fa-save me-1"></i>Save Planned
+                        </button>
+                        <button type="submit" class="btn btn-warning" name="next_action" value="save_planned_analyze" id="save-planned-analyze-btn" style="display: none;">
+                            <i class="fas fa-brain me-1"></i>Save & Analyze Plan
+                        </button>
                     </div>
                 </form>
             </div>
@@ -553,7 +575,7 @@
             <div class="card-header">
                 <h6 class="mb-0">
                     <i class="fas fa-lightbulb text-warning me-2"></i>
-                    Trading Tips
+                    Trade Journal Tips
                 </h6>
             </div>
             <div class="card-body">
@@ -1158,6 +1180,39 @@ function initializeAutocomplete() {
 
 // Initialize autocomplete when page loads
 document.addEventListener('DOMContentLoaded', initializeAutocomplete);
+
+// Planned trade checkbox handler
+document.addEventListener('DOMContentLoaded', function() {
+    const isPlannedCheckbox = document.getElementById('is_planned');
+    const entryOptionalText = document.getElementById('entry-optional-text');
+    const saveBtn = document.getElementById('save-btn');
+    const savePlannedBtn = document.getElementById('save-planned-btn');
+    const savePlannedAnalyzeBtn = document.getElementById('save-planned-analyze-btn');
+    
+    function togglePlannedMode() {
+        const isPlanned = isPlannedCheckbox.checked;
+        
+        if (isPlanned) {
+            // Show planned mode
+            entryOptionalText.style.display = 'inline';
+            saveBtn.style.display = 'none';
+            savePlannedBtn.style.display = 'inline-block';
+            savePlannedAnalyzeBtn.style.display = 'inline-block';
+        } else {
+            // Show normal mode
+            entryOptionalText.style.display = 'none';
+            saveBtn.style.display = 'inline-block';
+            savePlannedBtn.style.display = 'none';
+            savePlannedAnalyzeBtn.style.display = 'none';
+        }
+    }
+    
+    if (isPlannedCheckbox) {
+        isPlannedCheckbox.addEventListener('change', togglePlannedMode);
+        // Initialize on page load
+        togglePlannedMode();
+    }
+});
 
 // Auto-fill current date/time for entry if empty
 document.addEventListener('DOMContentLoaded', function() {

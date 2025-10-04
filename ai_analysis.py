@@ -358,6 +358,80 @@ class TradingAIAnalyzer:
             print(f"Error analyzing daily performance: {str(e)}")
             return None
 
+    def analyze_planned_trade(self, trade, user_settings=None):
+        """
+        Analyze a planned trade and provide entry/exit recommendations
+
+        Args:
+            trade: Trade object (planned trade)
+            user_settings: UserSettings object for risk defaults
+
+        Returns:
+            TradeAnalysis object or None if analysis fails
+        """
+        try:
+            print(f"DEBUG: analyze_planned_trade called for trade {trade.id}")
+            if not self._ensure_api_key():
+                print("DEBUG: API key validation failed, returning error dict")
+                return {"error": "OPENAI_API_KEY environment variable not set. Please add your OpenAI API key to the .env file."}
+            print("DEBUG: API key validation passed, proceeding with planned trade analysis")
+            
+            # Get current market price for context
+            current_price = trade.get_current_market_price()
+            
+            # Prepare planned trade data for analysis
+            planned_data = self._prepare_planned_trade_data(trade, user_settings, current_price)
+
+            # Generate analysis prompt
+            prompt = self._create_planned_trade_analysis_prompt(planned_data)
+
+            # Get AI analysis
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": self._get_planned_trade_system_prompt()},
+                    {"role": "user", "content": prompt},
+                ],
+                max_tokens=2000,
+                temperature=0.7,
+            )
+
+            analysis_text = response.choices[0].message.content
+
+            # Parse the analysis
+            parsed_analysis = self._parse_planned_analysis(analysis_text)
+
+            # Create or update TradeAnalysis record
+            analysis = TradeAnalysis.query.filter_by(trade_id=trade.id).first()
+            if not analysis:
+                analysis = TradeAnalysis(
+                    trade_id=trade.id, user_id=trade.user_id, ai_model_used=self.model
+                )
+
+            # Update analysis fields with planned trade specific data
+            analysis.overall_score = parsed_analysis.get("overall_score", 5)
+            analysis.entry_analysis = parsed_analysis.get("entry_analysis", "")
+            analysis.exit_analysis = parsed_analysis.get("exit_analysis", "")
+            analysis.risk_analysis = parsed_analysis.get("risk_analysis", "")
+            analysis.market_context = parsed_analysis.get("market_context", "")
+            analysis.options_analysis = parsed_analysis.get("options_analysis", "")
+
+            # Set JSON fields for planned trade recommendations
+            analysis.set_recommendations(parsed_analysis.get("recommendations", []))
+            analysis.set_key_lessons(parsed_analysis.get("key_lessons", []))
+            analysis.set_future_setups(parsed_analysis.get("future_setups", []))
+
+            # Save to database
+            db.session.add(analysis)
+            db.session.commit()
+
+            return analysis
+
+        except Exception as e:
+            print(f"DEBUG: Exception in analyze_planned_trade: {str(e)}")
+            print(f"DEBUG: Exception type: {type(e)}")
+            return None
+
     def _prepare_trade_data(self, trade):
         """Prepare trade data for AI analysis"""
         data = {
@@ -437,6 +511,70 @@ class TradingAIAnalyzer:
 
         return data
 
+    def _prepare_planned_trade_data(self, trade, user_settings, current_price):
+        """Prepare planned trade data for AI analysis"""
+        data = {
+            "symbol": trade.symbol,
+            "trade_type": trade.trade_type,
+            "setup_type": trade.setup_type,
+            "market_condition": trade.market_condition,
+            "timeframe": trade.timeframe,
+            "entry_reason": trade.entry_reason,
+            "notes": trade.notes,
+            "tags": trade.tags,
+            "stop_loss": trade.stop_loss,
+            "take_profit": trade.take_profit,
+            "risk_amount": trade.risk_amount,
+            "current_price": current_price,
+        }
+
+        # Add user risk defaults
+        if user_settings:
+            data.update({
+                "account_size": user_settings.account_size,
+                "default_risk_percent": user_settings.default_risk_percent,
+                "max_daily_loss": user_settings.max_daily_loss,
+                "max_position_size": user_settings.max_position_size,
+            })
+
+        # Add options-specific data if applicable
+        if trade.is_option_trade():
+            data.update({
+                "is_option_trade": True,
+                "is_spread_trade": trade.is_spread_trade(),
+                "strike_price": trade.strike_price,
+                "expiration_date": (
+                    trade.expiration_date.strftime("%Y-%m-%d")
+                    if trade.expiration_date
+                    else None
+                ),
+                "option_type": trade.option_type,
+                "premium_paid": trade.premium_paid,
+                "implied_volatility": trade.implied_volatility,
+                "underlying_price_at_entry": trade.underlying_price_at_entry,
+                "days_to_expiration": trade.get_days_to_expiration(),
+                "delta": trade.delta,
+                "gamma": trade.gamma,
+                "theta": trade.theta,
+                "vega": trade.vega,
+            })
+
+            # Add spread-specific data
+            if trade.is_spread_trade():
+                data.update({
+                    "spread_type": trade.spread_type,
+                    "long_strike": trade.long_strike,
+                    "short_strike": trade.short_strike,
+                    "long_premium": trade.long_premium,
+                    "short_premium": trade.short_premium,
+                    "net_credit": trade.net_credit,
+                    "max_profit": trade.max_profit,
+                    "max_loss": trade.max_loss,
+                    "breakeven_price": trade.breakeven_price,
+                })
+
+        return data
+
     def _prepare_daily_data(self, journal_entry, trades):
         """Prepare daily data for AI analysis"""
         return {
@@ -479,6 +617,20 @@ Provide specific, actionable feedback that helps the trader improve. Be construc
     def _get_daily_system_prompt(self):
         """Get the system prompt for daily analysis"""
         return """You are a world-class day trader reviewing daily performance. Focus on execution quality, emotional control, and how well the trader adapted to market conditions. Provide actionable areas for improvement and tips for the next trading day."""
+
+    def _get_planned_trade_system_prompt(self):
+        """Get the system prompt for planned trade analysis"""
+        return """You are a world-class trading coach and strategist with decades of experience in stocks, options, and derivatives trading. Your role is to analyze planned trades and provide specific entry/exit recommendations, risk management guidance, and position sizing advice.
+
+Key areas to focus on:
+1. ENTRY STRATEGY: Specific entry zones, timing, and price levels based on technical analysis
+2. RISK MANAGEMENT: Stop loss placement, position sizing, and risk/reward ratios
+3. EXIT STRATEGY: Take profit levels, trailing stops, and exit conditions
+4. MARKET CONTEXT: How the setup aligns with current market conditions
+5. POSITION SIZING: Recommended position size based on account size and risk tolerance
+6. OPTIONS ANALYSIS: For options trades, analyze strike selection, expiration, and Greeks
+
+Provide actionable, specific recommendations that the trader can implement immediately. Be practical and focus on risk management first."""
 
     def _create_trade_analysis_prompt(self, trade_data):
         """Create the analysis prompt for a single trade"""
@@ -564,6 +716,82 @@ Format your response clearly with section headers."""
 
         return prompt
 
+    def _create_planned_trade_analysis_prompt(self, planned_data):
+        """Create the analysis prompt for a planned trade"""
+        prompt = f"""Analyze this planned trade and provide specific entry/exit recommendations:
+
+PLANNED TRADE SUMMARY:
+- Symbol: {planned_data['symbol']}
+- Type: {planned_data['trade_type']}
+- Setup: {planned_data['setup_type']}
+- Timeframe: {planned_data['timeframe']}
+- Market Condition: {planned_data['market_condition']}
+- Current Price: ${planned_data['current_price']:.2f} (if available)
+
+TRADE REASONING:
+Entry Reason: {planned_data['entry_reason']}
+Notes: {planned_data['notes']}
+Tags: {planned_data['tags']}
+
+RISK MANAGEMENT:
+- Planned Stop Loss: ${planned_data['stop_loss'] or 'Not set'}
+- Planned Take Profit: ${planned_data['take_profit'] or 'Not set'}
+- Risk Amount: ${planned_data['risk_amount'] or 'Not set'}
+
+USER SETTINGS:
+- Account Size: ${planned_data.get('account_size', 'Not set')}
+- Default Risk %: {planned_data.get('default_risk_percent', 'Not set')}%
+- Max Daily Loss: ${planned_data.get('max_daily_loss', 'Not set')}
+- Max Position Size: ${planned_data.get('max_position_size', 'Not set')}
+"""
+
+        # Add options-specific analysis
+        if planned_data.get("is_option_trade"):
+            prompt += f"""
+OPTIONS DETAILS:
+- Strike Price: ${planned_data['strike_price'] or 'Not set'}
+- Expiration: {planned_data['expiration_date'] or 'Not set'}
+- Option Type: {planned_data['option_type'] or 'Not set'}
+- Premium: ${planned_data['premium_paid'] or 'Not set'}
+- Implied Volatility: {planned_data['implied_volatility'] or 'Not set'}%
+- Days to Expiration: {planned_data['days_to_expiration'] or 'Not set'}
+- Delta: {planned_data['delta'] or 'Not set'}
+- Gamma: {planned_data['gamma'] or 'Not set'}
+- Theta: {planned_data['theta'] or 'Not set'}
+- Vega: {planned_data['vega'] or 'Not set'}
+"""
+
+        # Add spread-specific analysis
+        if planned_data.get("is_spread_trade"):
+            prompt += f"""
+SPREAD DETAILS:
+- Spread Type: {planned_data['spread_type']}
+- Short Strike: ${planned_data['short_strike'] or 'Not set'}
+- Long Strike: ${planned_data['long_strike'] or 'Not set'}
+- Net Credit: ${planned_data['net_credit'] or 'Not set'}
+- Max Profit: ${planned_data['max_profit'] or 'Not set'}
+- Max Loss: ${planned_data['max_loss'] or 'Not set'}
+- Breakeven: ${planned_data['breakeven_price'] or 'Not set'}
+"""
+
+        prompt += """
+Please provide a comprehensive trading plan with:
+
+1. ENTRY STRATEGY: Specific entry zones, price levels, and timing
+2. STOP LOSS PLACEMENT: Where to place stops and why
+3. TAKE PROFIT LEVELS: 1R, 2R, 3R targets with specific prices
+4. POSITION SIZING: Recommended quantity based on account size and risk
+5. RISK ANALYSIS: Risk/reward ratio and risk management
+6. MARKET CONTEXT: How this setup fits current market conditions
+7. OPTIONS ANALYSIS: Strike selection and Greeks analysis (if applicable)
+8. RECOMMENDATIONS: Specific actionable advice for execution
+9. KEY LESSONS: Important considerations for this trade
+10. FUTURE SETUPS: Similar setups to watch for
+
+Format your response clearly with section headers and specific price levels where possible."""
+
+        return prompt
+
     def _create_daily_analysis_prompt(self, daily_data):
         """Create the analysis prompt for daily performance"""
         return f"""Analyze this trading day:
@@ -642,6 +870,49 @@ Be specific and actionable."""
                     "key_lessons",
                     "future_setups",
                 ]:
+                    # Parse as list
+                    items = [
+                        item.strip("- ").strip()
+                        for item in content.split("\n")
+                        if item.strip() and not item.strip().startswith("OVERALL")
+                    ]
+                    parsed[key] = [
+                        item for item in items if len(item) > 10
+                    ]  # Filter out short/empty items
+                else:
+                    # Parse as text
+                    parsed[key] = content
+
+        return parsed
+
+    def _parse_planned_analysis(self, analysis_text):
+        """Parse the AI planned trade analysis response into structured data"""
+        parsed = {}
+
+        # Extract overall score
+        score_match = re.search(
+            r"(?:OVERALL SCORE|SCORE).*?(\d+)", analysis_text, re.IGNORECASE
+        )
+        if score_match:
+            parsed["overall_score"] = int(score_match.group(1))
+
+        # Extract sections using regex for planned trade specific analysis
+        sections = {
+            "entry_analysis": r"ENTRY STRATEGY:?\s*(.*?)(?=\n\d+\.|STOP LOSS|$)",
+            "exit_analysis": r"TAKE PROFIT LEVELS?:?\s*(.*?)(?=\n\d+\.|POSITION SIZING|$)",
+            "risk_analysis": r"(?:STOP LOSS PLACEMENT|RISK ANALYSIS):?\s*(.*?)(?=\n\d+\.|POSITION SIZING|MARKET CONTEXT|$)",
+            "market_context": r"MARKET CONTEXT:?\s*(.*?)(?=\n\d+\.|OPTIONS ANALYSIS|RECOMMENDATIONS|$)",
+            "options_analysis": r"OPTIONS ANALYSIS:?\s*(.*?)(?=\n\d+\.|RECOMMENDATIONS|KEY LESSONS|$)",
+            "recommendations": r"RECOMMENDATIONS?:?\s*(.*?)(?=\n\d+\.|KEY LESSONS|FUTURE SETUPS|$)",
+            "key_lessons": r"KEY LESSONS?:?\s*(.*?)(?=\n\d+\.|FUTURE SETUPS|$)",
+            "future_setups": r"FUTURE SETUPS?:?\s*(.*?)(?=\n\d+\.|$)",
+        }
+
+        for key, pattern in sections.items():
+            match = re.search(pattern, analysis_text, re.IGNORECASE | re.DOTALL)
+            if match:
+                content = match.group(1).strip()
+                if key in ["recommendations", "key_lessons", "future_setups"]:
                     # Parse as list
                     items = [
                         item.strip("- ").strip()

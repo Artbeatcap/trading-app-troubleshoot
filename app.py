@@ -407,7 +407,7 @@ def market_brief():
             show_demo_data=True,
             feature_name=None,
             limitations=None,
-            brief=brief,
+            brief=brief
         )
 
     # Load briefs from database
@@ -1383,6 +1383,7 @@ def add_trade():
         session['pending_trade'] = {
             'symbol': form.symbol.data.upper(),
             'trade_type': form.trade_type.data,
+            'is_planned': form.is_planned.data,
             'entry_date': form.entry_date.data.isoformat() if form.entry_date.data else None,
             'entry_price': form.entry_price.data,
             'quantity': form.quantity.data,
@@ -1448,6 +1449,7 @@ def add_trade():
                 user_id=current_user.id,
                 symbol=form.symbol.data.upper(),
                 trade_type=form.trade_type.data,
+                is_planned=form.is_planned.data,
                 entry_date=form.entry_date.data,
                 entry_price=form.entry_price.data,
                 quantity=form.quantity.data,
@@ -1514,22 +1516,51 @@ def add_trade():
             if 'pending_trade' in session:
                 session.pop('pending_trade')
 
-            # Auto-analyze if trade is closed and user has auto-analysis enabled
-            if (
-                trade.exit_price
-                and hasattr(current_user, "settings")
-                and current_user.settings.auto_analyze_trades
-            ):
+            # Handle different next_action values
+            next_action = request.form.get('next_action', 'save')
+            
+            if next_action == 'save_planned':
+                flash("Planned trade saved successfully!", "success")
+                return redirect(url_for("view_trade", id=trade.id))
+            elif next_action == 'save_planned_analyze':
+                # Check if user has Pro access for AI analysis
+                if not current_user.has_pro_access():
+                    flash("Planned trade saved! AI planning requires Pro access. Upgrade to get AI-powered entry and exit recommendations.", "warning")
+                    return redirect(url_for("view_trade", id=trade.id))
+                
                 try:
-                    ai_analyzer.analyze_trade(trade)
-                    flash("Trade added and analyzed successfully!", "success")
+                    # Get user settings for risk defaults
+                    user_settings = None
+                    if hasattr(current_user, 'settings'):
+                        user_settings = current_user.settings
+                    
+                    analysis = ai_analyzer.analyze_planned_trade(trade, user_settings)
+                    if analysis:
+                        flash("Planned trade saved and AI analysis completed!", "success")
+                    else:
+                        flash("Planned trade saved! AI analysis failed - please try again later.", "warning")
+                    return redirect(url_for("view_trade", id=trade.id))
                 except Exception as e:
-                    print(f"Error in auto-analysis: {e}")
-                    flash("Trade added successfully! Analysis will be done later.", "success")
+                    print(f"Error in planned trade analysis: {e}")
+                    flash("Planned trade saved! AI analysis failed - please try again later.", "warning")
+                    return redirect(url_for("view_trade", id=trade.id))
             else:
-                flash("Trade added successfully!", "success")
+                # Handle normal trade analysis for closed trades
+                if (
+                    trade.exit_price
+                    and hasattr(current_user, "settings")
+                    and current_user.settings.auto_analyze_trades
+                ):
+                    try:
+                        ai_analyzer.analyze_trade(trade)
+                        flash("Trade added and analyzed successfully!", "success")
+                    except Exception as e:
+                        print(f"Error in auto-analysis: {e}")
+                        flash("Trade added successfully! Analysis will be done later.", "success")
+                else:
+                    flash("Trade added successfully!", "success")
 
-            return redirect(url_for("trades"))
+                return redirect(url_for("trades"))
             
         except Exception as e:
             print(f"Error in add_trade: {e}")
@@ -1612,6 +1643,36 @@ def analyze_trade(id):
             flash("Analysis failed. Please check your OpenAI API key.", "error")
     except Exception as e:
         print(f"DEBUG: Analysis exception: {str(e)}")
+        flash(f"Analysis error: {str(e)}", "error")
+
+    return redirect(url_for("view_trade", id=id))
+
+
+@app.route("/trade/<int:id>/analyze_planned", methods=["POST"])
+@login_required
+@requires_pro
+def analyze_planned_trade(id):
+    trade = Trade.query.filter_by(id=id, user_id=current_user.id).first_or_404()
+    
+    if not trade.is_planned:
+        flash("This trade is not a planned trade.", "error")
+        return redirect(url_for("view_trade", id=id))
+
+    try:
+        print(f"DEBUG: Starting AI planned trade analysis for trade {trade.id}")
+        
+        # Get user settings for risk defaults
+        user_settings = None
+        if hasattr(current_user, 'settings'):
+            user_settings = current_user.settings
+        
+        analysis = ai_analyzer.analyze_planned_trade(trade, user_settings)
+        if analysis:
+            flash("AI planning analysis completed!", "success")
+        else:
+            flash("AI planning analysis failed - please try again later.", "warning")
+    except Exception as e:
+        print(f"DEBUG: Planned trade analysis exception: {str(e)}")
         flash(f"Analysis error: {str(e)}", "error")
 
     return redirect(url_for("view_trade", id=id))
@@ -3018,7 +3079,7 @@ def email_diagnostics():
         out["MAIL_SUPPRESS_SEND"] = app.config.get("MAIL_SUPPRESS_SEND")
 
         # Popular providers
-        out["SENDGRID_API_KEY"] = bool(os.getenv("SENDGRID_API_KEY") or os.getenv("SENDGRID_KEY"))
+        out["SENDGRID_KEY"] = bool(os.getenv("SENDGRID_KEY"))
         out["MAILGUN_CONFIG"] = bool(os.getenv("MAILGUN_DOMAIN") and os.getenv("MAILGUN_API_KEY"))
         out["SES_CONFIG"] = bool(os.getenv("AWS_SES_ACCESS_KEY_ID") and os.getenv("AWS_SES_SECRET_ACCESS_KEY"))
 

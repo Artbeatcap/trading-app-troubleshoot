@@ -119,7 +119,12 @@
                         {% for trade in trades %}
                             <tr class="trade-row {% if trade.profit_loss and trade.profit_loss > 0 %}profit{% elif trade.profit_loss %}loss{% endif %}">
                                 <td>{{ trade.entry_date.strftime('%Y-%m-%d') if trade.entry_date is not string else trade.entry_date }}</td>
-                                <td>{{ trade.symbol }}</td>
+                                <td>
+                                    {{ trade.symbol }}
+                                    {% if trade.is_planned %}
+                                        <span class="badge bg-info ms-1">Planned</span>
+                                    {% endif %}
+                                </td>
                                 <td>{{ trade.trade_type.replace('_', ' ').title() }}</td>
                                 <td>{{ trade.setup_type }}</td>
                                 <td>${{ "%.2f"|format(trade.entry_price) }}</td>

@@ -186,6 +186,9 @@ class Trade(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
 
+    # Planned trade flag
+    is_planned = db.Column(db.Boolean, default=False, nullable=False)
+
     # ────────────────────────────────────────────────────────────
     # NEW: live quote via Tradier REST
     # ────────────────────────────────────────────────────────────
@@ -224,12 +227,12 @@ class Trade(db.Model):
     trade_type = db.Column(
         db.String(20), nullable=False
     )  # 'long', 'short', 'option_call', 'option_put'
-    entry_date = db.Column(db.DateTime, nullable=False)
+    entry_date = db.Column(db.DateTime, nullable=True)  # Nullable for planned trades
     exit_date = db.Column(db.DateTime)
 
     # Entry details
-    entry_price = db.Column(db.Float, nullable=False)
-    quantity = db.Column(db.Integer, nullable=False)
+    entry_price = db.Column(db.Float, nullable=True)  # Nullable for planned trades
+    quantity = db.Column(db.Integer, nullable=True)  # Nullable for planned trades
     entry_reason = db.Column(db.Text)  # Strategy/setup description
 
     # Exit details
@@ -498,6 +501,10 @@ class Trade(db.Model):
     def is_open_position(self):
         """Check if this is an open position (no exit price)"""
         return self.exit_price is None
+
+    def is_planned_trade(self):
+        """Check if this is a planned trade (not yet entered)"""
+        return self.is_planned
 
     def get_unrealized_pnl_with_live_price(
         self, current_option_price=None, current_stock_price=None
