@@ -596,7 +596,7 @@ VOICE & STYLE
 - When uncertain due to missing data, say so briefly.
 
 MANDATORY SECTION ORDER (Markdown H2)
-## TL;DR (Top 5 bullets)
+## Executive Summary
 ## What's moving — After-hours & Premarket
 ## Key Market Headlines
 ## Technical Analysis & Daily Range Insights
@@ -606,7 +606,7 @@ MANDATORY SECTION ORDER (Markdown H2)
 ## Housekeeping
 
 SECTION GUIDANCE & FORMATS
-- TL;DR: 3–5 bullets. Each bullet = [What changed] → [Why it matters] → [Watch X at Y level/time].
+- Executive Summary: 3–5 bullets. Each bullet = [What changed] → [Why it matters] → [Watch X at Y level/time].
 - What's moving: 3–8 tickers max. For each, write 2–5 tight sentences:
   - Catalyst (from inputs) + positioning/flow if provided
   - Why traders should care (gap size, liquidity, RV vs beta, expected ATR)
@@ -656,7 +656,7 @@ DATA FEED
 
 TASK
 Using only the DATA FEED above, produce the morning brief with the exact section set:
-1) TL;DR (Top 5 bullets; each bullet = What changed → Why it matters → Watch X at Y)
+1) Executive Summary (Top 5 bullets; each bullet = What changed → Why it matters → Watch X at Y)
 2) What's moving — After-hours & Premarket (3–8 names, 2–5 sentences each; include Watch + invalidation if given)
 3) Key Market Headlines (H3 headline, H4 'Summary', then 2–5 sentence paragraph; blank line between items)
 4) Technical Analysis & Daily Range Insights (SPY/QQQ ranges and nearby S/R only from inputs)
