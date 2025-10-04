@@ -607,6 +607,7 @@ MANDATORY SECTION ORDER (Markdown H2)
 
 SECTION GUIDANCE & FORMATS
 - Executive Summary: 3–5 bullets. Each bullet = [What changed] → [Why it matters] → [Watch X at Y level/time].
+  Format each bullet with a blank line before it for better separation.
 - What's moving: 3–8 tickers max. For each, write 2–5 tight sentences:
   - Catalyst (from inputs) + positioning/flow if provided
   - Why traders should care (gap size, liquidity, RV vs beta, expected ATR)
@@ -633,6 +634,7 @@ FORMATTING RULES
 - Plain Markdown. Bold tickers only on first mention in a section.
 - Use short paragraphs and bullets. Avoid nested bullets > 1 level deep.
 - Use "Watch:" and "Why it matters:" sparingly to aid skimming.
+- Executive Summary bullets: Add blank line before each bullet point for better visual separation.
 """
 
 BRIEF_USER_TEMPLATE = """
@@ -656,7 +658,7 @@ DATA FEED
 
 TASK
 Using only the DATA FEED above, produce the morning brief with the exact section set:
-1) Executive Summary (Top 5 bullets; each bullet = What changed → Why it matters → Watch X at Y)
+1) Executive Summary (Top 5 bullets; each bullet = What changed → Why it matters → Watch X at Y. Add blank line before each bullet for better separation)
 2) What's moving — After-hours & Premarket (3–8 names, 2–5 sentences each; include Watch + invalidation if given)
 3) Key Market Headlines (H3 headline, H4 'Summary', then 2–5 sentence paragraph; blank line between items)
 4) Technical Analysis & Daily Range Insights (SPY/QQQ ranges and nearby S/R only from inputs)
