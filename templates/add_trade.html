@@ -20,6 +20,183 @@
     </div>
 </div>
 
+<!-- Symbol Input Section - SINGLE SOURCE OF TRUTH -->
+<div class="card mb-3" style="position: relative; z-index: 1000;">
+    <div class="card-body">
+        <div class="row g-3 align-items-center">
+            <div class="col-md-4">
+                <label for="symbol-input" class="form-label fw-bold">
+                    <i class="fas fa-tag me-2"></i>Stock Symbol
+                </label>
+                <input type="text" class="form-control form-control-lg" id="symbol-input" name="symbol" 
+                       placeholder="Enter symbol (e.g., AAPL)" autocomplete="off" required>
+                <small class="text-muted">This symbol will be used for the chart and trade details</small>
+            </div>
+            <div class="col-md-8">
+                <div class="autocomplete-results" id="symbol-autocomplete"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Chart & Levels Card - MOVED TO TOP -->
+<div class="card mb-4" style="position: relative; z-index: 1;">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-chart-area me-2"></i>Chart & Levels</h5>
+    </div>
+    <div class="card-body">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label">Timeframe</label>
+                <select id="chart-timeframe" class="form-select">
+                    <option value="1d">Daily</option>
+                    <option value="4h">4 hour</option>
+                    <option value="1h">Hourly</option>
+                    <option value="5m">5 min</option>
+                    <option value="1m">1 min</option>
+                </select>
+            </div>
+            <div class="col-md-8">
+                <button id="load-chart" type="button" class="btn btn-outline-primary me-2">
+                    <i class="fas fa-sync-alt me-1"></i>Load Chart
+                </button>
+                <button id="auto-levels" type="button" class="btn btn-outline-success me-2">
+                    <i class="fas fa-magic me-1"></i>Auto-mark S/R
+                </button>
+                <button id="explain-btn" type="button" class="btn btn-outline-info me-2">
+                    <i class="fas fa-robot me-1"></i>Explain this chart
+                </button>
+                <button id="save-snapshot" type="button" class="btn btn-primary">
+                    <i class="fas fa-camera me-1"></i>Save Snapshot to Trade
+                </button>
+            </div>
+        </div>
+        
+        <!-- Enhanced S/R Controls -->
+        <div class="row mt-2">
+            <div class="col-md-12">
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" id="major-only" checked>
+                        <label class="form-check-label" for="major-only">Major only</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" id="show-circles" checked>
+                        <label class="form-check-label" for="show-circles">Show pivots</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <select id="level-style" class="form-select form-select-sm" style="width: auto;">
+                            <option value="zone" selected>Zones</option>
+                            <option value="line">Lines</option>
+                        </select>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <select id="max-levels" class="form-select form-select-sm" style="width: auto;">
+                            <option>3</option><option selected>4</option><option>5</option>
+                        </select>
+                    </div>
+                    <button id="clear-levels" type="button" class="btn btn-outline-secondary btn-sm">
+                        Clear
+                    </button>
+                    <small class="text-muted ms-2">Intraday covers recent history; older data auto-switches to Daily.</small>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Extended Hours Controls -->
+        <div class="row mt-2">
+            <div class="col-md-12">
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" id="include-premarket" checked>
+                        <label class="form-check-label" for="include-premarket">Pre-market</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" id="include-afterhours" checked>
+                        <label class="form-check-label" for="include-afterhours">After-hours</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" id="hide-closed" checked>
+                        <label class="form-check-label" for="hide-closed">Hide closed sessions</label>
+                    </div>
+                    <small class="text-muted ms-2">Pre-market: 4:00-9:30 ET | After-hours: 16:00-20:00 ET</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Scroll Zoom Tip -->
+        <div class="row mt-1">
+            <div class="col-md-12">
+                <small class="text-muted">
+                    <i class="fas fa-info-circle me-1"></i>
+                    💡 Tip: Scroll on chart to zoom price (Y-axis), Shift+Scroll to zoom time (X-axis)
+                </small>
+            </div>
+        </div>
+
+        <!-- Zoom/Pan/Draw Controls -->
+        <div class="d-flex flex-wrap gap-2 mb-2">
+            <!-- Zoom range presets -->
+            <div class="btn-group">
+                <button class="btn btn-sm btn-outline-primary" data-zoom="1D">1D</button>
+                <button class="btn btn-sm btn-outline-primary" data-zoom="5D">5D</button>
+                <button class="btn btn-sm btn-outline-primary" data-zoom="1M">1M</button>
+                <button class="btn btn-sm btn-outline-primary" data-zoom="3M">3M</button>
+                <button class="btn btn-sm btn-outline-primary" data-zoom="6M">6M</button>
+                <button class="btn btn-sm btn-outline-primary" data-zoom="YTD">YTD</button>
+                <button class="btn btn-sm btn-outline-primary" data-zoom="1Y">1Y</button>
+                <button class="btn btn-sm btn-outline-primary" data-zoom="ALL">All</button>
+            </div>
+
+            <!-- Pan/Zoom controls -->
+            <div class="btn-group ms-2">
+                <button class="btn btn-sm btn-outline-secondary" id="zoom-in">＋</button>
+                <button class="btn btn-sm btn-outline-secondary" id="zoom-out">－</button>
+                <button class="btn btn-sm btn-outline-secondary" id="pan-left">⟵</button>
+                <button class="btn btn-sm btn-outline-secondary" id="pan-right">⟶</button>
+                <button class="btn btn-sm btn-outline-secondary" id="reset">Reset</button>
+            </div>
+
+            <!-- Draw tools -->
+            <div class="btn-group ms-2">
+                <button class="btn btn-sm btn-outline-success" data-draw="zoom">Zoom</button>
+                <button class="btn btn-sm btn-outline-success" data-draw="pan">Pan</button>
+                <button class="btn btn-sm btn-outline-success" data-draw="line">Line</button>
+                <button class="btn btn-sm btn-outline-success" data-draw="rect">Zone</button>
+                <button class="btn btn-sm btn-outline-danger"  data-draw="erase">Erase</button>
+            </div>
+        </div>
+
+        <div id="tradeChart" style="height: 460px;" class="mt-3"></div>
+        
+        <!-- Level Legend -->
+        <div id="level-legend" class="mt-2"></div>
+        <div id="explain-result" class="mt-3"></div>
+        
+        <style>
+        #level-legend .badge { margin-right: .4rem; margin-bottom: .35rem; font-weight: 500; }
+        #level-legend .legend-title { font-size: .9rem; color: #6c757d; margin-right: .5rem; }
+        .js-plotly-plot .modebar-btn svg { width: 20px; height: 20px; }
+        .js-plotly-plot .modebar-group .modebar-btn { padding: 6px; }
+        .xaxislayer-above:hover,
+        .yaxislayer-above:hover,
+        .xtick:hover,
+        .ytick:hover {
+            cursor: ns-resize !important; /* vertical resize cursor for zoom indication */
+        }
+        .nsewdrag:hover,
+        .xy:hover,
+        .plot:hover {
+            cursor: move !important; /* indicate chart is interactive */
+        }
+        </style>
+
+        <!-- Hidden fields to submit with the trade -->
+        <input type="hidden" name="chart_annotations_json" id="chart_annotations_json">
+        <input type="hidden" name="chart_snapshot_path" id="chart_snapshot_path">
+    </div>
+</div>
+
 <div class="row">
     <div class="col-lg-8">
         <div class="card">
@@ -49,21 +226,11 @@
                 <form method="POST" enctype="multipart/form-data">
                     {{ form.hidden_tag() }}
                     
+                    <!-- Hidden field - value comes from top symbol input -->
+                    <input type="hidden" name="symbol" id="symbol-hidden">
+                    
                     <!-- Basic Trade Information -->
                     <div class="row mb-4">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                {{ form.symbol.label(class="form-label fw-bold") }}
-                                {{ form.symbol(class="form-control", id="symbol-input", autocomplete="off", placeholder="Enter stock symbol (e.g., AAPL)") }}
-                                {% if form.symbol.errors %}
-                                    <div class="text-danger small">
-                                        {% for error in form.symbol.errors %}
-                                            <div>{{ error }}</div>
-                                        {% endfor %}
-                                    </div>
-                                {% endif %}
-                            </div>
-                        </div>
                         <div class="col-md-6">
                             <div class="mb-3">
                                 {{ form.trade_type.label(class="form-label fw-bold") }}
@@ -502,6 +669,7 @@
                         </div>
                     </div>
                     
+                    
                     <!-- Charts & Screenshots -->
                     <div class="mb-4">
                         <label class="form-label fw-semibold">Charts & Screenshots</label>
@@ -677,6 +845,9 @@
 {% endblock %}
 
 {% block scripts %}
+<!-- Plotly CDN -->
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 {{ super() }}
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
@@ -699,6 +870,24 @@
         initPicker('#exit_date');
     });
 })();
+</script>
+<script>
+// Auto-run Explain if deep link parameter present: ?auto_explain=1&symbol=NVDA
+document.addEventListener('DOMContentLoaded', ()=>{
+    try{
+        const usp = new URLSearchParams(window.location.search);
+        if(usp.get('symbol')){
+            const s = usp.get('symbol').toUpperCase();
+            const el = document.getElementById('symbol-input');
+            if(el) el.value = s;
+        }
+        if(usp.get('auto_explain')==='1'){
+            const loadBtn = document.getElementById('load-chart');
+            if(loadBtn) loadBtn.click();
+            setTimeout(()=>{ document.getElementById('explain-btn')?.click(); }, 500);
+        }
+    }catch(_){ }
+});
 </script>
 <script>
 (function(){
@@ -1057,7 +1246,7 @@ function initializeAutocomplete() {
         border-radius: 0 0 4px 4px;
         max-height: 200px;
         overflow-y: auto;
-        z-index: 9999;
+        z-index: 10000;
         display: none;
         box-shadow: 0 4px 8px rgba(0,0,0,0.15);
     `;
@@ -1095,6 +1284,14 @@ function initializeAutocomplete() {
                 symbolInput.value = stock.symbol;
                 dropdown.style.display = 'none';
                 selectedIndex = -1;
+                
+                // Auto-load chart when symbol is selected
+                setTimeout(() => {
+                    const loadButton = document.getElementById('load-chart');
+                    if (loadButton) {
+                        loadButton.click();
+                    }
+                }, 100);  // Small delay to ensure symbol is set
             });
             
             dropdown.appendChild(item);
@@ -1160,6 +1357,14 @@ function initializeAutocomplete() {
                 symbolInput.value = selectedStock.symbol;
                 dropdown.style.display = 'none';
                 selectedIndex = -1;
+                
+                // Auto-load chart when symbol is selected via Enter
+                setTimeout(() => {
+                    const loadButton = document.getElementById('load-chart');
+                    if (loadButton) {
+                        loadButton.click();
+                    }
+                }, 100);
             }
         } else if (e.key === 'Escape') {
             dropdown.style.display = 'none';
@@ -1335,5 +1540,867 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+</script>
+
+<!-- Chart & Levels JavaScript -->
+<script>
+const el = document.getElementById('tradeChart');
+let chartData = null;
+let layout = {
+    dragmode: 'zoom',
+    margin: {l:40,r:8,t:20,b:20},
+    xaxis: {type:'date', rangeslider:{visible:false}},
+    yaxis: {fixedrange:false},
+    shapes: []
+};
+
+function isEquitySymbol(sym) {
+    // crude but effective: you can refine by lookup later
+    return /^[A-Z.\-]{1,6}$/.test(sym);
+}
+
+// Auto timeframe picker based on zoom window
+function pickTF(windowMs) {
+    const MS_DAY = 86400000;
+    if (windowMs <= 3*MS_DAY)   return '1m';
+    if (windowMs <= 14*MS_DAY)  return '5m';
+    if (windowMs <= 180*MS_DAY) return '1h';
+    if (windowMs <= 540*MS_DAY) return '4h';   // NEW
+    return '1d';
+}
+
+// Helper: set x range by label
+function setRangeByLabel(label){
+    const MS_DAY = 86400000;  // Define MS_DAY locally (24 * 60 * 60 * 1000)
+    const now = buffer.t.length ? new Date(buffer.t[buffer.t.length-1]) : new Date();
+    let start;
+    const d = (n)=>new Date(now.getTime() - n*MS_DAY);
+
+    switch(label){
+        case '1D':  start = d(1);  break;
+        case '5D':  start = d(5);  break;
+        case '1M':  start = d(30); break;
+        case '3M':  start = d(90); break;
+        case '6M':  start = d(180);break;
+        case 'YTD': start = new Date(new Date(now.getFullYear(),0,1)); break;
+        case '1Y':  start = d(365); break;
+        case 'ALL': start = new Date(buffer.t[0]); break;
+        default: return;
+    }
+    Plotly.relayout(el, {'xaxis.range':[start, now], 'xaxis.autorange': false, 'yaxis.autorange': true});
+}
+
+// Helper: get current range
+function currentRange(){
+    const r = el.layout?.xaxis?.range;
+    if (r && r.length===2) return [new Date(r[0]), new Date(r[1])];
+    const last = buffer.t[buffer.t.length-1];
+    return [new Date(last-5*MS_DAY), new Date(last)]; // fallback
+}
+
+// Helper: merge bars (for backfill)
+function mergeBars(a, b) {
+    const all = [...a.t.map((t,i)=>({t,o:a.o[i],h:a.h[i],l:a.l[i],c:a.c[i],v:a.v[i]})),
+                  ...b.t.map((t,i)=>({t,o:b.o[i],h:b.h[i],l:b.l[i],c:b.c[i],v:b.v[i]}))];
+    all.sort((x,y)=>x.t-y.t);
+    const seen = new Set();
+    const unique = all.filter(x=>{
+        if(seen.has(x.t)) return false;
+        seen.add(x.t);
+        return true;
+    });
+    return {
+        t: unique.map(x=>x.t),
+        o: unique.map(x=>x.o),
+        h: unique.map(x=>x.h),
+        l: unique.map(x=>x.l),
+        c: unique.map(x=>x.c),
+        v: unique.map(x=>x.v)
+    };
+}
+
+// Helper: fetch range
+async function fetchRange(symbol, tf, startISO, endISO) {
+    const params = new URLSearchParams({ symbol, tf });
+    if (tf === '1d') {
+        const start = new Date(Date.now() - 3650*24*3600*1000).toISOString().slice(0,10);
+        params.set('start', start);
+    } else if (startISO) {
+        params.set('start', startISO);
+    }
+    if (endISO) params.set('end', endISO);
+    
+    const res = await fetch(`/api/candles?${params.toString()}`);
+    const j = await res.json();
+    if (j.error) throw new Error(j.error);
+    return j;
+}
+
+// Return Plotly rangebreaks that hide nights/weekends but keep PM/AH if requested.
+function buildRangebreaks({ includePM=true, includeAH=true, hideClosed=true }) {
+    if (!hideClosed) return [];
+    const breaks = [
+        // Hide full weekends
+        { pattern: 'day of week', bounds: ['sat', 'mon'] },
+    ];
+    
+    // Hide the overnight period from market close (16:00/4PM) to market open (09:30/9:30AM)
+    // This covers: 16:00-24:00 and 00:00-09:30 on each trading day
+    breaks.push({ pattern: 'hour', bounds: [16, 24] }); // Market close (4 PM) to midnight
+    breaks.push({ pattern: 'hour', bounds: [0, 9] });    // Midnight to 9 AM
+    
+    // Hide 9:00-9:30 AM (pre-market gap before 9:30 market open) unless PM is included
+    // Use values pattern with daily repeating template
+    if (!includePM) {
+        breaks.push({ 
+            values: ['1970-01-01 09:00', '1970-01-01 09:30']  // Hides 9:00-9:30 AM daily
+        });
+    }
+    
+    // The breaks above ensure:
+    // - Weekends are hidden
+    // - Market close (16:00/4 PM) to market open (09:30/9:30 AM) is hidden
+    // - 9:00-9:30 AM gap is hidden unless pre-market is enabled
+    // - After-hours period (16:00+) is hidden by the [16, 24] break
+    
+    return breaks;
+}
+
+// Apply rangebreaks based on current UI + timeframe.
+// For daily TF, we only need weekend break; intraday uses full set above.
+function applyRangebreaks(symbol, tf) {
+    const includePM = document.getElementById('include-premarket')?.checked ?? true;
+    const includeAH = document.getElementById('include-afterhours')?.checked ?? true;
+    const hideClosed = document.getElementById('hide-closed')?.checked ?? true;
+
+    let rb = [];
+    if (tf === '1d') {
+        // daily: hide weekends; nights are irrelevant at 1D granularity
+        rb = hideClosed ? [{ pattern:'day of week', bounds:['sat','mon'] }] : [];
+    } else {
+        // For 4h and shorter timeframes, always apply comprehensive rangebreaks to remove gaps
+        const isShortTF = ['4h', '1h', '30m', '15m', '5m', '1m'].includes(tf);
+        if (isShortTF && hideClosed) {
+            // Force hideClosed=true for short timeframes to remove all gaps
+            rb = buildRangebreaks({ includePM, includeAH, hideClosed: true });
+        } else {
+            rb = buildRangebreaks({ includePM, includeAH, hideClosed });
+        }
+    }
+
+    // Note: Plotly uses the viewer's local timezone for axis labels/tooltips.
+    // Your Tiingo timestamps are UTC; that's fine—breaks still apply to displayed local time.
+    layout.xaxis = {
+        ...(layout.xaxis || {}),
+        type: 'date',
+        rangeslider: { visible: false },
+        rangebreaks: rb,
+        autorange: layout.xaxis?.autorange !== undefined ? layout.xaxis.autorange : true  // Preserve autorange setting
+    };
+}
+
+// Remove zero-volume / NaN bars so PM/AH only shows executed trades
+function filterBars(j) {
+    const t=[] , o=[], h=[], l=[], c=[], v=[];
+    for (let i=0; i<j.t.length; i++) {
+        const vi = j.v?.[i] ?? 0;
+        const oi = j.o[i], hi=j.h[i], li=j.l[i], ci=j.c[i];
+        // keep daily bars as-is; for intraday, drop bars with zero volume or NaN
+        const isValid = Number.isFinite(oi)&&Number.isFinite(hi)&&Number.isFinite(li)&&Number.isFinite(ci) && (vi>0 || j.t.length<=400);
+        if (isValid) { t.push(j.t[i]); o.push(oi); h.push(hi); l.push(li); c.push(ci); v.push(vi); }
+    }
+    return { t, o, h, l, c, v };
+}
+
+async function loadCandles() {
+    const symbol = (document.getElementById('symbol-input')?.value || 'AAPL').toUpperCase();
+    const tf = document.getElementById('chart-timeframe').value;
+    
+    currentSymbol = symbol;
+    currentTF = tf;
+    
+    const params = new URLSearchParams({ symbol, tf });
+    if (tf === '1d') {
+        // pull ~10 years by default
+        const start = new Date(Date.now() - 3650*24*3600*1000).toISOString().slice(0,10);
+        params.set('start', start);
+    }
+    
+    const res = await fetch(`/api/candles?${params.toString()}`);
+    let j = await res.json();
+    if (j.error) { 
+        alert(j.error); 
+        return; 
+    }
+
+    // Filter out empty bars for intraday so we don't plot "flat" closed periods
+    if (tf !== '1d') j = filterBars(j);
+
+    chartData = j;
+    buffer = j; // Store in buffer for backfill system
+    
+    // Clear any stale range and explicitly enable autorange for both axes BEFORE applying rangebreaks
+    // This ensures autorange is preserved when rangebreaks update the layout
+    delete layout.xaxis.range;
+    layout.xaxis.autorange = true;
+    layout.yaxis = { ...(layout.yaxis || {}), autorange: true, fixedrange: false };
+    
+    // Apply rangebreaks (skip closed time), only for typical equities
+    // This will update layout.xaxis but autorange=true is already set above
+    if (isEquitySymbol(symbol)) {
+        applyRangebreaks(symbol, tf);
+        // Ensure autorange stays true after rangebreaks update
+        layout.xaxis.autorange = true;
+    } else {
+        // e.g., crypto/FX leave empty to show 24/7
+        layout.xaxis = {
+            ...(layout.xaxis || {}),
+            type: 'date',
+            rangeslider: { visible: false },
+            rangebreaks: [],
+            autorange: true
+        };
+    }
+
+    const trace = {
+        type: 'candlestick',
+        x: j.t.map(ts => new Date(ts)),
+        open: j.o, high: j.h, low: j.l, close: j.c,
+        name: symbol,
+        increasing: {line:{width:1}},
+        decreasing: {line:{width:1}}
+    };
+
+    Plotly.newPlot(el, [trace], layout, {
+        responsive: true,
+        displaylogo: false,
+        modeBarButtonsToAdd: ['zoom2d','pan2d','resetScale2d','autoscale','drawline','drawrect','eraseshape']
+    });
+    
+    // Connect the onRelayout handler for deep backfill
+    el.on('plotly_relayout', onRelayout);
+    
+    // Setup axis scroll zoom after chart is loaded
+    setTimeout(setupAxisScrollZoom, 200);
+    
+    // Auto-zoom to recent data, then show S/R levels and expected move
+    setTimeout(async () => {
+        // Calculate appropriate zoom window based on timeframe
+        const bars = j.t.length;
+        let recentBars = bars;
+        const tf = document.getElementById('chart-timeframe').value;
+        
+        // Determine how many bars to show based on timeframe
+        const barCounts = {
+            '1m': 120,   // last ~2 hours
+            '5m': 96,    // last ~8 hours  
+            '15m': 96,   // last ~24 hours
+            '30m': 84,   // last ~42 hours (1.75 days)
+            '1h': 120,   // last 5 days
+            '4h': 84,    // last 2 weeks
+            '1d': 90     // last 3 months
+        };
+        recentBars = Math.min(bars, barCounts[tf] || 90);
+        
+        if (bars > recentBars) {
+            // Zoom to show only the most recent bars
+            const startIdx = bars - recentBars;
+            const startTime = new Date(j.t[startIdx]);
+            const endTime = new Date(j.t[bars - 1]);
+            await Plotly.relayout(el, {
+                'xaxis.range': [startTime, endTime],
+                'xaxis.autorange': false,
+                'yaxis.autorange': true
+            });
+        }
+        
+        // Auto-mark support/resistance levels
+        try {
+            await autoLevels();
+        } catch (err) {
+            console.warn('Auto-levels failed:', err);
+        }
+        
+        // Auto-show expected move and scenarios
+        try {
+            await runExplain();
+        } catch (err) {
+            console.warn('Auto-explain failed:', err);
+        }
+    }, 300); // Wait for chart to fully render
+}
+
+// Improved onRelayout with deep backfill fix
+const onRelayout = debounce(async (ev) => {
+    if (fetching) return;
+
+    // 1) get visible window
+    const x0 = ev['xaxis.range[0]'] || el.layout?.xaxis?.range?.[0];
+    const x1 = ev['xaxis.range[1]'] || el.layout?.xaxis?.range?.[1];
+    if (!x0 || !x1) return;
+    const left  = new Date(x0).getTime();
+    const right = new Date(x1).getTime();
+    const windowMs = right - left;
+
+    // 2) choose best TF for this window
+    const newTF = pickTF(windowMs);
+    const tfChanged = newTF !== currentTF;
+
+    // 3) find current coverage
+    const minTs = buffer.t.length ? buffer.t[0] : left;
+    const maxTs = buffer.t.length ? buffer.t[buffer.t.length-1] : right;
+
+    // if the new visible window extends beyond our data, fetch to fully cover it (+padding)
+    const PAD = Math.max(0.25*windowMs, 2*MS_DAY); // always pad at least 2 days
+    const needStart = left  < (minTs + 6e4);  // left edge earlier than earliest buffered?
+    const needEnd   = right > (maxTs - 6e4);  // right edge later than latest buffered?
+
+    try {
+        fetching = true;
+
+        // If timeframe changed → reload the whole visible window with that TF
+        if (tfChanged) {
+            currentTF = newTF;
+            const startISO = new Date(left - PAD).toISOString().slice(0,16).replace('T',' ');
+            const endISO   = new Date(right + PAD).toISOString().slice(0,16).replace('T',' ');
+            const j = await fetchRange(currentSymbol, currentTF, startISO, endISO);
+            buffer = j;
+
+            applyRangebreaks(currentSymbol, currentTF);
+            await Plotly.react(el, [{
+                type:'candlestick',
+                x: buffer.t.map(ts=>new Date(ts)),
+                open:buffer.o, high:buffer.h, low:buffer.l, close:buffer.c,
+                name: currentSymbol, increasing:{line:{width:1}}, decreasing:{line:{width:1}}
+            }], {...layout, yaxis:{fixedrange:false, autorange:true}}, {responsive:true, displaylogo:false});
+
+            await Plotly.relayout(el, {'xaxis.range':[new Date(left), new Date(right)]});
+        } else {
+            // Same TF but we zoomed beyond the buffer: fetch the missing sides
+
+            if (needStart) {
+                const wantStart = new Date(left - PAD);
+                const wantEnd   = new Date(minTs - 6e4);
+                const jL = await fetchRange(currentSymbol, currentTF, wantStart.toISOString().slice(0,10), wantEnd.toISOString().slice(0,10));
+                buffer = mergeBars(buffer, jL);
+            }
+            if (needEnd) {
+                const wantStart = new Date(maxTs + 6e4);
+                const wantEnd   = new Date(right + PAD);
+                const jR = await fetchRange(currentSymbol, currentTF, wantStart.toISOString().slice(0,10), wantEnd.toISOString().slice(0,10));
+                buffer = mergeBars(buffer, jR);
+            }
+
+            if (needStart || needEnd) {
+                await Plotly.restyle(el, {
+                    x: [buffer.t.map(ts=>new Date(ts))],
+                    open:[buffer.o], high:[buffer.h], low:[buffer.l], close:[buffer.c]
+                }, [0]);
+                await Plotly.relayout(el, {'xaxis.range':[new Date(left), new Date(right)], 'yaxis.autorange': true});
+            }
+        }
+    } catch (err) {
+        console.warn('relayout fetch error', err.message);
+    } finally {
+        fetching = false;
+    }
+}, 200);
+
+// Debounce helper
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+async function autoLevels() {
+    if (!chartData) return;
+    const major = document.getElementById('major-only').checked ? "1":"0";
+    const circles = document.getElementById('show-circles').checked ? "1":"0";
+    const style = document.getElementById('level-style').value;
+    const max = document.getElementById('max-levels').value;
+
+    const res = await fetch(`/api/ai/sr-levels?major=${major}&circles=${circles}&style=${style}&max=${max}`, {
+        method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(chartData)
+    });
+    const { level_shapes, pivot_circles, levels } = await res.json();
+
+    // replace previous AI levels instead of piling on
+    const keep = (el._fullLayout.shapes || []).filter(s => !(s._generated_by === 'ai_major'));
+    const tagged = (arr) => arr.map(s => ({...s, _generated_by:'ai_major'}));
+    layout.shapes = keep.concat(tagged(level_shapes), tagged(pivot_circles));
+    Plotly.relayout(el, {shapes: layout.shapes});
+
+    // NEW: legend
+    renderLevelLegend(levels || []);
+}
+
+function formatPx(n){ return (+n).toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2}); }
+
+function renderLevelLegend(levels=[]) {
+    const elLegend = document.getElementById('level-legend');
+    if (!elLegend) return;
+    if (!levels.length) { elLegend.innerHTML = ""; return; }
+
+    const badges = levels.map((p,i)=>`<span class="badge bg-info-subtle text-info-emphasis">L${i+1}: ${formatPx(p)}</span>`).join("");
+    elLegend.innerHTML = `<span class="legend-title">Major levels:</span>${badges}`;
+}
+
+async function saveSnapshot() {
+    // Save annotations JSON
+    const gd = el;
+    const fullLayout = gd._fullLayout;
+    const shapes = (fullLayout.shapes || []).map(s => ({...s, x0: s.x0, x1: s.x1, y0: s.y0, y1: s.y1}));
+    document.getElementById('chart_annotations_json').value = JSON.stringify({shapes});
+
+    // Save PNG to server
+    const dataUrl = await Plotly.toImage(el, {format:'png', width:1200, height:600, scale:2});
+    const up = await fetch('/api/upload-chart', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({dataUrl})});
+    const j = await up.json();
+    if (j.path) {
+        document.getElementById('chart_snapshot_path').value = j.path;
+        alert('Chart snapshot attached to this trade.');
+    } else {
+        alert('Could not save snapshot.');
+    }
+}
+
+document.getElementById('load-chart').addEventListener('click', loadCandles);
+document.getElementById('auto-levels').addEventListener('click', autoLevels);
+document.getElementById('save-snapshot').addEventListener('click', saveSnapshot);
+
+// Explain this chart (timeframe-aware)
+async function runExplain(){
+  const symbol = (document.getElementById('symbol-input')?.value || 'AAPL').toUpperCase();
+  const tf = document.getElementById('chart-timeframe')?.value || '1d';
+  const r = await fetch('/api/ai/explain_chart', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ symbol, timeframes:[tf], context:{ include_expected_move:true }, user_risk_prefs:{ risk_per_trade_pct: 1.0 } })
+  });
+  const data = await r.json();
+  const tfb = (data.timeframes||[])[0];
+  const elOut = document.getElementById('explain-result');
+  if(!tfb){ elOut.innerHTML = '<div class="text-muted">No analysis</div>'; return; }
+  const em = tfb.expected_move, lv = tfb.levels;
+
+  elOut.innerHTML = `
+    <div class="card border-info">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+          <h6 class="mb-0">${data.symbol} • ${tfb.tf.toUpperCase()}</h6>
+          <div class="small text-muted">ATR(14) ${em.atr.toFixed(2)} • EM ±${(em.atr*em.atr_mult).toFixed(2)} → ${em.lower.toFixed(2)} / ${em.upper.toFixed(2)}</div>
+        </div>
+        <div class="small mt-1 text-muted">Levels: L ${lv.recent_low} • Mid ${lv.mid} • H ${lv.recent_high}</div>
+        <div class="mt-2 d-flex gap-2 flex-wrap">
+          <button class="btn btn-sm btn-outline-info" onclick='showEMBand({lower: ${em.lower}, upper: ${em.upper}})'>Show Expected Move</button>
+          <button class="btn btn-sm btn-outline-secondary" onclick="clearEMBand()">Clear EM</button>
+        </div>
+        <div class="row g-2 mt-2">
+          ${tfb.scenarios.map(s=>`
+            <div class="col-md-6">
+              <div class="border rounded p-2 h-100">
+                <div class="small text-muted">${s.direction.toUpperCase()} • ${s.playbook} • ${(s.probability*100).toFixed(0)}%</div>
+                <div class="fw-semibold">Trigger: ${s.trigger}</div>
+                <div class="small">Entry ${s.entry_zone[0]}–${s.entry_zone[1]} • Stop ${s.invalidation} • T1/T2/T3 ${s.targets.join('/')}</div>
+                <div class="small text-muted">R:R ${s.r_r}</div>
+                <div class="small mt-1">${s.notes}</div>
+                <div class="mt-2 d-flex gap-2 flex-wrap">
+                  <button class="btn btn-sm ${s.direction==='bull'?'btn-success':'btn-danger'}"
+                          onclick="showScenarioZones({ direction: '${s.direction}', entry0: ${s.entry_zone[0]}, entry1: ${s.entry_zone[1]}, stop: ${s.invalidation}, t1: ${s.targets[0]}, t2: ${s.targets[1]}, t3: ${s.targets[2]} })">
+                    Show ${s.direction==='bull'?'Bull':'Bear'} zones
+                  </button>
+                  <button class="btn btn-sm btn-outline-secondary" onclick="clearScenarioZones()">Clear zones</button>
+                </div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    </div>`;
+}
+document.getElementById('explain-btn').addEventListener('click', runExplain);
+
+document.getElementById('clear-levels').addEventListener('click', () => {
+    layout.shapes = (el._fullLayout.shapes || []).filter(s => !(s._generated_by === 'ai_major'));
+    Plotly.relayout(el, {shapes: layout.shapes});
+    renderLevelLegend([]); // clear legend
+});
+
+// Re-apply rangebreaks when toggles change
+['include-premarket','include-afterhours','hide-closed'].forEach(id=>{
+    const elToggle = document.getElementById(id);
+    if (!elToggle) return;
+    elToggle.addEventListener('change', async ()=>{
+        if (chartData) {
+            const symbol = (document.getElementById('symbol-input')?.value || 'AAPL').toUpperCase();
+            const tf = document.getElementById('chart-timeframe').value;
+            applyRangebreaks(symbol, tf);
+            // Just relayout to apply the new breaks without touching data
+            await Plotly.relayout(el, { xaxis: layout.xaxis });
+        }
+    });
+});
+
+// Auto-reload chart when timeframe changes
+document.getElementById('chart-timeframe').addEventListener('change', () => {
+    // Only auto-reload if a chart is already loaded
+    if (chartData) {
+        const loadButton = document.getElementById('load-chart');
+        if (loadButton) {
+            loadButton.click();
+        }
+    }
+    // If explain panel is visible, refresh analysis for new timeframe
+    if (document.getElementById('explain-result').innerHTML.trim()) {
+        clearEMBand(); clearScenarioZones();
+        runExplain();
+    }
+});
+
+// Wire preset buttons
+document.querySelectorAll('[data-zoom]').forEach(btn=>{
+    btn.addEventListener('click', ()=> setRangeByLabel(btn.dataset.zoom));
+});
+
+// Zoom/Pan step controls
+document.getElementById('zoom-in').addEventListener('click', ()=>{
+    const [a,b]=currentRange(); const mid=(a.getTime()+b.getTime())/2; const span=(b-a)/2;
+    Plotly.relayout(el, {'xaxis.range':[new Date(mid-span/2), new Date(mid+span/2)], 'xaxis.autorange': false, 'yaxis.autorange': true});
+});
+document.getElementById('zoom-out').addEventListener('click', ()=>{
+    const [a,b]=currentRange(); const mid=(a.getTime()+b.getTime())/2; const span=(b-a);
+    Plotly.relayout(el, {'xaxis.range':[new Date(mid-1.5*span), new Date(mid+1.5*span)], 'xaxis.autorange': false, 'yaxis.autorange': true});
+});
+document.getElementById('pan-left').addEventListener('click', ()=>{
+    const [a,b]=currentRange(); const span=(b-a);
+    Plotly.relayout(el, {'xaxis.range':[new Date(a-span*0.5), new Date(b-span*0.5)], 'xaxis.autorange': false});
+});
+document.getElementById('pan-right').addEventListener('click', ()=>{
+    const [a,b]=currentRange(); const span=(b-a);
+    Plotly.relayout(el, {'xaxis.range':[new Date(a+span*0.5), new Date(b+span*0.5)], 'xaxis.autorange': false});
+});
+document.getElementById('reset').addEventListener('click', ()=>{
+    Plotly.relayout(el, {'xaxis.autorange': true, 'yaxis.autorange': true});
+});
+
+// Draw tool toggles
+document.querySelectorAll('[data-draw]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+        const mode = btn.dataset.draw;
+        if (mode === 'zoom')  return Plotly.relayout(el, {dragmode:'zoom'});
+        if (mode === 'pan')   return Plotly.relayout(el, {dragmode:'pan'});
+        if (mode === 'line')  return Plotly.relayout(el, {dragmode:'drawline'});
+        if (mode === 'rect')  return Plotly.relayout(el, {dragmode:'drawrect'});
+        if (mode === 'erase') return Plotly.relayout(el, {dragmode:'eraseshape'});
+    });
+});
+
+// Enhanced scroll wheel zoom on chart
+(function setupAxisScrollZoom() {
+    const checkChart = setInterval(() => {
+        if (!el || !el._fullLayout) return;
+        clearInterval(checkChart);
+        
+        const plotDiv = el;
+        
+        // Add wheel event listener with capture phase to intercept before Plotly
+        plotDiv.addEventListener('wheel', (e) => {
+            const target = e.target;
+            
+            // Check if scrolling on X-axis labels
+            const onXAxis = target.closest('.xaxislayer-above') || 
+                           target.closest('.xtick') ||
+                           (target.classList && (target.classList.contains('xtick') || 
+                                                target.classList.contains('xaxislayer-above')));
+            
+            // Check if scrolling on Y-axis labels
+            const onYAxis = target.closest('.yaxislayer-above') || 
+                           target.closest('.ytick') ||
+                           (target.classList && (target.classList.contains('ytick') || 
+                                                target.classList.contains('yaxislayer-above')));
+            
+            // Check if scrolling on plot area (the actual chart)
+            const onPlotArea = target.closest('.nsewdrag') || 
+                              target.closest('.xy') ||
+                              target.closest('.plot') ||
+                              (target.classList && (target.classList.contains('nsewdrag') || 
+                                                   target.classList.contains('xy') ||
+                                                   target.classList.contains('plot')));
+            
+            // Only handle if on axis labels OR plot area
+            if (!onXAxis && !onYAxis && !onPlotArea) return;
+            
+            // Always prevent default and stop propagation to ensure zoom works
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const zoomFactor = e.deltaY > 0 ? 1.15 : 0.85; // Zoom out or in
+            const layout = plotDiv._fullLayout;
+            
+            // Determine zoom direction
+            let zoomXAxis = false;
+            let zoomYAxis = false;
+            
+            if (onXAxis) {
+                // Scrolling on X-axis labels: zoom X-axis only
+                zoomXAxis = true;
+            } else if (onYAxis) {
+                // Scrolling on Y-axis labels: zoom Y-axis only
+                zoomYAxis = true;
+            } else if (onPlotArea) {
+                // Scrolling on plot area
+                if (e.shiftKey) {
+                    // Shift + scroll: zoom X-axis (time/horizontal)
+                    zoomXAxis = true;
+                } else {
+                    // Normal scroll: zoom Y-axis (price/vertical)
+                    zoomYAxis = true;
+                }
+            }
+            
+            const updates = {};
+            
+            if (zoomXAxis) {
+                // Zoom X-axis around center
+                const xaxis = layout.xaxis;
+                const currentRange = xaxis.range;
+                if (!currentRange || currentRange.length !== 2) return;
+                
+                const x0 = new Date(currentRange[0]).getTime();
+                const x1 = new Date(currentRange[1]).getTime();
+                const center = (x0 + x1) / 2;
+                const span = (x1 - x0) / 2;
+                const newSpan = span * zoomFactor;
+                
+                updates['xaxis.range'] = [
+                    new Date(center - newSpan),
+                    new Date(center + newSpan)
+                ];
+                updates['xaxis.autorange'] = false;
+            }
+            
+            if (zoomYAxis) {
+                // Zoom Y-axis around center
+                const yaxis = layout.yaxis;
+                const currentRange = yaxis.range;
+                if (!currentRange || currentRange.length !== 2) return;
+                
+                const y0 = currentRange[0];
+                const y1 = currentRange[1];
+                const center = (y0 + y1) / 2;
+                const span = (y1 - y0) / 2;
+                const newSpan = span * zoomFactor;
+                
+                updates['yaxis.range'] = [center - newSpan, center + newSpan];
+                updates['yaxis.autorange'] = false;
+            }
+            
+            if (Object.keys(updates).length > 0) {
+                Plotly.relayout(plotDiv, updates);
+            }
+        }, { passive: false, capture: true }); // Use capture phase to intercept early
+        
+    }, 100);
+})();
+
+// Form submission handler to copy symbol value to hidden field
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.querySelector('form');
+    const symbolInput = document.getElementById('symbol-input');
+    const symbolHidden = document.getElementById('symbol-hidden');
+    
+    if (form && symbolInput && symbolHidden) {
+        form.addEventListener('submit', () => {
+            symbolHidden.value = symbolInput.value;
+        });
+    }
+});
+
+// ====== Overlays: EM band and scenario zones with labels ======
+function currentXRange(){
+    const r = el.layout?.xaxis?.range;
+    if (r && r.length===2) return [new Date(r[0]), new Date(r[1])];
+    const xs = chartData?.t || [];
+    if (xs.length) return [new Date(xs[0]), new Date(xs[xs.length-1])];
+    const now = new Date(); return [new Date(now-7*24*3600*1000), now];
+}
+
+async function _clearByTag(prefix){
+    if (!el || !el._fullLayout) {
+        console.warn('_clearByTag: chart element or layout not available');
+        return;
+    }
+    // Get current shapes and annotations, filtering out those with matching tag prefix
+    // Read from Plotly's current layout state
+    const layout = el._fullLayout;
+    if (!layout) {
+        console.warn('_clearByTag: layout not available');
+        return;
+    }
+    
+    const currentShapes = (layout.shapes || []).slice(); // Make a copy to avoid mutation issues
+    const currentAnnots = (layout.annotations || []).slice(); // Make a copy
+    
+    // Filter out shapes and annotations that match the prefix
+    const shapes = currentShapes.filter(s => {
+        const tag = s._generated_by;
+        if (!tag || typeof tag !== 'string') return true; // Keep if no tag
+        return !tag.startsWith(prefix); // Keep if tag doesn't start with prefix
+    });
+    
+    const annots = currentAnnots.filter(a => {
+        const tag = a._generated_by;
+        if (!tag || typeof tag !== 'string') return true; // Keep if no tag
+        return !tag.startsWith(prefix); // Keep if tag doesn't start with prefix
+    });
+    
+    // Debug logging
+    const removedShapes = currentShapes.length - shapes.length;
+    const removedAnnots = currentAnnots.length - annots.length;
+    if (removedShapes > 0 || removedAnnots > 0) {
+        console.log(`_clearByTag('${prefix}'): Removing ${removedShapes} shapes, ${removedAnnots} annotations`);
+    }
+    
+    // Update the layout with filtered arrays - this will remove all shapes/annotations with matching tags
+    try {
+        await Plotly.relayout(el, { shapes, annotations: annots });
+        // Verify removal after Plotly updates
+        await new Promise(resolve => setTimeout(resolve, 100));
+        const verifyLayout = el._fullLayout;
+        const remaining = (verifyLayout.shapes || []).filter(s => 
+            s._generated_by && typeof s._generated_by === 'string' && s._generated_by.startsWith(prefix)
+        ).length;
+        if (remaining > 0) {
+            console.warn(`_clearByTag: ${remaining} shapes with prefix '${prefix}' still remain after relayout`);
+        }
+    } catch (err) {
+        console.error('Error clearing shapes/annotations:', err);
+    }
+}
+
+async function showEMBand(em){
+    if (!el || !el._fullLayout || !em) return;
+    const [x0, x1] = currentXRange();
+    const tag = 'em_band';
+    await _clearByTag(tag);
+    // Wait a moment for Plotly to update layout after clearing
+    await new Promise(resolve => setTimeout(resolve, 50));
+    const addShapes = [{
+        type:'rect', xref:'x', yref:'y', x0:x0, x1:x1, y0: em.lower, y1: em.upper,
+        fillcolor:'rgba(52,152,219,0.12)', line:{width:0}, layer:'below', _generated_by:tag
+    }];
+    // Read current shapes after clearing is complete
+    const currentShapes = el._fullLayout?.shapes || [];
+    await Plotly.relayout(el, { shapes: currentShapes.concat(addShapes) });
+}
+async function clearEMBand(){ 
+    await _clearByTag('em_band'); 
+}
+
+// Track scenario shapes/annotations by using a marker property Plotly preserves
+const SCENARIO_MARKER = '__scenario_zone__';
+
+async function clearScenarioZones(){ 
+    if (!el || !el._fullLayout) {
+        console.warn('clearScenarioZones: chart not available');
+        return;
+    }
+    
+    const layout = el._fullLayout;
+    const currentShapes = (layout.shapes || []).slice();
+    const currentAnnots = (layout.annotations || []).slice();
+    
+    // Filter by checking both _generated_by and a visible property pattern (fillcolor for rects, specific colors for lines)
+    const scenarioFillColors = ['rgba(46,204,113,0.18)', 'rgba(231,76,60,0.18)']; // bull/bear fills
+    const scenarioLineColors = ['rgba(39,174,96,0.9)', 'rgba(192,57,43,0.9)']; // bull/bear lines
+    
+    const shapes = currentShapes.filter(s => {
+        // Check _generated_by tag first
+        const tag = s._generated_by;
+        if (tag && typeof tag === 'string' && tag.startsWith('scenario_')) {
+            return false; // Remove it
+        }
+        // Also check by visible properties (Plotly preserves these)
+        if (s.type === 'rect' && s.fillcolor && scenarioFillColors.includes(s.fillcolor)) {
+            return false; // Remove scenario rects
+        }
+        if (s.type === 'line' && s.line && scenarioLineColors.includes(s.line.color)) {
+            return false; // Remove scenario lines
+        }
+        return true; // Keep everything else
+    });
+    
+    const annots = currentAnnots.filter(a => {
+        // Check _generated_by tag
+        const tag = a._generated_by;
+        if (tag && typeof tag === 'string' && tag.startsWith('scenario_')) {
+            return false; // Remove it
+        }
+        // Also check by visible properties (bgcolor matches scenario line colors)
+        if (a.bgcolor && (scenarioLineColors.includes(a.bgcolor) || 
+            ['rgba(39,174,96,0.9)', 'rgba(192,57,43,0.9)'].some(c => a.bgcolor.includes(c.slice(5, -1))))) {
+            return false; // Remove scenario annotations
+        }
+        return true; // Keep everything else
+    });
+    
+    const removed = (currentShapes.length + currentAnnots.length) - (shapes.length + annots.length);
+    if (removed > 0) {
+        console.log(`clearScenarioZones: Removing ${removed} items`);
+    }
+    
+    try {
+        await Plotly.relayout(el, { shapes, annotations: annots });
+        console.log('clearScenarioZones: Completed successfully');
+    } catch (err) {
+        console.error('Error clearing scenario zones:', err);
+    }
+}
+
+async function showScenarioZones({direction, entry0, entry1, stop, t1, t2, t3}){
+    if (!el || !el._fullLayout) return;
+    const [x0, x1] = currentXRange();
+    const fill = direction==='bull' ? 'rgba(46,204,113,0.18)' : 'rgba(231,76,60,0.18)';
+    const line = direction==='bull' ? 'rgba(39,174,96,0.9)'  : 'rgba(192,57,43,0.9)';
+    const tag  = `scenario_${direction}`;
+    
+    // Clear existing scenario zones first
+    await clearScenarioZones();
+    // Wait for Plotly to update
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    const addShapes = [
+        { type:'rect', xref:'x', yref:'y', x0:x0, x1:x1, y0: Math.min(entry0,entry1), y1: Math.max(entry0,entry1),
+          fillcolor:fill, line:{width:0}, layer:'below', _generated_by:tag, name:SCENARIO_MARKER },
+        { type:'line', xref:'x', yref:'y', x0:x0, x1:x1, y0: stop, y1: stop,
+          line:{color:line, width:2}, _generated_by:tag, name:SCENARIO_MARKER }
+    ];
+    [t1,t2,t3].filter(Number.isFinite).forEach(ty=>{
+        addShapes.push({ type:'line', xref:'x', yref:'y', x0:x0, x1:x1, y0:ty, y1:ty, 
+          line:{color:line, width:1, dash:'dot'}, _generated_by:tag, name:SCENARIO_MARKER });
+    });
+    const rightX = x1;
+    const addAnnots = [
+        { x:rightX, y:stop, xref:'x', yref:'y', xanchor:'left', yanchor:'middle', text:'Stop', showarrow:false,
+          font:{size:10, color:'#fff'}, bgcolor:line, bordercolor:line, opacity:0.95, _generated_by:tag, name:SCENARIO_MARKER }
+    ];
+    [['T1',t1],['T2',t2],['T3',t3]].forEach(([label,val])=>{
+        if(!Number.isFinite(val)) return;
+        addAnnots.push({ x:rightX, y:val, xref:'x', yref:'y', xanchor:'left', yanchor:'middle', text:label, showarrow:false,
+            font:{size:10, color:'#fff'}, bgcolor:line, bordercolor:line, opacity:0.9, _generated_by:tag, name:SCENARIO_MARKER });
+    });
+    // Read current shapes/annotations after clearing is complete
+    const currentShapes = el._fullLayout?.shapes || [];
+    const currentAnnots = el._fullLayout?.annotations || [];
+    const shapes = currentShapes.concat(addShapes);
+    const annotations = currentAnnots.concat(addAnnots);
+    await Plotly.relayout(el, { shapes, annotations });
+}
 </script>
 {% endblock %}
