@@ -129,7 +129,7 @@
             <div class="col-md-12">
                 <small class="text-muted">
                     <i class="fas fa-info-circle me-1"></i>
-                    💡 Tip: Scroll on chart to zoom price (Y-axis), Shift+Scroll to zoom time (X-axis)
+                    ðŸ’¡ Tip: Scroll on chart to zoom price (Y-axis), Shift+Scroll to zoom time (X-axis)
                 </small>
             </div>
         </div>
@@ -150,10 +150,10 @@
 
             <!-- Pan/Zoom controls -->
             <div class="btn-group ms-2">
-                <button class="btn btn-sm btn-outline-secondary" id="zoom-in">＋</button>
-                <button class="btn btn-sm btn-outline-secondary" id="zoom-out">－</button>
-                <button class="btn btn-sm btn-outline-secondary" id="pan-left">⟵</button>
-                <button class="btn btn-sm btn-outline-secondary" id="pan-right">⟶</button>
+                <button class="btn btn-sm btn-outline-secondary" id="zoom-in">ï¼‹</button>
+                <button class="btn btn-sm btn-outline-secondary" id="zoom-out">ï¼</button>
+                <button class="btn btn-sm btn-outline-secondary" id="pan-left">âŸµ</button>
+                <button class="btn btn-sm btn-outline-secondary" id="pan-right">âŸ¶</button>
                 <button class="btn btn-sm btn-outline-secondary" id="reset">Reset</button>
             </div>
 
@@ -169,8 +169,10 @@
 
         <div id="tradeChart" style="height: 460px;" class="mt-3"></div>
         
-        <!-- Level Legend -->
+        <!-- Level Legend (legacy) -->
         <div id="level-legend" class="mt-2"></div>
+        <!-- Auto S/R Levels Legend (enhanced chart) -->
+        <div id="levels-legend" class="mt-2"></div>
         <div id="explain-result" class="mt-3"></div>
         
         <style>
@@ -660,7 +662,7 @@
                         </div>
                         <div class="row g-2">
                             <div class="col-md-8">
-                                <input class="form-control" id="journal_note" placeholder="1–2 lines: setup, reason, lesson">
+                                <input class="form-control" id="journal_note" placeholder="1â€“2 lines: setup, reason, lesson">
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label small mb-1">Confidence</label>
@@ -675,11 +677,11 @@
                         <label class="form-label fw-semibold">Charts & Screenshots</label>
                         <div id="op-drop" class="border border-2 border-dashed rounded-3 p-4 text-center bg-light" style="cursor: pointer;">
                             <div class="mb-1">Drag & drop images here</div>
-                            <div class="text-muted small">…or click to browse / paste from clipboard</div>
+                            <div class="text-muted small">â€¦or click to browse / paste from clipboard</div>
                             <input id="op-files" name="screenshots" type="file" accept="image/*" multiple hidden>
                         </div>
                         <div id="op-preview" class="d-flex flex-wrap gap-3 mt-3"></div>
-                        <div class="form-text">PNG, JPG, GIF — up to 10 files, 10 MB each.</div>
+                        <div class="form-text">PNG, JPG, GIF â€” up to 10 files, 10 MB each.</div>
                     </div>
 
                     <!-- Chart Screenshots -->
@@ -748,7 +750,7 @@
             </div>
             <div class="card-body">
                 <div class="mb-3">
-                    <h6 class="text-primary">📊 Setup Types</h6>
+                    <h6 class="text-primary">ðŸ“Š Setup Types</h6>
                     <small class="text-muted">
                         Choose the pattern or setup that prompted your trade:
                         breakout, pullback, reversal, support/resistance, etc.
@@ -756,7 +758,7 @@
                 </div>
                 
                 <div class="mb-3">
-                    <h6 class="text-warning">🛡️ Risk Management</h6>
+                    <h6 class="text-warning">ðŸ›¡ï¸ Risk Management</h6>
                     <small class="text-muted">
                         Always set stop losses and consider your risk/reward ratio. 
                         A good rule is to risk no more than 2% of your account per trade.
@@ -764,7 +766,7 @@
                 </div>
                 
                 <div class="mb-3">
-                    <h6 class="text-success">📝 Documentation</h6>
+                    <h6 class="text-success">ðŸ“ Documentation</h6>
                     <small class="text-muted">
                         The more detail you provide about your reasoning, 
                         the better the AI can analyze and help improve your trading.
@@ -772,7 +774,7 @@
                 </div>
                 
                 <div class="mb-3">
-                    <h6 class="text-info">🤖 AI Analysis</h6>
+                    <h6 class="text-info">ðŸ¤– AI Analysis</h6>
                     <small class="text-muted">
                         Upload chart screenshots for enhanced AI analysis! The AI will analyze 
                         your charts to provide detailed technical feedback on entry/exit timing, 
@@ -781,7 +783,7 @@
                 </div>
                 
                 <div class="mb-3">
-                    <h6 class="text-purple">📸 Chart Screenshots</h6>
+                    <h6 class="text-purple">ðŸ“¸ Chart Screenshots</h6>
                     <small class="text-muted">
                         For best results, upload clear screenshots showing key levels, 
                         indicators, and the timeframe you used for your trade decisions.
@@ -789,7 +791,7 @@
                 </div>
                 
                 <div class="mb-3">
-                    <h6 class="text-info">📋 Options Trading</h6>
+                    <h6 class="text-info">ðŸ“‹ Options Trading</h6>
                     <small class="text-muted">
                         For options trades, include strike price, expiration, and underlying stock price. 
                         Greeks and implied volatility help the AI provide better analysis of your options strategy.
@@ -797,7 +799,7 @@
                 </div>
                 
                 <div class="mb-0">
-                    <h6 class="text-warning">⏰ Time Decay</h6>
+                    <h6 class="text-warning">â° Time Decay</h6>
                     <small class="text-muted">
                         Options lose value over time (theta decay). Consider how much time 
                         you have until expiration and how it affects your strategy.
@@ -805,7 +807,7 @@
                 </div>
                 
                 <div class="mb-3">
-                    <h6 class="text-success">💰 Credit Spreads</h6>
+                    <h6 class="text-success">ðŸ’° Credit Spreads</h6>
                     <small class="text-muted">
                         Credit spreads collect premium upfront. For put spreads: sell higher strike, buy lower strike. 
                         For call spreads: sell lower strike, buy higher strike. Max profit = net credit received.
@@ -813,7 +815,7 @@
                 </div>
                 
                 <div class="mb-0">
-                    <h6 class="text-primary">📐 Strike Selection</h6>
+                    <h6 class="text-primary">ðŸ“ Strike Selection</h6>
                     <small class="text-muted">
                         Choose strikes based on your market outlook and risk tolerance. 
                         Wider spreads = more credit but higher risk. Closer to money = more credit but lower probability.
@@ -1273,7 +1275,7 @@ function initializeAutocomplete() {
                 border-bottom: 1px solid #eee;
                 font-size: 14px;
             `;
-            item.innerHTML = `<strong>${stock.symbol}</strong> — ${stock.name}`;
+            item.innerHTML = `<strong>${stock.symbol}</strong> â€” ${stock.name}`;
             
             item.addEventListener('mouseenter', () => {
                 selectedIndex = index;
@@ -1689,7 +1691,7 @@ function applyRangebreaks(symbol, tf) {
     }
 
     // Note: Plotly uses the viewer's local timezone for axis labels/tooltips.
-    // Your Tiingo timestamps are UTC; that's fine—breaks still apply to displayed local time.
+    // Your Tiingo timestamps are UTC; that's fineâ€”breaks still apply to displayed local time.
     layout.xaxis = {
         ...(layout.xaxis || {}),
         type: 'date',
@@ -1858,7 +1860,7 @@ const onRelayout = debounce(async (ev) => {
     try {
         fetching = true;
 
-        // If timeframe changed → reload the whole visible window with that TF
+        // If timeframe changed â†’ reload the whole visible window with that TF
         if (tfChanged) {
             currentTF = newTF;
             const startISO = new Date(left - PAD).toISOString().slice(0,16).replace('T',' ');
@@ -1931,25 +1933,70 @@ async function autoLevels() {
     });
     const { level_shapes, pivot_circles, levels } = await res.json();
 
+    // Get current price to determine support vs resistance
+    const currentPrice = chartData.c && chartData.c.length > 0 ? chartData.c[chartData.c.length - 1] : null;
+    
+    // Re-color level_shapes based on support/resistance
+    const coloredShapes = (level_shapes || []).map(shape => {
+        // Extract price from shape (y0 for lines, (y0+y1)/2 for rects)
+        const price = shape.type === 'line' ? shape.y0 : (shape.y0 + shape.y1) / 2;
+        const isResistance = currentPrice && price > currentPrice;
+        
+        // Color: red for support, green for resistance
+        const color = isResistance ? 'rgba(40,167,69,0.9)' : 'rgba(220,53,69,0.9)'; // green for resistance, red for support
+        const fillColor = isResistance ? 'rgba(40,167,69,0.12)' : 'rgba(220,53,69,0.12)';
+        
+        if (shape.type === 'line') {
+            return { ...shape, line: { ...shape.line, color } };
+        } else { // rect/zone
+            return { ...shape, line: { ...shape.line, color }, fillcolor: fillColor };
+        }
+    });
+
     // replace previous AI levels instead of piling on
     const keep = (el._fullLayout.shapes || []).filter(s => !(s._generated_by === 'ai_major'));
     const tagged = (arr) => arr.map(s => ({...s, _generated_by:'ai_major'}));
-    layout.shapes = keep.concat(tagged(level_shapes), tagged(pivot_circles));
+    layout.shapes = keep.concat(tagged(coloredShapes), tagged(pivot_circles));
     Plotly.relayout(el, {shapes: layout.shapes});
 
-    // NEW: legend
-    renderLevelLegend(levels || []);
+    // Updated legend with support/resistance labels
+    renderLevelLegend(levels || [], currentPrice);
 }
 
 function formatPx(n){ return (+n).toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2}); }
 
-function renderLevelLegend(levels=[]) {
+function renderLevelLegend(levels=[], currentPrice=null) {
     const elLegend = document.getElementById('level-legend');
     if (!elLegend) return;
     if (!levels.length) { elLegend.innerHTML = ""; return; }
 
-    const badges = levels.map((p,i)=>`<span class="badge bg-info-subtle text-info-emphasis">L${i+1}: ${formatPx(p)}</span>`).join("");
-    elLegend.innerHTML = `<span class="legend-title">Major levels:</span>${badges}`;
+    // Separate support and resistance
+    const supportLevels = currentPrice ? levels.filter(p => p < currentPrice) : [];
+    const resistanceLevels = currentPrice ? levels.filter(p => p > currentPrice) : [];
+    
+    let html = '<div class="mb-2"><strong>Key Price Levels:</strong></div>';
+    
+    // Show support levels (red)
+    if (supportLevels.length > 0) {
+        supportLevels.forEach(price => {
+            html += `<span class="badge bg-danger me-2 mb-2">Support: $${formatPx(price)}</span>`;
+        });
+    }
+    
+    // Show resistance levels (green)
+    if (resistanceLevels.length > 0) {
+        resistanceLevels.forEach(price => {
+            html += `<span class="badge bg-success me-2 mb-2">Resistance: $${formatPx(price)}</span>`;
+        });
+    }
+    
+    // Fallback if no current price or levels don't separate cleanly
+    if (!currentPrice || (supportLevels.length === 0 && resistanceLevels.length === 0)) {
+        const badges = levels.map((p,i)=>`<span class="badge bg-info-subtle text-info-emphasis me-2 mb-2">L${i+1}: ${formatPx(p)}</span>`).join("");
+        html = `<span class="legend-title">Major levels:</span>${badges}`;
+    }
+    
+    elLegend.innerHTML = html;
 }
 
 async function saveSnapshot() {
@@ -1993,10 +2040,10 @@ async function runExplain(){
     <div class="card border-info">
       <div class="card-body">
         <div class="d-flex justify-content-between align-items-center">
-          <h6 class="mb-0">${data.symbol} • ${tfb.tf.toUpperCase()}</h6>
-          <div class="small text-muted">ATR(14) ${em.atr.toFixed(2)} • EM ±${(em.atr*em.atr_mult).toFixed(2)} → ${em.lower.toFixed(2)} / ${em.upper.toFixed(2)}</div>
+          <h6 class="mb-0">${data.symbol} â€¢ ${tfb.tf.toUpperCase()}</h6>
+          <div class="small text-muted">ATR(14) ${em.atr.toFixed(2)} â€¢ EM Â±${(em.atr*em.atr_mult).toFixed(2)} â†’ ${em.lower.toFixed(2)} / ${em.upper.toFixed(2)}</div>
         </div>
-        <div class="small mt-1 text-muted">Levels: L ${lv.recent_low} • Mid ${lv.mid} • H ${lv.recent_high}</div>
+        <div class="small mt-1 text-muted">Levels: L ${lv.recent_low} â€¢ Mid ${lv.mid} â€¢ H ${lv.recent_high}</div>
         <div class="mt-2 d-flex gap-2 flex-wrap">
           <button class="btn btn-sm btn-outline-info" onclick='showEMBand({lower: ${em.lower}, upper: ${em.upper}})'>Show Expected Move</button>
           <button class="btn btn-sm btn-outline-secondary" onclick="clearEMBand()">Clear EM</button>
@@ -2005,9 +2052,9 @@ async function runExplain(){
           ${tfb.scenarios.map(s=>`
             <div class="col-md-6">
               <div class="border rounded p-2 h-100">
-                <div class="small text-muted">${s.direction.toUpperCase()} • ${s.playbook} • ${(s.probability*100).toFixed(0)}%</div>
+                <div class="small text-muted">${s.direction.toUpperCase()} â€¢ ${s.playbook} â€¢ ${(s.probability*100).toFixed(0)}%</div>
                 <div class="fw-semibold">Trigger: ${s.trigger}</div>
-                <div class="small">Entry ${s.entry_zone[0]}–${s.entry_zone[1]} • Stop ${s.invalidation} • T1/T2/T3 ${s.targets.join('/')}</div>
+                <div class="small">Entry ${s.entry_zone[0]}â€“${s.entry_zone[1]} â€¢ Stop ${s.invalidation} â€¢ T1/T2/T3 ${s.targets.join('/')}</div>
                 <div class="small text-muted">R:R ${s.r_r}</div>
                 <div class="small mt-1">${s.notes}</div>
                 <div class="mt-2 d-flex gap-2 flex-wrap">
