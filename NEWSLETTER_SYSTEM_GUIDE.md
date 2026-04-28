@@ -108,8 +108,15 @@ ADMIN_EMAIL=admin@yourdomain.com
 SERVER_NAME=yourdomain.com
 PREFERRED_URL_SCHEME=https
 
-# News API (for market brief content)
-FINNHUB_TOKEN=your-finnhub-token
+# Market data + news provider (for market brief content)
+# Polygon.io "Massive API" (Stocks Starter tier). Earnings calendar,
+# earnings surprises, and economic calendar are NOT available on this tier
+# and render as empty sections in the weekly brief.
+MASSIVE_API_KEY=your-polygon-api-key
+# Seconds between outbound provider calls
+RATE_LIMIT_DELAY=0.05
+# Anthropic Claude Haiku (AI catalyst summaries for movers)
+ANTHROPIC_API_KEY=your-anthropic-api-key
 ```
 
 ### 2. Database Migration
@@ -213,7 +220,8 @@ send_market_brief_to_subscribers()
 
 3. **Daily briefs not sending**
    - Check if scheduler is running
-   - Verify `FINNHUB_TOKEN` for news content
+   - Verify `MASSIVE_API_KEY` (or `POLYGON_API_KEY`) is set; optionally
+     `ANTHROPIC_API_KEY` for the AI catalyst summaries on movers
    - Check logs for API errors
 
 4. **Subscribers not receiving emails**

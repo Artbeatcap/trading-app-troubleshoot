@@ -16,7 +16,7 @@ try:
 except ImportError:
     OPENAI_AVAILABLE = False
 
-MODEL = os.getenv("SUMMARY_MODEL", "gpt-4o-mini")  # default
+MODEL = os.getenv("SUMMARY_MODEL", "gpt-5-nano")  # default
 
 CLIENT = None  # Lazily initialized
 
@@ -102,7 +102,7 @@ def summarize_brief(brief: Dict[str, Any]) -> Dict[str, str]:
                 {"role": "system", "content": SYSTEM},
                 {"role": "user", "content": msg}
             ],
-            temperature=1.0,
+            temperature=0.2,
             max_completion_tokens=500,
         )
         

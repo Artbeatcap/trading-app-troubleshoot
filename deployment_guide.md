@@ -1,597 +1,145 @@
-# Flask App Deployment Guide for VPS
+# Manual Deployment Guide
 
-This guide will walk you through deploying your AI Trading Analysis Flask app to a VPS.
+## Pre-Deployment Checklist
+- [ ] Test all changes locally
+- [ ] Commit changes to git
+- [ ] Review files to be deployed
+- [ ] Notify users of potential downtime (if major changes)
 
-## Current Deployment Information
+## Manual Deployment Steps
 
-**Live Application Status:**
-- **VPS Hostname**: `167.88.43.61`
-- **Application Path**: `/home/tradingapp/trading-analysis`
-- **Service Name**: `trading-analysis.service`
-- **Status**: ✅ **ACTIVE AND RUNNING**
-- **Memory Usage**: ~157MB
-- **Workers**: 4 Gunicorn workers
-- **HTTP Response**: 200 OK
+### 1. Connect to Server
 
-**Quick Access Commands:**
-```bash
-# SSH to VPS
-ssh root@167.88.43.61
-
-# Check service status
-systemctl status trading-analysis
-
-# View application logs
-journalctl -u trading-analysis -f
-
-# Test application
-curl http://localhost:8000/
-```
-
-## Prerequisites
-
-1. **VPS Access**: SSH access to your VPS (e.g., root@167.88.43.61)
-2. **Domain Name**: A domain pointing to your VPS (optional but recommended)
-3. **API Keys**: Ensure you have your API keys ready:
-   - OpenAI API Key
-   - Tradier API Token
-   - Email credentials (Gmail or other SMTP provider)
-
-## Step 1: Prepare Your Local Project
-
-### 1.1 Create a Production Configuration
-Create a `.env.production` file with your production settings:
-
-```bash
-# Database (PostgreSQL recommended for production)
-DATABASE_URL=postgresql://username:password@localhost/trading_journal
-
-# Security
-SECRET_KEY=your-super-secret-production-key-here
-
-# OpenAI
-OPENAI_API_KEY=your-openai-api-key
-
-# Tradier
-TRADIER_API_TOKEN=your-tradier-token
-
-# Email Configuration
-MAIL_SERVER=smtp.gmail.com
-MAIL_PORT=587
-MAIL_USE_TLS=true
-MAIL_USERNAME=your-email@gmail.com
-MAIL_PASSWORD=your-app-password
-# Mail sender configuration
-MAIL_DEFAULT_SENDER_NAME=Options Plunge Support
-MAIL_DEFAULT_SENDER_EMAIL=support@optionsplunge.com
-```
-
-### 1.2 Update Database Configuration
-For production, you should use PostgreSQL instead of SQLite. Update your `config.py`:
-
-```python
-# In config.py, update the database URI
-SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///trading_journal.db'
-```
-
-## Step 2: Set Up Your VPS
-
-### 2.1 Connect to Your VPS
 ```bash
 ssh root@167.88.43.61
 ```
 
-### 2.2 Update System
+### 2. Navigate to App Directory
+
 ```bash
-apt update && apt upgrade -y
-```
-
-### 2.3 Install Required Software
-```bash
-# Install Python and pip
-apt install python3 python3-pip python3-venv -y
-
-# Install PostgreSQL
-apt install postgresql postgresql-contrib -y
-
-# Install Nginx
-apt install nginx -y
-
-# Install Git
-apt install git -y
-
-# Install build dependencies
-apt install build-essential python3-dev libpq-dev -y
-```
-
-### 2.4 Create a Non-Root User
-```bash
-# Create a new user (if not already exists)
-adduser tradingapp
-usermod -aG sudo tradingapp
-
-# Note: For this deployment, we're using the existing tradingapp user
-# The application is already deployed at /home/tradingapp/trading-analysis
-```
-
-## Step 3: Set Up PostgreSQL
-
-### 3.1 Install and Start PostgreSQL
-```bash
-# Install PostgreSQL (if not already installed)
-sudo apt install postgresql postgresql-contrib -y
-
-# Start and enable PostgreSQL
-sudo systemctl start postgresql
-sudo systemctl enable postgresql
-
-# Verify PostgreSQL is running
-sudo systemctl status postgresql
-```
-
-### 3.2 Configure PostgreSQL Database and User
-```bash
-# Access PostgreSQL as root (no password required)
-sudo -u postgres psql
-
-# Create the database user
-CREATE USER trading_user WITH PASSWORD 'Hvjband12345';
-
-# Create the database
-CREATE DATABASE trading_analysis OWNER trading_user;
-
-# Grant all privileges to the user
-GRANT ALL PRIVILEGES ON DATABASE trading_analysis TO trading_user;
-
-# Verify the setup
-\l                    # List databases
-\du                   # List users
-\q                    # Exit PostgreSQL
-```
-
-### 3.3 Test Database Connection
-```bash
-# Test connection as root (for verification)
-sudo -u postgres psql -c "SELECT version();"
-
-# Test connection with the new user
-psql -h localhost -U trading_user -d trading_analysis -c "SELECT version();"
-# Enter password when prompted: Hvjband12345
-```
-
-### 3.4 Troubleshooting PostgreSQL Connection Issues
-
-If you encounter connection issues:
-
-1. **Check if PostgreSQL is running:**
-   ```bash
-   sudo systemctl status postgresql
-   ```
-
-2. **Verify the database and user exist:**
-   ```bash
-   sudo -u postgres psql -c "\l"    # List databases
-   sudo -u postgres psql -c "\du"   # List users
-   ```
-
-3. **Check PostgreSQL logs:**
-   ```bash
-   sudo tail -f /var/log/postgresql/postgresql-*.log
-   ```
-
-4. **Verify connection from application:**
-   ```bash
-   cd /home/tradingapp/trading-analysis
-   source venv/bin/activate
-   python -c "from app import app, db; print('Database connection test:', db.engine.execute(db.text('SELECT 1')).fetchone())"
-   ```
-
-### 3.5 Update Application Configuration
-```bash
-# Navigate to your app directory
 cd /home/tradingapp/trading-analysis
-
-# Update the .env file to use PostgreSQL
-sed -i 's|DATABASE_URL=sqlite:///.*|DATABASE_URL=postgresql://trading_user:Hvjband12345@localhost/trading_analysis|g' .env
-
-# Verify the change
-grep DATABASE_URL .env
 ```
 
-### 3.6 Initialize Database with PostgreSQL
+### 3. Create Backup
+
 ```bash
-# Activate virtual environment
-source venv/bin/activate
-
-# Initialize database (this will create tables in PostgreSQL)
-python init_db.py
-
-# Verify tables were created
-psql -h localhost -U trading_user -d trading_analysis -c "\dt"
-```
-
-## Step 4: Deploy Your Application
-
-### 4.1 Deploy Your Application Files
-```bash
-# The application is already deployed at:
-# /home/tradingapp/trading-analysis
-
-# For updates, you can either:
-
-# Option 1: Upload via SCP (recommended for updates)
-scp trading-analysis-update-$(date +%Y%m%d_%H%M%S).tar.gz root@167.88.43.61:/home/tradingapp/trading-analysis/
-
-# Option 2: Clone from repository (for fresh deployments)
-# mkdir /home/tradingapp/trading-analysis
-# cd /home/tradingapp/trading-analysis
-# git clone https://github.com/yourusername/ai-trading-analysis-troubleshoot.git .
-```
-
-### 4.2 Set Up Python Environment
-```bash
-# Navigate to app directory
-cd /home/tradingapp/trading-analysis
-
-# Create virtual environment (if not exists)
-python3 -m venv venv_new
-source venv_new/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt --no-cache-dir
-
-# Install additional required packages
-pip install psycopg2-binary
-```
-
-### 4.3 Configure Environment Variables
-```bash
-# Create production environment file
-cp .env.production .env
-
-# Or create manually
-nano .env
-# Add your production environment variables here
-```
-
-### 4.4 Initialize Database
-```bash
-# Activate virtual environment
-source venv_new/bin/activate
-
-# Initialize database
-python init_db.py
-
-# Run migrations
-python migrate_db.py
-```
-
-## Step 5: Set Up Gunicorn
-
-### 5.1 Create Systemd Service
-```bash
-# Create service file
-sudo nano /etc/systemd/system/trading-analysis.service
-```
-
-Add the following content:
-```ini
-[Unit]
-Description=Trading Analysis Flask App
-After=network.target
-
-[Service]
-User=tradingapp
-Group=tradingapp
-WorkingDirectory=/home/tradingapp/trading-analysis
-Environment="PATH=/home/tradingapp/trading-analysis/venv/bin"
-ExecStart=/home/tradingapp/trading-analysis/venv/bin/gunicorn --bind 127.0.0.1:8000 --workers 4 app:app
-ExecReload=/bin/kill -s HUP $MAINPID
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-```
-
-**Note**: The service is already configured and running. The current service uses the existing `venv` directory.
-
-### 5.2 Start the Service
-```bash
-# Reload systemd
-sudo systemctl daemon-reload
-
-# Enable and start the service
-sudo systemctl enable trading-analysis
-sudo systemctl start trading-analysis
-
-# Check status
-sudo systemctl status trading-analysis
-
-# For updates, restart the service
-sudo systemctl restart trading-analysis
-```
-
-## Step 6: Configure Nginx
-
-### 6.1 Create Nginx Configuration
-```bash
-sudo nano /etc/nginx/sites-available/trading-analysis
-```
-
-Add the following configuration:
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com www.your-domain.com;
-
-    location / {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    location /static {
-        alias /home/tradingapp/trading-analysis/static;
-        expires 30d;
-    }
-
-    location /uploads {
-        alias /home/tradingapp/trading-analysis/static/uploads;
-        expires 30d;
-    }
-}
-```
-
-### 6.2 Enable the Site
-```bash
-# Create symbolic link
-sudo ln -s /etc/nginx/sites-available/trading-analysis /etc/nginx/sites-enabled/
-
-# Remove default site (optional)
-sudo rm /etc/nginx/sites-enabled/default
-
-# Test Nginx configuration
-sudo nginx -t
-
-# Restart Nginx
-sudo systemctl restart nginx
-```
-
-## Step 7: Set Up SSL (Optional but Recommended)
-
-### 7.1 Install Certbot
-```bash
-# Install Certbot
-sudo apt install certbot python3-certbot-nginx -y
-
-# Get SSL certificate
-sudo certbot --nginx -d your-domain.com -d www.your-domain.com
-```
-
-## Step 8: Configure Firewall
-
-### 8.1 Set Up UFW
-```bash
-# Install UFW
-sudo apt install ufw -y
-
-# Allow SSH
-sudo ufw allow ssh
-
-# Allow HTTP and HTTPS
-sudo ufw allow 80
-sudo ufw allow 443
-
-# Enable firewall
-sudo ufw enable
-```
-
-## Step 9: Testing and Monitoring
-
-### 9.1 Test Your Application
-```bash
-# Check if the app is running
-curl http://localhost:8000
-
-# Check logs
-sudo journalctl -u trading-analysis -f
-```
-
-### 9.2 Set Up Log Rotation
-```bash
-# Create log directory
-sudo mkdir -p /var/log/trading-analysis
-
-# Update systemd service to use log file
-sudo nano /etc/systemd/system/trading-analysis.service
-```
-
-Add these lines to the service file:
-```ini
-StandardOutput=append:/var/log/trading-analysis/app.log
-StandardError=append:/var/log/trading-analysis/error.log
-```
-
-## Step 10: Maintenance and Updates
-
-### 10.1 Update Your Application
-```bash
-# Method 1: Upload and extract update package
-cd /home/tradingapp/trading-analysis
-tar -xzf trading-analysis-update-*.tar.gz --overwrite
-
-# Method 2: Pull from Git (if using repository)
-# cd /home/tradingapp/trading-analysis
-# git pull origin main
-
-# Activate virtual environment
-source venv_new/bin/activate
-
-# Install new dependencies
-pip install -r requirements.txt --no-cache-dir
-pip install psycopg2-binary
-
-# Run database migrations
-python migrate_db.py
-
-# Restart the service
-sudo systemctl restart trading-analysis
-
-# Verify deployment
-sudo systemctl status trading-analysis
-curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/
-```
-
-### 10.2 Backup Strategy
-```bash
-# Create backup script
-nano /home/tradingapp/backup.sh
-```
-
-Add backup script content:
-```bash
-#!/bin/bash
-DATE=$(date +%Y%m%d_%H%M%S)
-BACKUP_DIR="/home/tradingapp/backups"
-
+# Create backup directory with timestamp
+BACKUP_DIR="/home/tradingapp/backups/$(date +%Y%m%d_%H%M%S)"
 mkdir -p $BACKUP_DIR
 
-# Backup database
-pg_dump -h localhost -U tradingapp trading_journal > $BACKUP_DIR/db_backup_$DATE.sql
-
-# Backup application files
-tar -czf $BACKUP_DIR/app_backup_$DATE.tar.gz /home/tradingapp/trading-analysis
-
-# Keep only last 7 days of backups
-find $BACKUP_DIR -name "*.sql" -mtime +7 -delete
-find $BACKUP_DIR -name "*.tar.gz" -mtime +7 -delete
+# Backup current files
+cp app.py $BACKUP_DIR/
+cp -r templates $BACKUP_DIR/
 ```
 
-Make it executable:
-```bash
-chmod +x /home/tradingapp/backup.sh
-```
+### 4. Upload Modified Files from Local Machine
 
-## Step 11: Managing Deployments and Cleanup
-
-### 11.1 Current Deployment Status
-The application is currently deployed and running at:
-- **VPS Hostname**: `167.88.43.61`
-- **Application Path**: `/home/tradingapp/trading-analysis`
-- **Service Name**: `trading-analysis.service`
-- **Port**: `8000` (internal), `80` (external via Nginx)
-
-### 11.2 Clean Up Old Deployments
-If you have multiple instances or old deployments running, follow these steps:
+**From your local machine (in a new terminal):**
 
 ```bash
-# Stop and disable old services
-sudo systemctl stop ai-trading-analysis.service 2>/dev/null || true
-sudo systemctl disable ai-trading-analysis.service 2>/dev/null || true
-sudo rm -f /etc/systemd/system/ai-trading-analysis.service
+# Upload app.py
+scp app.py root@167.88.43.61:/home/tradingapp/trading-analysis/
 
-# Kill all stray Gunicorn processes
-sudo pkill -f gunicorn 2>/dev/null || true
+# Upload index.html
+scp templates/index.html root@167.88.43.61:/home/tradingapp/trading-analysis/templates/
 
-# Remove old application directories
-sudo rm -rf /var/www/ai-trading-analysis
+# Upload NEW welcome.html
+scp templates/welcome.html root@167.88.43.61:/home/tradingapp/trading-analysis/templates/
 
-# Clean up old Nginx configurations
-sudo rm -f /etc/nginx/sites-enabled/ai-trading-analysis
-sudo rm -f /etc/nginx/sites-available/ai-trading-analysis
-
-# Reload systemd and Nginx
-sudo systemctl daemon-reload
-sudo nginx -t
-sudo systemctl reload nginx
+# Upload any other modified templates
+scp templates/view_trade.html root@167.88.43.61:/home/tradingapp/trading-analysis/templates/
+scp templates/trades.html root@167.88.43.61:/home/tradingapp/trading-analysis/templates/
 ```
 
-### 11.3 Verify Single Instance Running
-```bash
-# Check for Gunicorn processes
-pgrep -fl gunicorn
+### 5. Verify Files on Server
 
-# Should show only one master process from /home/tradingapp/trading-analysis
-# Example output:
-# 12345 /home/tradingapp/trading-analysis/venv/bin/python /home/tradingapp/trading-analysis/venv/bin/gunicorn --bind 127.0.0.1:8000 --workers 4 app:app
-
-# Check service status
-sudo systemctl status trading-analysis --no-pager
-
-# Verify application is responding
-curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/
-```
-
-### 11.4 Port Management
-```bash
-# Check what's using port 8000
-sudo netstat -tlnp | grep :8000
-
-# If you need to expose port 8000 directly (not recommended for production)
-sudo ufw allow 8000/tcp
-sudo ufw reload
-
-# For production, use Nginx proxy (port 80) instead
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
-sudo ufw reload
-```
-
-### 11.5 Database Migration from SQLite to PostgreSQL
-If you're migrating from SQLite to PostgreSQL:
+**Back on the server:**
 
 ```bash
-# 1. Backup existing SQLite data
-cp /home/tradingapp/trading-analysis/trading_analysis.db /home/tradingapp/backups/
+# Check if files were uploaded
+ls -lh app.py
+ls -lh templates/welcome.html
+ls -lh templates/index.html
 
-# 2. Update .env to use PostgreSQL
-sed -i 's|DATABASE_URL=sqlite:///.*|DATABASE_URL=postgresql://trading_user:Hvjband12345@localhost/trading_analysis|g' .env
-
-# 3. Initialize PostgreSQL database
-cd /home/tradingapp/trading-analysis
-source venv_new/bin/activate
-python init_db.py
-
-# 4. Verify PostgreSQL connection
-python -c "from app import app, db; print('PostgreSQL connection successful')"
+# Optional: Check file contents
+head -20 templates/welcome.html
 ```
+
+### 6. Restart Application
+
+```bash
+# Restart the Flask app service
+systemctl restart trading-analysis.service
+
+# Check status
+systemctl status trading-analysis.service
+
+# Watch logs for errors
+journalctl -u trading-analysis.service -f
+```
+
+Press Ctrl+C to stop watching logs once you confirm it's running.
+
+### 7. Test the Live Site
+
+1. Visit https://optionsplunge.com
+2. Test registration flow → Should see new welcome page
+3. Test login → Returning users should see dashboard
+4. Test adding a trade → Should see confirmation message
+5. Check that landing page shows new stats
+
+### 8. Rollback (if something breaks)
+
+```bash
+# Stop the service
+systemctl stop trading-analysis.service
+
+# Restore from backup (use the timestamp from step 3)
+cp /home/tradingapp/backups/YYYYMMDD_HHMMSS/app.py /home/tradingapp/trading-analysis/
+cp -r /home/tradingapp/backups/YYYYMMDD_HHMMSS/templates/* /home/tradingapp/trading-analysis/templates/
+
+# Restart
+systemctl start trading-analysis.service
+systemctl status trading-analysis.service
+```
+
+## Post-Deployment Verification
+
+- [ ] Homepage loads correctly
+- [ ] Registration redirects to welcome page
+- [ ] Welcome page displays properly
+- [ ] Adding trades shows confirmation message
+- [ ] No errors in logs: `journalctl -u trading-analysis.service -n 100`
+- [ ] Check for Python errors: Look for traceback in logs
 
 ## Troubleshooting
 
-### Common Issues:
+### If service won't start:
 
-1. **Permission Denied**: Make sure the `tradingapp` user owns the application directory
-2. **Database Connection**: Verify PostgreSQL is running and credentials are correct
-3. **Port Already in Use**: Check if port 8000 is available
-4. **Static Files Not Loading**: Ensure Nginx has correct permissions for static directory
-
-### Useful Commands:
 ```bash
-# Check service status
-sudo systemctl status trading-analysis
+# Check for Python syntax errors
+cd /home/tradingapp/trading-analysis
+python3 -m py_compile app.py
 
-# View logs
-sudo journalctl -u trading-analysis -f
-
-# Check Nginx status
-sudo systemctl status nginx
-
-# Check PostgreSQL status
-sudo systemctl status postgresql
-
-# Test database connection
-psql -h localhost -U tradingapp -d trading_journal
+# Check logs
+journalctl -u trading-analysis.service -n 50 --no-pager
 ```
 
-## Security Considerations
+### If templates not found:
 
-1. **Change Default Passwords**: Update all default passwords
-2. **Regular Updates**: Keep system and packages updated
-3. **Firewall**: Only open necessary ports
-4. **SSL**: Always use HTTPS in production
-5. **Backups**: Regular automated backups
-6. **Monitoring**: Set up monitoring for uptime and performance
+```bash
+# Verify templates directory structure
+ls -la /home/tradingapp/trading-analysis/templates/
 
-Your Flask app should now be successfully deployed and accessible via your domain or VPS IP address! 
+# Check file permissions
+chmod 644 /home/tradingapp/trading-analysis/templates/*.html
+```
+
+### If 500 errors occur:
+
+```bash
+# Watch logs in real-time
+journalctl -u trading-analysis.service -f
+```
+
+Then visit the page that's causing the error and watch the logs for Python tracebacks.

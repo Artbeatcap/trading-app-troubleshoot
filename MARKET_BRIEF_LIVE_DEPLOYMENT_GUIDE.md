@@ -95,7 +95,7 @@ User=tradingapp
 Group=tradingapp
 WorkingDirectory=/home/tradingapp/trading-analysis
 Environment="PATH=/home/tradingapp/trading-analysis/venv/bin"
-Environment="DATABASE_URL=postgresql://trading_user:Hvjband12345@localhost/trading_analysis"
+Environment="DATABASE_URL=postgresql://trading_user:<DB_PASSWORD>@localhost/trading_analysis"
 ExecStart=/home/tradingapp/trading-analysis/venv/bin/gunicorn --config gunicorn.conf.py wsgi:app
 ExecReload=/bin/kill -s HUP \$MAINPID
 Restart=always
@@ -118,7 +118,7 @@ User=tradingapp
 Group=tradingapp
 WorkingDirectory=/home/tradingapp/trading-analysis
 Environment="PATH=/home/tradingapp/trading-analysis/venv/bin"
-Environment="DATABASE_URL=postgresql://trading_user:Hvjband12345@localhost/trading_analysis"
+Environment="DATABASE_URL=postgresql://trading_user:<DB_PASSWORD>@localhost/trading_analysis"
 ExecStart=/home/tradingapp/trading-analysis/venv/bin/python tasks.py
 Restart=always
 RestartSec=10

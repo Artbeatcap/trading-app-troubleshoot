@@ -109,7 +109,7 @@ sudo systemctl status postgresql
 sudo -u postgres psql
 
 # Create the database user
-CREATE USER trading_user WITH PASSWORD 'Hvjband12345';
+CREATE USER trading_user WITH PASSWORD '<DB_PASSWORD>';
 
 # Create the database
 CREATE DATABASE trading_analysis OWNER trading_user;
@@ -130,7 +130,7 @@ sudo -u postgres psql -c "SELECT version();"
 
 # Test connection with the new user
 psql -h localhost -U trading_user -d trading_analysis -c "SELECT version();"
-# Enter password when prompted: Hvjband12345
+# Enter password when prompted: <DB_PASSWORD>
 ```
 
 ### 3.4 Troubleshooting PostgreSQL Connection Issues
@@ -166,7 +166,7 @@ If you encounter connection issues:
 cd /home/tradingapp/trading-analysis
 
 # Update the .env file to use PostgreSQL
-sed -i 's|DATABASE_URL=sqlite:///.*|DATABASE_URL=postgresql://trading_user:Hvjband12345@localhost/trading_analysis|g' .env
+sed -i 's|DATABASE_URL=sqlite:///.*|DATABASE_URL=postgresql://trading_user:<DB_PASSWORD>@localhost/trading_analysis|g' .env
 
 # Verify the change
 grep DATABASE_URL .env
@@ -487,7 +487,7 @@ If you're migrating from SQLite to PostgreSQL:
 cp /home/tradingapp/trading-analysis/trading_analysis.db /home/tradingapp/backups/
 
 # 2. Update .env to use PostgreSQL
-sed -i 's|DATABASE_URL=sqlite:///.*|DATABASE_URL=postgresql://trading_user:Hvjband12345@localhost/trading_analysis|g' .env
+sed -i 's|DATABASE_URL=sqlite:///.*|DATABASE_URL=postgresql://trading_user:<DB_PASSWORD>@localhost/trading_analysis|g' .env
 
 # 3. Initialize PostgreSQL database
 cd /home/tradingapp/trading-analysis

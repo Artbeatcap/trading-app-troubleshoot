@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Database configuration
-DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://tradingapp:Hvjband12345@localhost/trading_journal')
+DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://tradingapp:<DB_PASSWORD>@localhost/trading_journal')
 
 def create_tables():
     """Create all tables defined in models.py"""

@@ -13,8 +13,8 @@ The 502 Bad Gateway error was caused by multiple issues:
 
 ### 1. Database Configuration Mismatch
 - **Problem:** Systemd service file had incorrect database URL
-- **Service File:** `DATABASE_URL=postgresql://trading_user:Hvjband12345@localhost/trading_analysis`
-- **Actual Config:** `DATABASE_URL=postgresql://tradingapp:Hvjband12345@localhost/trading_journal`
+- **Service File:** `DATABASE_URL=postgresql://trading_user:<DB_PASSWORD>@localhost/trading_analysis`
+- **Actual Config:** `DATABASE_URL=postgresql://tradingapp:<DB_PASSWORD>@localhost/trading_journal`
 - **Issue:** Database name mismatch (`trading_analysis` vs `trading_journal`)
 
 ### 2. Template File Permissions
@@ -81,6 +81,7 @@ To prevent future issues:
 ---
 
 **✅ 502 Bad Gateway error has been successfully resolved!** 🎉
+
 
 
 

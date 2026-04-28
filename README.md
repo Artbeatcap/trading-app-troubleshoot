@@ -22,7 +22,7 @@ A comprehensive trading platform that combines AI-powered trade analysis with pr
 ### 📈 **Advanced Features**
 - **Multi-leg Options**: Credit spreads with automatic metrics calculation
 - **Risk Management**: Position sizing and risk/reward analysis
-- **Real-time Data**: Live stock prices and options chains via Yahoo Finance
+- **Real-time Data**: Live stock prices and news via the Polygon.io "Massive API", with Anthropic Claude Haiku for AI catalyst summaries
 - **Mobile Responsive**: Beautiful UI that works on all devices
 - **User Management**: Secure authentication and personalized settings
 
@@ -88,8 +88,19 @@ DATABASE_URL=postgresql://user:pass@host:5432/dbname
 # OpenAI API (for AI analysis)
 OPENAI_API_KEY=your-openai-api-key
 
-# Tradier Configuration
-TRADIER_API_TOKEN=your-tradier-token
+# Market data provider (required)
+# Polygon.io "Massive API" (Stocks Starter tier). Accepts MASSIVE_API_KEY or
+# POLYGON_API_KEY. The Stocks Starter tier does not include earnings
+# calendar, earnings surprises, or economic calendar endpoints; those
+# sections render empty until a higher tier is configured.
+MASSIVE_API_KEY=your-polygon-api-key
+# Optional override (mainly for tests):
+POLYGON_BASE_URL=https://api.polygon.io
+# Seconds between outbound API calls.
+RATE_LIMIT_DELAY=0.05
+
+# Anthropic Claude Haiku (AI catalyst summaries for movers / alerts)
+ANTHROPIC_API_KEY=your-anthropic-api-key
 
 # Email Configuration (optional)
 MAIL_SERVER=smtp.gmail.com

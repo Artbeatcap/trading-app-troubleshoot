@@ -13,7 +13,7 @@ usermod -aG sudo tradingapp
 
 # 4. Set up PostgreSQL
 sudo -u postgres psql -c "CREATE DATABASE trading_journal;"
-sudo -u postgres psql -c "CREATE USER tradingapp WITH PASSWORD 'Hvjband12345';"
+sudo -u postgres psql -c "CREATE USER tradingapp WITH PASSWORD '<DB_PASSWORD>';"
 sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE trading_journal TO tradingapp;"
 sudo -u postgres psql -c "\\q"
 
