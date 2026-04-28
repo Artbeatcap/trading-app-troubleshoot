@@ -15,6 +15,12 @@ class EarningsItem(BaseModel):
     ticker: str = Field(..., description="Stock ticker symbol")
     note: str = Field(..., description="Earnings note/analysis")
 
+class NewsItem(BaseModel):
+    """Represents a news headline item."""
+    headline: str = Field(..., description="News headline")
+    summary: str = Field(..., description="News summary/description")
+    datetime: Optional[int] = Field(default=None, description="Unix timestamp of news item")
+
 class MorningBrief(BaseModel):
     subject_theme: str = Field(..., description="Theme for the subject line")
     date: str = Field(..., description="Date in readable format (e.g., 'August 20, 2025')")
@@ -22,6 +28,8 @@ class MorningBrief(BaseModel):
     logo_url: str = Field(default="", description="URL to logo image (optional)")
     market_overview: str = Field(..., description="Market overview section")
     macro_data: str = Field(..., description="Macro/Data section")
+    # News headlines
+    news_headlines: List[NewsItem] = Field(default_factory=list, description="List of news headlines")
     # New movers lists
     ah_moves: List[MoveItem] = Field(default_factory=list, description="After-hours movers list")
     premarket_moves: List[MoveItem] = Field(default_factory=list, description="Premarket movers list")

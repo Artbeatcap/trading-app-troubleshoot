@@ -3,11 +3,19 @@ Market Brief Generator for Trading Analysis App
 Integrates with existing stock news email logic and sends to subscribers
 """
 
+# Enhanced gapping stocks functionality
+from market_brief_generator_fixed import (
+    fetch_gapping_stocks_enhanced,
+    CONVERSATIONAL_SYSTEM_PROMPT,
+)
+
 import os
+import re
 import requests
 import json
 import hashlib
 import time
+from html import escape
 from datetime import datetime, timedelta, time as dt_time
 from datetime import date
 import sys
@@ -16,15 +24,23 @@ import math
 from typing import Optional
 import pytz
 from pathlib import Path
-from openai import OpenAI
 from flask import current_app
 from flask_mail import Message
 from models import MarketBriefSubscriber, db
+from providers import get_default_provider, summarize_catalyst
 import logging
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Custom exceptions
+class BriefDataUnavailable(Exception):
+    """Raised when required market data cannot be retrieved."""
+    pass
+
+
+DAILY_REQUIRED_MARKET_SYMBOLS = ["spy", "qqq"]
 
 # ----- Tiny on-disk JSON cache (60–120s) -----
 CACHE_DIR = Path(os.getenv("OP_CACHE_DIR", Path(__file__).resolve().parent / "cache"))
@@ -51,110 +67,37 @@ def _cache_put_json(key: str, data: Dict[str, Any]) -> None:
     except Exception:
         pass
 
-def _fh_api_key() -> str | None:
-    """Get Finnhub API key from config or environment."""
-    return (current_app.config.get('FINNHUB_TOKEN') if current_app else None) or os.getenv('FINNHUB_TOKEN')
-
 def fetch_economic_calendar_today() -> List[Dict[str, str]]:
-    """Fetch today's economic calendar events from Finnhub with caching."""
-    token = _fh_api_key()
-    if token:
-        try:
-            today = datetime.now(tz=NY).date().isoformat()
-            url = "https://finnhub.io/api/v1/calendar/economic"
-            cache_key = f"fh:econ:{today}"
-            cached = _cache_get_json(cache_key, FH_CACHE_TTL)
-            if cached is not None:
-                data = cached.get("economicCalendar", [])
-            else:
-                r = requests.get(url, params={"from": today, "to": today, "token": token}, timeout=12)
-                raw = r.json() if r.status_code == 200 else {}
-                data = (raw or {}).get("economicCalendar", [])
-                if raw:
-                    _cache_put_json(cache_key, raw)
-            key_terms = ("cpi","ppi","payroll","employment","claims","pmi","ism","gdp","confidence","inventories","fomc","minutes","retail sales")
-            out: List[Dict[str, str]] = []
-            for ev in data:
-                name = (ev.get("event") or "").strip()
-                if not name:
-                    continue
-                if any(k in name.lower() for k in key_terms):
-                    why = (
-                        "Rates trajectory"
-                        if any(x in name.lower() for x in ("cpi","inflation","ppi","gdp","payroll","employment","claims","fed","fomc"))
-                        else "Growth/sentiment signal"
-                    )
-                    out.append({
-                        "time_et": ev.get("time") or ev.get("time_utc") or "",
-                        "event": name,
-                        "estimate": ev.get("estimate") or ev.get("actual") or "",
-                        "previous": ev.get("previous") or "",
-                        "impact": ev.get("impact") or "",
-                        "why": why,
-                    })
-            if out:
-                return out
-        except Exception:
-            pass
-    # FALLBACK → AV inference
-    return fetch_economic_catalysts_today_av()
+    """Today's economic calendar via providers.DataProvider.
 
-def fetch_economic_catalysts_today_av() -> List[Dict[str, str]]:
-    """Fallback: Fetch economic catalysts using Alpha Vantage inference."""
-    # This is a placeholder for the Alpha Vantage fallback
-    # In a real implementation, this would use Alpha Vantage API
-    return []
+    Returns an empty list on the current Polygon tier (no economic-calendar
+    endpoint). Kept for callers that still expect the function to exist.
+    """
+    today = datetime.now(tz=NY).date().isoformat()
+    try:
+        rows = get_default_provider().get_economic_calendar(today, today)
+    except Exception:
+        return []
+    return [
+        {k: v for k, v in ev.items() if k != "date"}
+        for ev in rows
+    ]
+
 
 def fetch_economic_calendar_range(days_ahead: int = 7, start: datetime | None = None) -> List[Dict[str, str]]:
+    """Economic calendar for [start, start+days_ahead) via providers.DataProvider.
+
+    Returns an empty list on the current Polygon tier (no economic-calendar
+    endpoint). Kept for callers that still expect the function to exist.
     """
-    PRIMARY (Finnhub): real economic calendar for a date range [start, start+days_ahead).
-    FALLBACK (Alpha Vantage): infer catalysts via NEWS_SENTIMENT (titles-only, no estimates).
-    """
-    token = _fh_api_key()
     start_dt = (start or datetime.now(tz=NY)).date()
     end_dt = start_dt + timedelta(days=days_ahead)
-    if token:
-        try:
-            url = "https://finnhub.io/api/v1/calendar/economic"
-            cache_key = f"fh:econ:{start_dt.isoformat()}:{end_dt.isoformat()}"
-            cached = _cache_get_json(cache_key, FH_CACHE_TTL)
-            if cached is not None:
-                raw = cached
-            else:
-                r = requests.get(url, params={"from": start_dt.isoformat(), "to": end_dt.isoformat(), "token": token}, timeout=12)
-                raw = r.json() if r.status_code == 200 else {}
-                if raw:
-                    _cache_put_json(cache_key, raw)
-            data = (raw or {}).get("economicCalendar", [])
-            key_terms = ("cpi","ppi","payroll","employment","claims","pmi","ism","gdp","confidence","inventories","fomc","minutes","retail sales")
-            out: List[Dict[str, str]] = []
-            for ev in data:
-                name = (ev.get("event") or "").strip()
-                if not name:
-                    continue
-                if any(k in name.lower() for k in key_terms):
-                    why = (
-                        "Rates trajectory"
-                        if any(x in name.lower() for x in ("cpi","inflation","ppi","gdp","payroll","employment","claims","fed","fomc"))
-                        else "Growth/sentiment signal"
-                    )
-                    out.append({
-                        "date": (ev.get("date") or start_dt.isoformat()),
-                        "time_et": ev.get("time") or ev.get("time_utc") or "",
-                        "event": name,
-                        "estimate": ev.get("estimate") or "",
-                        "previous": ev.get("previous") or "",
-                        "impact": ev.get("impact") or "",
-                        "why": why,
-                    })
-            return out
-        except Exception:
-            pass
-    # FALLBACK: AV inference (no dates/times/estimates guaranteed)
-    cats = fetch_economic_catalysts_today_av()
-    # Transform to week-ahead "best we can" list with today's date
-    d = datetime.now(tz=NY).date().isoformat()
-    return [{"date": d, "time_et": c.get("time_et","—"), "event": c.get("event",""), "why": c.get("why","")} for c in cats]
+    try:
+        return get_default_provider().get_economic_calendar(
+            start_dt.isoformat(), end_dt.isoformat()
+        )
+    except Exception:
+        return []
 
 def _week_bounds(dt: datetime | None = None) -> tuple[datetime, datetime]:
     """Return (Mon, Fri) datetimes for the week containing dt (ET)."""
@@ -176,86 +119,107 @@ def build_weekly_brief() -> Dict[str, Any]:
     """
     mon, fri = _week_bounds()
     
-    # Get current stock prices for realistic levels
-    stock_prices = fetch_stock_prices()
+    # Get current stock prices for realistic levels (no synthetic fallbacks)
+    stock_prices = fetch_stock_prices_strict()
+    if not stock_prices or not has_valid_price_data(stock_prices):
+        raise BriefDataUnavailable("Missing live price data for weekly brief")
+
     expected_range = calculate_expected_range(stock_prices)
-    
+    if not expected_range:
+        raise BriefDataUnavailable("Unable to derive index levels for weekly brief")
+
     # Try to get economic calendar and movers
     cats = fetch_economic_calendar_range(days_ahead=7, start=mon)
     movers = fetch_top_movers_av()
-    
-    # Format movers as bullet points with fallback
-    movers_bullets = []
+
+    def _fmt_price(symbol: str) -> str:
+        value = stock_prices.get(symbol, {}).get('current_price')
+        return f"${value:.2f}" if isinstance(value, (int, float)) and value else "N/A"
+
+    def _fmt_change(symbol: str) -> Optional[str]:
+        value = stock_prices.get(symbol, {}).get('change_percent')
+        if isinstance(value, (int, float)):
+            return f"{value:+.2f}%"
+        return None
+
+    spy_change = _fmt_change('spy')
+    qqq_change = _fmt_change('qqq')
+    change_fragments = [frag for frag in (spy_change and f"SPY {spy_change}", qqq_change and f"QQQ {qqq_change}") if frag]
+
+    index_blurb = f"SPY closed at {_fmt_price('spy')} and QQQ at {_fmt_price('qqq')} heading into the new week."
+    if change_fragments:
+        index_blurb += f" Latest session moves: {', '.join(change_fragments)}."
+
+    movers_bullets: List[str] = []
     if movers:
-        for mover in movers[:5]:  # Top 5 movers
-            direction = "📈" if mover.get("direction") == "up" else "📉"
-            ticker = mover.get("ticker", "")
-            change = mover.get("change_percent", "")
-            movers_bullets.append(f"{direction} {ticker}: {change}")
-    else:
-        # Fallback content when API fails
-        spy_change = stock_prices.get("spy", {}).get("change_percent", 0)
-        qqq_change = stock_prices.get("qqq", {}).get("change_percent", 0)
-        iwm_change = stock_prices.get("iwm", {}).get("change_percent", 0)
-        
-        if spy_change > 0:
-            movers_bullets.append(f"📈 SPY: +{spy_change:.2f}% (Large caps leading)")
-        else:
-            movers_bullets.append(f"📉 SPY: {spy_change:.2f}% (Large cap pressure)")
-            
-        if qqq_change > 0:
-            movers_bullets.append(f"📈 QQQ: +{qqq_change:.2f}% (Tech strength)")
-        else:
-            movers_bullets.append(f"📉 QQQ: {qqq_change:.2f}% (Tech weakness)")
-    
-    # Format catalysts as bullet points with fallback
-    macro_bullets = []
+        for mover in movers[:8]:
+            ticker = mover.get("ticker") or ""
+            if not ticker:
+                continue
+            change_pct = mover.get("change_percent") or mover.get("pct") or ""
+            direction_icon = "📈" if mover.get("direction") == "up" else "📉"
+            note = mover.get("why") or mover.get("headline")
+            bullet = f"{direction_icon} {ticker}: {change_pct}"
+            if note:
+                bullet += f" — {note}"
+            movers_bullets.append(bullet)
+
+    macro_bullets: List[str] = []
     if cats:
-        for cat in cats[:5]:  # Top 5 catalysts
-            event = cat.get("event", "")
-            why = cat.get("why", "")
-            macro_bullets.append(f"{event} ({why})")
+        for cat in cats[:8]:
+            parts = []
+            date_str = cat.get("date")
+            time_str = cat.get("time_et") or cat.get("time")
+            event = cat.get("event")
+            if date_str:
+                parts.append(date_str)
+            if time_str:
+                parts.append(time_str)
+            if event:
+                parts.append(event)
+            line = " • ".join(part for part in parts if part)
+            why = cat.get("why") or cat.get("impact")
+            if why:
+                line = f"{line} — {why}" if line else why
+            if line:
+                macro_bullets.append(line)
+
+    vix_value = stock_prices.get('vix', {}).get('current_price')
+    if isinstance(vix_value, (int, float)) and vix_value > 0:
+        volatility_note = "elevated" if vix_value >= 20 else "moderate"
+        flow_blurb = f"VIX is at {vix_value:.2f}, signalling {volatility_note} implied volatility for the coming sessions."
     else:
-        # Fallback economic events
-        macro_bullets = [
-            "Federal Reserve policy updates and economic data releases",
-            "Quarterly earnings reports from major corporations",
-            "Geopolitical developments affecting market sentiment",
-            "Key economic indicators including employment and inflation data"
-        ]
-    
+        flow_blurb = ""
+
+    levels = {symbol: expected_range.get(symbol) for symbol in ('spy', 'qqq', 'iwm') if expected_range.get(symbol)}
+    if not levels:
+        raise BriefDataUnavailable("Weekly brief lacks index levels after calculations")
+
+    preheader = "Weekly recap with movers and catalysts"
+    if macro_bullets:
+        preheader = f"{len(macro_bullets)} macro catalysts on deck this week"
+    elif movers_bullets:
+        preheader = f"Tracking {len(movers_bullets)} notable movers into the week"
+
     ctx = {
         "subject_theme": "Market Analysis",
         "date_human": f"Week of {mon.strftime('%B %d, %Y')}",
-        "preheader": "Weekly market recap and week-ahead outlook",
+        "preheader": preheader,
         "recap": {
-            "index_blurb": f"Markets showed mixed performance this week with SPY at ${stock_prices.get('spy', {}).get('current_price', 'N/A'):.2f} and key indices trading within established ranges.",
-            "sector_blurb": "Sector rotation continued with technology and healthcare leading gains while energy experienced volatility.",
+            "index_blurb": index_blurb,
+            "sector_blurb": "Notable movers covered below" if movers_bullets else "",
             "movers_bullets": movers_bullets,
-            "flow_blurb": f"Options flow remained active with VIX at {stock_prices.get('vix', {}).get('current_price', 'N/A'):.2f}, indicating {'elevated' if stock_prices.get('vix', {}).get('current_price', 20) > 20 else 'moderate'} market volatility."
+            "flow_blurb": flow_blurb
         },
-        "levels": {
-            "spy": expected_range.get("spy", {"support": "420", "support2": "415", "resistance": "430", "resistance2": "435", "resistance3": "440"}),
-            "qqq": expected_range.get("qqq", {"support": "380", "support2": "375", "resistance": "390", "resistance2": "395", "resistance3": "400"}),
-            "iwm": expected_range.get("iwm", {"support": "200", "support2": "195", "resistance": "210", "resistance2": "215", "resistance3": "220"})
-        },
+        "levels": levels,
         "week_ahead": {
             "macro_bullets": macro_bullets,
-            "earnings_bullets": [
-                "Key earnings reports from major tech companies",
-                "Financial sector earnings continue this week",
-                "Retail earnings season begins"
-            ]
+            "earnings_bullets": []
         },
-        "swing_playbook_bullets": [
-            "Watch for breakout above key resistance levels",
-            "Monitor sector rotation opportunities",
-            "Prepare for potential volatility around economic data"
-        ],
+        "swing_playbook_bullets": [],
         "cta_url": "https://optionsplunge.com/dashboard",
         "unsubscribe_url": "https://optionsplunge.com/unsubscribe",
         "preferences_url": "https://optionsplunge.com/settings",
-        # Additional data for compatibility
         "date_range": {
             "monday": mon.strftime("%Y-%m-%d"),
             "friday": fri.strftime("%Y-%m-%d"),
@@ -267,65 +231,32 @@ def build_weekly_brief() -> Dict[str, Any]:
     }
     return ctx
 
-def _av_api_key() -> str | None:
-    """Get Alpha Vantage API key from environment."""
-    return os.getenv('ALPHA_VANTAGE_API_KEY')
-
-def _av_get(params: Dict[str, Any], timeout: int = 12) -> Dict[str, Any]:
-    """Tiny helper for Alpha Vantage GETs with caching."""
-    base = "https://www.alphavantage.co/query"
-    apikey = _av_api_key()
-    if not apikey:
-        return {}
-    try:
-        # Build a stable cache key that ignores the secret but varies by query
-        key_pairs = "&".join(f"{k}={params[k]}" for k in sorted(params))
-        cache_key = f"av:{key_pairs}"
-        cached = _cache_get_json(cache_key, AV_CACHE_TTL)
-        if cached is not None:
-            return cached
-        q = {**params, "apikey": apikey}
-        r = requests.get(base, params=q, timeout=timeout)
-        data = r.json() if r.status_code == 200 else {}
-        if data:
-            _cache_put_json(cache_key, data)
-        return data
-    except Exception:
-        return {}
-
 def fetch_top_movers_av() -> List[Dict[str, Any]]:
-    """Fetch top movers using Alpha Vantage TOP_GAINERS_LOSERS API with caching."""
+    """Top gainers/losers via providers.DataProvider.
+
+    Name preserved for backward-compat with existing callers. The historical
+    Alpha Vantage `TOP_GAINERS_LOSERS` call has been removed.
+    """
     try:
-        data = _av_get({"function": "TOP_GAINERS_LOSERS"})
-        if not data or "Error Message" in data or "Note" in data:
-            return []
-        
-        movers = []
-        # Process top gainers
-        for item in data.get("top_gainers", [])[:5]:  # Limit to top 5
-            movers.append({
-                "ticker": item.get("ticker", ""),
-                "change_percent": item.get("change_percentage", ""),
-                "price": item.get("price", ""),
-                "change": item.get("change_amount", ""),
-                "volume": item.get("volume", ""),
-                "direction": "up"
-            })
-        
-        # Process top losers
-        for item in data.get("top_losers", [])[:5]:  # Limit to top 5
-            movers.append({
-                "ticker": item.get("ticker", ""),
-                "change_percent": item.get("change_percentage", ""),
-                "price": item.get("price", ""),
-                "change": item.get("change_amount", ""),
-                "volume": item.get("volume", ""),
-                "direction": "down"
-            })
-        
-        return movers
+        dp = get_default_provider()
+        gainers = dp.get_gainers(limit=5)
+        losers = dp.get_losers(limit=5)
     except Exception:
         return []
+
+    def _fmt(mover: dict, direction: str) -> Dict[str, Any]:
+        pct = mover.get("change_pct")
+        price = mover.get("price")
+        return {
+            "ticker": mover.get("ticker") or "",
+            "change_percent": f"{pct:+.2f}%" if isinstance(pct, (int, float)) else "",
+            "price": f"{price:.2f}" if isinstance(price, (int, float)) else "",
+            "change": "",
+            "volume": str(mover.get("volume") or ""),
+            "direction": direction,
+        }
+
+    return [_fmt(m, "up") for m in gainers] + [_fmt(m, "down") for m in losers]
 
 # Environment variables (resolved at runtime to allow config overrides)
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
@@ -398,10 +329,8 @@ except ImportError:
     HEADLINE_SUMMARIZER_AVAILABLE = False
     logging.warning("Headline summarizer module not available")
 
-# ===== Tradier session/time helpers and universe =====
+# ===== Session/time helpers and universe =====
 NY = pytz.timezone("America/New_York")
-TRADIER_BASE = os.getenv("TRADIER_BASE_URL", "https://api.tradier.com/v1")
-TRADIER_TOKEN = os.getenv("TRADIER_API_TOKEN")
 
 # Junk scan env knobs (optional)
 JUNK_ENABLE = (os.getenv("JUNK_ENABLE", "1").strip() == "1")
@@ -411,8 +340,10 @@ JUNK_MIN_ABS_PCT = float(os.getenv("JUNK_MIN_ABS_PCT", "5.0"))
 JUNK_MIN_PM_VOL = int(os.getenv("JUNK_MIN_PM_VOL", "100000"))
 JUNK_MIN_AH_VOL = int(os.getenv("JUNK_MIN_AH_VOL", "100000"))
 
-# Low-float tagging (optional)
-FINNHUB_TOKEN = os.getenv("FINNHUB_API_KEY") or os.getenv("FINNHUB_TOKEN")
+# Low-float tagging (optional; resolved via providers.DataProvider company
+# profile. Note: Polygon Stocks Starter tier does not expose free-float, so
+# this tag is effectively disabled until an earnings/float-capable provider
+# is wired in.)
 JUNK_FLOAT_MAX = int(os.getenv("JUNK_FLOAT_MAX", "50000000"))
 
 # Universe source for junk scan
@@ -515,123 +446,80 @@ def _junk_universe() -> list[str]:
     return out[:1000]
 
 def _tradier_quotes(symbols: list[str]) -> list[dict]:
-    """
-    Calls Tradier /v1/markets/quotes in batches and returns a flat list of quote dicts.
-    """
-    if not TRADIER_TOKEN:
-        logger.warning("Tradier API token not configured")
-        return []
+    """Return a flat list of Tradier-shaped quote dicts for `symbols`.
 
-    headers = {"Authorization": f"Bearer {TRADIER_TOKEN}", "Accept": "application/json"}
+    Name preserved for backward-compat with existing callers. Internally
+    fetches via providers.DataProvider.get_snapshot and re-projects the
+    normalized quote into the {symbol, last, change_percentage, volume,
+    bid, ask} fields the callers expect.
+    """
+    dp = get_default_provider()
     out: list[dict] = []
-
-    for group in _chunk(symbols, 150):
+    for sym in symbols:
         try:
-            resp = requests.get(
-                f"{TRADIER_BASE}/markets/quotes",
-                params={"symbols": ",".join(group), "greeks": "false"},
-                headers=headers,
-                timeout=10,
-            )
-            if resp.status_code != 200:
-                logger.warning(f"Tradier quotes HTTP {resp.status_code}: {resp.text[:200]}")
-                continue
-            data = resp.json() or {}
-            q = (data.get("quotes") or {}).get("quote")
-            if isinstance(q, dict):
-                out.append(q)
-            elif isinstance(q, list):
-                out.extend(q)
-        except Exception as e:
-            logger.exception(f"Tradier batch failed for {len(group)} symbols: {e}")
+            q = dp.get_snapshot(sym)
+        except Exception:
+            q = None
+        if not q:
+            continue
+        price = q.get("price")
+        chg_pct = q.get("change_pct")
+        prev_close = None
+        try:
+            if price is not None and chg_pct not in (None, 0):
+                prev_close = float(price) / (1.0 + float(chg_pct) / 100.0)
+            elif price is not None:
+                prev_close = float(price)
+        except Exception:
+            prev_close = None
+        out.append(
+            {
+                "symbol": q.get("ticker") or sym,
+                "last": price,
+                "prevclose": prev_close,
+                "change_percentage": chg_pct,
+                "volume": q.get("volume") or 0,
+                "bid": None,
+                "ask": None,
+                "description": sym,
+                "type": "stock",
+            }
+        )
     return out
 
+
 def _tradier_timesales_volume(symbol: str, start_dt: datetime, end_dt: datetime) -> int:
-    """Sum session volume from Tradier Time & Sales between start_dt and end_dt."""
-    if not TRADIER_TOKEN:
-        return 0
-    headers = {"Authorization": f"Bearer {TRADIER_TOKEN}", "Accept": "application/json"}
+    """Sum 1-minute bar volume for `symbol` between `start_dt` and `end_dt`
+    via providers.DataProvider.
+    """
+    frm = start_dt.astimezone(pytz.UTC).strftime("%Y-%m-%d")
+    to = end_dt.astimezone(pytz.UTC).strftime("%Y-%m-%d")
     try:
-        params = {
-            "symbol": symbol,
-            "interval": "1min",
-            "start": start_dt.astimezone(pytz.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "end": end_dt.astimezone(pytz.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "session_filter": "all",
-        }
-        r = requests.get(f"{TRADIER_BASE}/markets/timesales", params=params, headers=headers, timeout=10)
-        if r.status_code != 200:
-            return 0
-        data = r.json() or {}
-        series = ((data.get("series") or {}).get("data")) or []
-        vol = 0
-        for bar in series:
-            v = bar.get("volume")
-            if isinstance(v, (int, float)):
-                vol += int(v)
-        return vol
+        bars = get_default_provider().get_bars(symbol, 1, "minute", frm, to, limit=5000)
     except Exception:
         return 0
+    start_ms = int(start_dt.astimezone(pytz.UTC).timestamp() * 1000)
+    end_ms = int(end_dt.astimezone(pytz.UTC).timestamp() * 1000)
+    vol = 0
+    for b in bars or []:
+        ts = b.get("timestamp")
+        if not ts:
+            continue
+        try:
+            bar_ms = int(
+                datetime.strptime(ts.replace("Z", "+00:00"), "%Y-%m-%dT%H:%M:%S%z")
+                .timestamp() * 1000
+            )
+        except Exception:
+            continue
+        if start_ms <= bar_ms <= end_ms:
+            v = b.get("volume")
+            if isinstance(v, (int, float)):
+                vol += int(v)
+    return vol
 
 # ===== Stable system and user templates for Morning Brief generation =====
-BRIEF_SYSTEM = """
-You are a professional sell-side market strategist producing a concise, trader-first morning brief
-for U.S. options day- and swing-traders. Match the author's voice when hints are provided. Use U.S. Eastern Time.
-
-PRIMARY OUTCOMES (in order of importance)
-1) Fast situational awareness (what changed, why it matters, where the risk is).
-2) Actionable prep (levels, triggers, invalidations, key times).
-3) Consistent structure readers can skim in under 3 minutes.
-
-STRICT RULES
-- Use ONLY the structured inputs from the user. Do NOT invent tickers, levels, dates, or numbers.
-- If an input is missing, skip input and move on.
-- No financial advice or instructions to enter trades. Provide analysis, context, and level-based scenarios only.
-- Plain Markdown only (no HTML). Keep total length under ~1,500 words.
-
-VOICE & STYLE
-- Human, clear, no hype. Short sentences. Prefer active voice.
-- Put numbers to claims (%, bps, points). Round sensibly.
-- When you cite levels, echo them exactly as provided.
-- When uncertain due to missing data, say so briefly.
-
-MANDATORY SECTION ORDER (Markdown H2)
-## Executive Summary
-## What's moving — After-hours & Premarket
-## Key Market Headlines
-## Technical Analysis & Daily Range Insights
-## Trader Playbook — If/Then Scenarios
-## Market Sentiment & Outlook
-## Key Levels to Watch
-
-SECTION GUIDANCE & FORMATS
-- Executive Summary: 3–5 bullets. Each bullet = [What changed] → [Why it matters] → [Watch X at Y level/time].
-  Format each bullet with a blank line before it for better separation.
-- What's moving: 3–8 tickers max. For each, write 2–5 tight sentences:
-  - Catalyst (from inputs) + positioning/flow if provided
-  - Why traders should care (gap size, liquidity, RV vs beta, expected ATR)
-  - Watch: the nearest trigger(s) and invalidation if provided
-  Format each as: **TICKER** — <2–5 sentences>. Keep tickers bold the first time only.
-- Key Market Headlines: For each article, format exactly:
-  ### <Major headline (concise)>
-  #### Summary
-  <2–5 sentence paragraph using only provided summary fields>
-  Add one blank line between items.
-- Technical Analysis & Daily Range: Mention SPY/QQQ spot (if provided), expected range, nearby supports/resistances,
-  and how the day could unfold around those levels (balance vs trend day) using only provided data.
-- Trader Playbook — If/Then Scenarios: 3–6 bullets max. Each bullet MUST use this template:
-  - If <instrument/level/time condition>, then <bias/expected behavior> while <invalidation/stop context> (timeframe: <scalp/day/swing>).
-  Use only provided levels/times; never invent.
-- Market Sentiment & Outlook: 1 short paragraph tying VIX/rates/breadth/positioning to likely tape behavior.
-- Key Levels to Watch: Print **daily AND weekly supports/resistances** for SPY and QQQ exactly as provided
-  (e.g., "SPY — Daily S: 520.10 / 517.80; R: 525.40 / 528.60; Weekly S: 521.20 / 517.00; R: 533.10 / 536.80").
-
-FORMATTING RULES
-- Plain Markdown. Bold tickers only on first mention in a section.
-- Use short paragraphs and bullets. Avoid nested bullets > 1 level deep.
-- Use "Watch:" and "Why it matters:" sparingly to aid skimming.
-- Executive Summary bullets: Add blank line before each bullet point for better visual separation.
-"""
+BRIEF_SYSTEM = CONVERSATIONAL_SYSTEM_PROMPT
 
 BRIEF_USER_TEMPLATE = """
 DATE: {date_str}
@@ -642,6 +530,9 @@ DATA FEED
 
 - VOL & SENTIMENT (VIX, term structure, put/call, breadth if available):
 {vix_text}
+
+- LEVELS METHODOLOGY (how S/R numbers were calculated; do not invent chart-based reasons):
+{levels_methodology_text}
 
 - OVERNIGHT / GAPS — AH & Premarket (tickers, catalysts, size, liquidity flags):
 {gapping_text}
@@ -674,6 +565,9 @@ SCOPE
 
 HARD RULES
 - Do NOT invent data. Use only provided inputs.
+- If any input block begins with "SECTION_UNAVAILABLE:", OMIT the corresponding
+  section from your output entirely. Do not describe the missing data, do not
+  fabricate content, do not include a header for it.
 - US Eastern Time / US markets focus.
 - Section headers EXACTLY (Markdown H2):
   ## Weekly Executive Summary
@@ -716,27 +610,728 @@ Using only the inputs above, produce the weekly brief with these sections:
 """
 # ===== END WEEKLY PROMPTS =====
 
-# ===== Tradier history + pivot helpers (Daily/Weekly) =====
+# ===== ENHANCED WEEKLY BRIEF: STABLE PROMPTS (for prompt caching) =====
+WEEKLY_SYSTEM_ENHANCED = """
+You are a senior market strategist writing a comprehensive WEEKLY market brief for active 
+US options traders and swing traders. Your brief should capture the big picture of market 
+activity and provide actionable context for the week ahead.
+
+AUDIENCE
+- Experienced options traders looking for high-level market context
+- Swing traders planning multi-day positions
+- Professional traders who need to understand major shifts and upcoming catalysts
+
+CORE OBJECTIVES
+1. Synthesize the past week's major moves into a coherent narrative
+2. Identify what moved markets and why (data, news, flows, technicals)
+3. Highlight upcoming events and data that will drive next week's trading
+4. Provide context for positioning and risk management
+
+SCOPE
+- Review: Monday-Friday of the PAST WEEK
+- Outlook: The COMING week (Monday-Friday)
+- Focus: US equities, major indices (SPY/QQQ), key sectors, rates/volatility
+
+SECTION STRUCTURE (Use exact H2 headers)
+
+## 📊 Week in Review - The Big Picture
+Start with 2-3 paragraphs capturing the overall market narrative:
+- What was the dominant theme? (Risk-on/off, rotation, consolidation, breakout, etc.)
+- Major index moves (SPY, QQQ) with % changes and key levels tested
+- What drove the moves? (Economic data, Fed speak, earnings, geopolitics, flows)
+- Volatility regime: VIX behavior, term structure, put/call ratios
+- Sector rotation: What led, what lagged, and why
+
+## 🎯 Major Trade Moves & Market Movers
+Highlight 5-8 significant individual moves or sector themes:
+- Use this format for each: **TICKER/SECTOR** — Brief catalyst + % move + what it means
+- Focus on: Large caps that moved >3-5%, sector ETFs, notable options activity
+- Include: Earnings surprises, analyst upgrades/downgrades, macro catalysts
+- Why traders should care: Liquidity, follow-through potential, cross-asset implications
+
+## 📰 Key Headlines That Moved Markets  
+List 5-8 major news items from the past week that had market impact:
+### [Headline - keep it concise and specific]
+2-3 sentences on what happened and why it matters for traders. Connect to price action 
+when possible (e.g., "Treasury yields spiked 15bps on hot CPI, pressuring growth names").
+
+## 📅 Week Ahead - Calendar & Catalysts
+Break down upcoming events by category:
+
+**Economic Data** (List with day/time if available)
+- Key reports with consensus estimates and what they mean
+- Why each matters: Rate expectations, growth trajectory, sentiment
+- Which assets/sectors are most sensitive
+
+**Earnings Releases** (Top 5-10 most significant)
+- Major names reporting with expected impact
+- Sector implications from bellwether reports
+- Key metrics traders will watch
+
+**Fed/Policy Events**
+- FOMC meetings, speeches, policy announcements
+- Expected impact on rates, volatility, positioning
+
+**Other Catalysts**
+- Options expiration, rebalancing, technical levels, seasonality
+
+## 🔬 Technical Setup & Key Levels
+Analyze SPY and QQQ from a swing trader perspective:
+
+**SPY Analysis**
+- Current price and weekly trend (consolidation, breakout, breakdown)
+- Critical support levels: [List only levels present in the payload; explain them as VIX-implied sigma bands when applicable (+/-1sigma, +/-2sigma, +3sigma). Do NOT cite indicators not provided.]
+- Resistance levels: [List only levels present in the payload; same rule as above — no invented chart reasons.]
+- Momentum indicators and what they signal
+- Expected trading range for the week
+
+**QQQ Analysis**  
+- Same structure as SPY
+- Note any divergence vs SPY
+- Tech sector sensitivity to upcoming events
+
+## 📈 Trader's Playbook - Positioning for the Week
+Provide 4-6 scenario-based trade setups:
+
+Format each as:
+**If/Then Scenario:** If [specific condition/level/event], then [expected market behavior],
+with [key risk level to watch].
+**Time horizon:** [Intraday scalp / 2-5 day swing / Week+ hold]
+**Rationale:** [Why this setup makes sense given current context]
+
+Use the actual levels from this week's data in the payload above. Do NOT invent
+placeholder levels or prices — only reference numbers that appear in the data you
+were given.
+
+Do NOT invent reasons for why a level is \"key\" (no moving averages, VWAP, prior highs/lows, Fibonacci, etc.) unless those specific facts are explicitly present in the payload. If you need to justify, justify only via the provided sigma-band methodology / probabilities.
+
+## 💭 Market Sentiment & Risk Assessment
+Final paragraph (3-5 sentences) synthesizing:
+- Overall market positioning (crowded trades, sentiment extremes)
+- Key risks for the week ahead (geopolitical, data misses, technical breakdowns)
+- Volatility expectations and hedging considerations
+- One key theme or level to anchor the week's trading
+
+WRITING GUIDELINES
+- Write in clear, professional English - no jargon without explanation
+- Use specific numbers: prices, percentages, levels, times
+- Be precise with levels and dates - no vague references
+- Keep paragraphs tight (3-5 sentences max)
+- Use bold for tickers/levels on FIRST mention only
+- If data is missing, acknowledge it briefly - don't invent
+
+DATA DISCIPLINE
+- Use ONLY information provided in the user prompt
+- If a section lacks data, state "Data not available" and move on
+- Never fabricate levels, estimates, or events
+- Cite timeframes in US Eastern Time
+"""
+
+# ===== ENHANCED WEEKLY USER TEMPLATE =====
+WEEKLY_USER_TEMPLATE_ENHANCED = """
+WEEK OF: {week_of_str}
+Current Date: {current_date}
+
+═══════════════════════════════════════════════════════════
+📊 WEEKLY MARKET PERFORMANCE (Mon-Fri: {week_mon} to {week_fri})
+═══════════════════════════════════════════════════════════
+
+MAJOR INDICES - Weekly Performance:
+{index_recap}
+
+SECTOR ROTATION - Leaders & Laggards:
+{weekly_movers}
+
+VOLATILITY & SENTIMENT:
+{volatility_data}
+
+═══════════════════════════════════════════════════════════
+📰 MAJOR NEWS & MARKET-MOVING EVENTS
+═══════════════════════════════════════════════════════════
+{weekly_headlines}
+
+═══════════════════════════════════════════════════════════
+📅 WEEK AHEAD - What to Watch
+═══════════════════════════════════════════════════════════
+
+ECONOMIC DATA RELEASES:
+{economic_calendar}
+
+EARNINGS REPORTS:
+{earnings_calendar}
+
+FED/POLICY EVENTS:
+{policy_events}
+
+OTHER CATALYSTS:
+{other_catalysts}
+
+═══════════════════════════════════════════════════════════
+🔬 TECHNICAL LEVELS FOR SWING TRADING
+═══════════════════════════════════════════════════════════
+
+SPY LEVELS:
+{spy_levels}
+
+QQQ LEVELS:
+{qqq_levels}
+
+═══════════════════════════════════════════════════════════
+🎯 WEEKLY RECAP GENERATION
+═══════════════════════════════════════════════════════════
+
+Based on the comprehensive market data above, create a professional weekly market recap 
+in the style of Investopedia or Bloomberg market summaries.
+
+CRITICAL REQUIREMENTS:
+
+1. **Opening Headline** (Investopedia-style):
+   - Example: "Stocks Wrap Up a Down Week on a High Note; Dow Closes Up Nearly 500 Points; NY Fed Chief Signals Support for Rate Cut"
+   - Must include: Overall week direction, specific point/percentage moves, major catalyst
+   - Be specific with numbers (e.g., "Dow up 487 points" not "Dow higher")
+
+2. **Week in Review Section** (2-3 detailed paragraphs):
+   - Paragraph 1: Overall market performance with specific index moves
+   - Paragraph 2: What drove the market (economic data, news catalysts, Fed developments)
+   - Paragraph 3: Sector rotation, winners/losers, breadth
+   - If Friday diverged from week: Add note about Friday's session
+
+3. **Major Trade Moves** (5-8 items):
+   - Focus on what actually moved THIS WEEK
+   - Include specific catalysts from the news
+   - Actual percentage moves from sector data
+
+4. **Key Headlines** (5-8 items):
+   - Use ACTUAL headlines from the weekly news feed
+   - Explain market impact of each headline
+   - Connect to price action
+
+Continue with remaining sections as specified in system prompt.
+
+IMPORTANT: Use REAL DATA from above. Don't invent numbers or events.
+
+SECTION_UNAVAILABLE HANDLING:
+If any payload field (e.g. economic_calendar, earnings_calendar, policy_events)
+starts with "SECTION_UNAVAILABLE:", completely OMIT that subsection and its
+header from the final output. Do not mention the data is missing, do not
+hallucinate a replacement. Simply skip that block and continue with the next
+available section.
+"""
+# ===== END ENHANCED WEEKLY PROMPTS =====
+
+# ===== Daily history + pivot helpers =====
 def _tradier_history_daily(symbol: str, start_d: date, end_d: date) -> list[dict]:
-    if not TRADIER_TOKEN:
-        return []
-    headers = {"Authorization": f"Bearer {TRADIER_TOKEN}", "Accept": "application/json"}
+    """Daily OHLCV history via providers.DataProvider, returned in the
+    legacy Tradier-shaped schema (`date`, `open`, `high`, `low`, `close`,
+    `volume`) expected by downstream callers.
+    """
     try:
-        r = requests.get(
-            f"{TRADIER_BASE}/markets/history",
-            params={"symbol": symbol, "interval": "daily", "start": start_d.isoformat(), "end": end_d.isoformat()},
-            headers=headers,
-            timeout=10,
+        bars = get_default_provider().get_daily_bars(
+            symbol, start_d.isoformat(), end_d.isoformat(), limit=5000
         )
-        if r.status_code != 200:
-            logger.warning(f"Tradier history HTTP {r.status_code}: {r.text[:200]}")
-            return []
-        data = r.json() or {}
-        days = ((data.get("history") or {}).get("day")) or []
-        return days if isinstance(days, list) else ([days] if days else [])
-    except Exception as e:
-        logger.exception(f"_tradier_history_daily failed for {symbol}: {e}")
+    except Exception as exc:
+        logger.exception(f"_tradier_history_daily failed for {symbol}: {exc}")
         return []
+    out = []
+    for b in bars or []:
+        ts = b.get("timestamp") or ""
+        out.append(
+            {
+                "date": ts[:10] if ts else "",
+                "open": b.get("open"),
+                "high": b.get("high"),
+                "low": b.get("low"),
+                "close": b.get("close"),
+                "volume": b.get("volume") or 0,
+            }
+        )
+    return out
+
+
+def fetch_comprehensive_weekly_market_data(week_mon: date, week_fri: date) -> dict:
+    """
+    Fetch comprehensive market data for the weekly recap.
+    Returns detailed performance data with specific point moves, percentages, and context.
+
+    Args:
+        week_mon: Monday of the week to analyze
+        week_fri: Friday of the week to analyze
+
+    Returns:
+        Dictionary with comprehensive market data
+    """
+    market_data: dict[str, Any] = {
+        "indices": {},
+        "sectors": {},
+        "volatility": {},
+        "breadth": {},
+        "notable_movers": [],
+    }
+
+    # =========================================================================
+    # MAJOR INDICES - Get detailed data
+    # =========================================================================
+    indices = {
+        "SPY": "S&P 500",
+        "QQQ": "Nasdaq 100",
+        "DIA": "Dow Jones",
+        "IWM": "Russell 2000",
+    }
+
+    for ticker, name in indices.items():
+        try:
+            hist = _tradier_history_daily(ticker, week_mon, week_fri)
+            if hist and len(hist) >= 2:
+                week_open = float(hist[0]["open"])
+                week_close = float(hist[-1]["close"])
+                week_high = max(float(d["high"]) for d in hist)
+                week_low = min(float(d["low"]) for d in hist)
+
+                # Calculate moves
+                point_change = week_close - week_open
+                pct_change = (point_change / week_open) * 100 if week_open else 0.0
+
+                # Determine trend
+                if pct_change > 2:
+                    trend = "strong rally"
+                elif pct_change > 0.5:
+                    trend = "modest gains"
+                elif pct_change > -0.5:
+                    trend = "essentially flat"
+                elif pct_change > -2:
+                    trend = "modest decline"
+                else:
+                    trend = "sharp selloff"
+
+                # Friday session move
+                friday_close = float(hist[-1]["close"])
+                friday_open = float(hist[-1]["open"])
+                friday_change = (
+                    ((friday_close - friday_open) / friday_open) * 100
+                    if friday_open
+                    else 0.0
+                )
+
+                market_data["indices"][ticker] = {
+                    "name": name,
+                    "week_open": week_open,
+                    "week_close": week_close,
+                    "week_high": week_high,
+                    "week_low": week_low,
+                    "point_change": point_change,
+                    "pct_change": pct_change,
+                    "trend": trend,
+                    "friday_pct": friday_change,
+                    "range": f"${week_low:.2f} - ${week_high:.2f}",
+                }
+
+        except Exception as e:
+            logger.warning(f"Error fetching {ticker} data: {e}")
+
+    # =========================================================================
+    # SECTOR PERFORMANCE - Detailed analysis
+    # =========================================================================
+    sectors = {
+        "XLK": "Technology",
+        "XLF": "Financials",
+        "XLE": "Energy",
+        "XLV": "Healthcare",
+        "XLY": "Consumer Discretionary",
+        "XLP": "Consumer Staples",
+        "XLI": "Industrials",
+        "XLB": "Materials",
+        "XLRE": "Real Estate",
+        "XLU": "Utilities",
+        "XLC": "Communication Services",
+    }
+
+    sector_performance: list[dict[str, Any]] = []
+    for ticker, name in sectors.items():
+        try:
+            hist = _tradier_history_daily(ticker, week_mon, week_fri)
+            if hist and len(hist) >= 2:
+                week_open = float(hist[0]["open"])
+                week_close = float(hist[-1]["close"])
+                pct_change = (
+                    ((week_close - week_open) / week_open) * 100 if week_open else 0.0
+                )
+
+                sector_performance.append(
+                    {
+                        "ticker": ticker,
+                        "name": name,
+                        "pct_change": pct_change,
+                        "close": week_close,
+                    }
+                )
+        except Exception as e:
+            logger.warning(f"Error fetching {ticker} sector data: {e}")
+
+    # Sort by performance
+    sector_performance.sort(key=lambda x: x["pct_change"], reverse=True)
+    market_data["sectors"] = sector_performance
+
+    # =========================================================================
+    # VOLATILITY METRICS
+    # =========================================================================
+    try:
+        vix_hist = _tradier_history_daily("VIX", week_mon, week_fri)
+        if vix_hist and len(vix_hist) >= 2:
+            vix_start = float(vix_hist[0]["close"])
+            vix_end = float(vix_hist[-1]["close"])
+            vix_high = max(float(d["high"]) for d in vix_hist)
+            vix_low = min(float(d["low"]) for d in vix_hist)
+
+            market_data["volatility"] = {
+                "vix_start": vix_start,
+                "vix_end": vix_end,
+                "vix_change": vix_end - vix_start,
+                "vix_high": vix_high,
+                "vix_low": vix_low,
+                "regime": "low"
+                if vix_end < 15
+                else "elevated"
+                if vix_end < 20
+                else "high",
+            }
+    except Exception as e:
+        logger.warning(f"Error fetching VIX data: {e}")
+
+    # =========================================================================
+    # MARKET BREADTH (placeholder; requires separate API)
+    # =========================================================================
+    market_data["breadth"] = {
+        "note": "Breadth data requires additional API integration",
+    }
+
+    return market_data
+
+
+def format_weekly_recap_headline(market_data: dict, major_news: list) -> str:
+    """
+    Generate an Investopedia-style headline for the weekly recap.
+
+    Args:
+        market_data: Comprehensive market data dictionary
+        major_news: List of major news items from the week
+
+    Returns:
+        Formatted headline string
+    """
+    # Get primary index (SPY)
+    spy = (market_data.get("indices") or {}).get("SPY", {})
+
+    if not spy:
+        return "Weekly Market Recap"
+
+    # Determine overall week direction
+    pct = spy.get("pct_change", 0.0) or 0.0
+    friday_pct = spy.get("friday_pct", 0.0) or 0.0
+
+    # Build headline components
+    components: list[str] = []
+
+    # Overall week context
+    if abs(pct) < 0.3:
+        week_desc = "Stocks Finish Week Essentially Flat"
+    elif pct > 0:
+        if pct > 2:
+            week_desc = f"Stocks Rally {pct:.1f}% for the Week"
+        else:
+            week_desc = f"Stocks Edge Higher, Up {pct:.1f}% for Week"
+    else:
+        if pct < -2:
+            week_desc = f"Stocks Tumble {abs(pct):.1f}% for the Week"
+        else:
+            week_desc = f"Stocks Decline {abs(pct):.1f}% for Week"
+
+    components.append(week_desc)
+
+    # Friday divergence (if significant)
+    if (pct < -1 and friday_pct > 1) or (pct > 1 and friday_pct < -1):
+        if pct < 0 and friday_pct > 0:
+            components.append("But Rally Friday")
+        elif pct > 0 and friday_pct < 0:
+            components.append("Despite Friday Selloff")
+
+    # Add major index point moves
+    indices_desc: list[str] = []
+    for ticker in ["SPY", "DIA", "QQQ"]:
+        idx = (market_data.get("indices") or {}).get(ticker, {})
+        if idx and abs(idx.get("pct_change", 0.0) or 0.0) > 0.5:
+            name = idx.get("name", ticker)
+            pct_chg = idx.get("pct_change", 0.0) or 0.0
+            point_chg = idx.get("point_change", 0.0) or 0.0
+
+            # Format based on magnitude
+            if abs(point_chg) > 10:  # Significant point move
+                direction = "Up" if point_chg > 0 else "Down"
+                indices_desc.append(f"{name} {direction} {abs(point_chg):.0f} Points")
+
+    if indices_desc:
+        components.append("; ".join(indices_desc[:2]))  # Max 2 index callouts
+
+    # Add top news catalyst if available
+    if major_news:
+        top_news = major_news[0]
+        headline = top_news.get("headline", "") or ""
+
+        # Extract key phrase (first 60 chars or to first semicolon/colon)
+        if headline:
+            key_phrase = headline.split(";")[0].split(":")[0]
+            if len(key_phrase) > 60:
+                key_phrase = key_phrase[:60] + "..."
+            components.append(key_phrase)
+
+    return "; ".join(components)
+
+
+def fetch_week_major_news(week_mon: date, week_fri: date) -> list[dict]:
+    """Fetch major market-moving news for the week via providers.DataProvider.
+
+    Aggregates news for a curated list of market-bellwether tickers
+    (index ETFs, mega-caps, rates/vol ETFs) so we get a broad macro read
+    without any Finnhub dependency.
+
+    Args:
+        week_mon: Monday of week
+        week_fri: Friday of week
+
+    Returns:
+        List of normalized news items: {headline, summary, source, url,
+        timestamp, related}.
+    """
+    cache_key = f"news:week:{week_mon.isoformat()}"
+    cached = _cache_get_json(cache_key, 14400)
+    if cached is not None:
+        return cached
+
+    dp = get_default_provider()
+    tickers = ["SPY", "QQQ", "DIA", "IWM", "AAPL", "MSFT", "NVDA", "TLT", "VIXY"]
+    market_keywords = [
+        "fed", "fomc", "powell", "rate", "inflation", "cpi", "ppi", "gdp",
+        "employment", "jobs", "payroll", "earnings", "market", "stocks",
+        "dow", "nasdaq", "s&p", "treasury", "yield", "recession", "economy",
+        "trade", "tariff", "central bank",
+    ]
+
+    week_start_ts = int(datetime.combine(week_mon, dt_time.min).timestamp())
+    week_end_ts = int(datetime.combine(week_fri, dt_time(23, 59, 59)).timestamp())
+
+    seen_urls: set[str] = set()
+    filtered: list[dict[str, Any]] = []
+
+    for tkr in tickers:
+        try:
+            items = dp.get_news(tkr, limit=20) or []
+        except Exception as exc:
+            logger.debug(f"get_news failed for {tkr}: {exc}")
+            continue
+        for it in items:
+            url = it.get("url") or ""
+            if url and url in seen_urls:
+                continue
+            pub = it.get("published") or ""
+            try:
+                ts = int(
+                    datetime.strptime(pub.replace("Z", "+00:00"), "%Y-%m-%dT%H:%M:%S%z")
+                    .timestamp()
+                )
+            except Exception:
+                ts = 0
+            if not (week_start_ts <= ts <= week_end_ts):
+                continue
+            title_l = (it.get("title") or "").lower()
+            if not any(k in title_l for k in market_keywords):
+                continue
+            seen_urls.add(url)
+            filtered.append(
+                {
+                    "headline": it.get("title") or "",
+                    "summary": it.get("description") or "",
+                    "source": it.get("source") or "",
+                    "url": url,
+                    "timestamp": ts,
+                    "related": tkr,
+                }
+            )
+
+    filtered.sort(key=lambda x: x["timestamp"], reverse=True)
+    top = filtered[:15]
+    if top:
+        _cache_put_json(cache_key, top)
+    logger.info(f"Found {len(top)} major news items for week")
+    return top
+
+
+def generate_week_in_review_narrative(
+    market_data: dict, news_items: list, econ_events: list | None = None
+) -> str:
+    """
+    Generate a comprehensive narrative of the week's market action.
+    Investopedia-style with specific numbers and context.
+
+    Args:
+        market_data: Comprehensive market data from fetch_comprehensive_weekly_market_data
+        news_items: Major news from fetch_week_major_news
+        econ_events: Economic events that occurred (optional)
+
+    Returns:
+        Formatted narrative string
+    """
+    narrative_parts: list[str] = []
+
+    # =========================================================================
+    # OPENING PARAGRAPH - Overall market performance
+    # =========================================================================
+    indices = market_data.get("indices") or {}
+    spy = indices.get("SPY", {})
+    qqq = indices.get("QQQ", {})
+    dia = indices.get("DIA", {})
+
+    if spy:
+        pct = spy.get("pct_change", 0.0) or 0.0
+        trend = spy.get("trend", "mixed trade")
+
+        # Opening sentence
+        if pct > 0:
+            opener = f"U.S. stocks posted {trend} for the week, "
+        else:
+            opener = f"U.S. stocks finished with {trend} for the week, "
+
+        # Add specific index performance
+        index_details: list[str] = []
+        index_details.append(
+            "with the S&P 500 "
+            f"{'gaining' if pct > 0 else 'losing'} "
+            f"{abs(pct):.1f}% to close at {spy.get('week_close', 0.0):.2f}"
+        )
+
+        if dia:
+            dia_pct = dia.get("pct_change", 0.0) or 0.0
+            point_chg = dia.get("point_change", 0.0) or 0.0
+            index_details.append(
+                "the Dow Jones Industrial Average "
+                f"{'advancing' if dia_pct > 0 else 'declining'} "
+                f"{abs(point_chg):.0f} points ({abs(dia_pct):.1f}%) "
+                f"to {dia.get('week_close', 0.0):.2f}"
+            )
+
+        if qqq:
+            qqq_pct = qqq.get("pct_change", 0.0) or 0.0
+            index_details.append(
+                "and the Nasdaq 100 "
+                f"{'rising' if qqq_pct > 0 else 'falling'} "
+                f"{abs(qqq_pct):.1f}% to {qqq.get('week_close', 0.0):.2f}"
+            )
+
+        narrative_parts.append(opener + ", ".join(index_details) + ".")
+
+    # =========================================================================
+    # PARAGRAPH 2 - What drove the market
+    # =========================================================================
+    drivers: list[str] = []
+
+    # Economic data impact
+    if econ_events:
+        high_impact = [e for e in econ_events if e.get("impact") == "HIGH"]
+        if high_impact:
+            event_names = [e.get("event", "") for e in high_impact[:2] if e.get("event")]
+            if event_names:
+                drivers.append(
+                    "economic data including " + " and ".join(event_names)
+                )
+
+    # Major news catalysts
+    if news_items:
+        top_news = news_items[:3]
+        news_themes: list[str] = []
+
+        for item in top_news:
+            headline = (item.get("headline", "") or "").lower()
+            if "fed" in headline or "rate" in headline:
+                news_themes.append("Federal Reserve policy signals")
+            elif "earnings" in headline:
+                news_themes.append("corporate earnings reports")
+            elif "inflation" in headline or "cpi" in headline:
+                news_themes.append("inflation data")
+            elif "employment" in headline or "jobs" in headline or "payroll" in headline:
+                news_themes.append("labor market developments")
+
+        if news_themes:
+            # Deduplicate while preserving order
+            unique_themes = list(dict.fromkeys(news_themes))
+            drivers.append(" and ".join(unique_themes[:2]))
+
+    # Volatility context
+    vol = market_data.get("volatility") or {}
+    if vol:
+        vix_change = vol.get("vix_change", 0.0) or 0.0
+        if abs(vix_change) > 2:
+            direction = "jumped" if vix_change > 0 else "fell"
+            drivers.append(
+                f"with volatility {direction} as the VIX "
+                f"{'rose' if vix_change > 0 else 'declined'} "
+                f"{abs(vix_change):.1f} points to {vol.get('vix_end', 0.0):.1f}"
+            )
+
+    if drivers:
+        if len(drivers) == 1:
+            driver_text = f"The week's trading was influenced by {drivers[0]}."
+        else:
+            driver_text = (
+                "The week's trading was influenced by "
+                f"{', '.join(drivers[:-1])} and {drivers[-1]}."
+            )
+        narrative_parts.append(driver_text)
+
+    # =========================================================================
+    # PARAGRAPH 3 - Sector rotation and leadership
+    # =========================================================================
+    sectors = market_data.get("sectors") or []
+    if isinstance(sectors, list) and len(sectors) >= 6:
+        leaders = sectors[:3]
+        laggards = sectors[-3:]
+
+        leader_text = ", ".join(
+            f"{s['name']} ({s['pct_change']:+.1f}%)" for s in leaders
+        )
+        laggard_text = ", ".join(
+            f"{s['name']} ({s['pct_change']:+.1f}%)" for s in laggards
+        )
+
+        rotation_text = (
+            f"Sector rotation showed {leaders[0]['name']} leading the market, "
+            f"followed by {leader_text}. "
+            f"On the downside, {laggards[-1]['name']} lagged, along with {laggard_text}."
+        )
+
+        narrative_parts.append(rotation_text)
+
+    # =========================================================================
+    # PARAGRAPH 4 - Friday's action (if divergent from week)
+    # =========================================================================
+    if spy:
+        week_pct = spy.get("pct_change", 0.0) or 0.0
+        friday_pct = spy.get("friday_pct", 0.0) or 0.0
+
+        if (week_pct < -1 and friday_pct > 1) or (week_pct > 1 and friday_pct < -1):
+            if week_pct < 0 and friday_pct > 1:
+                friday_text = (
+                    "Despite the weekly decline, stocks rallied strongly on Friday, "
+                    f"with the S&P 500 gaining {friday_pct:.1f}% in a broad-based "
+                    "recovery that helped trim weekly losses."
+                )
+            else:
+                friday_text = (
+                    "Friday's session saw profit-taking erase some of the week's gains, "
+                    f"with the S&P 500 declining {abs(friday_pct):.1f}% "
+                    "as investors locked in gains."
+                )
+
+            narrative_parts.append(friday_text)
+
+    return "\n\n".join(narrative_parts)
 
 def _pivot_levels_from_hlc(high: float, low: float, close: float) -> dict:
     P = (high + low + close) / 3.0
@@ -821,6 +1416,26 @@ def _render_brief_user_prompt(headlines: list[dict], expected_range: dict, gappi
     vix_val = vix.get('current_price')
     vix_text = f"VIX: {vix_val:.2f}" if isinstance(vix_val, (int, float)) else "No data provided"
 
+    # Levels methodology (source-of-truth for why these are "key levels")
+    levels_methodology_text = "No data provided"
+    try:
+        spy = expected_range.get("spy", {}) if isinstance(expected_range, dict) else {}
+        spy_px = spy.get("current_price")
+        spy_sigma = spy.get("sigma")
+        spy_sigma_pct = spy.get("sigma_pct")
+        if isinstance(vix_val, (int, float)) and isinstance(spy_px, (int, float)) and isinstance(spy_sigma, (int, float)) and spy_sigma > 0:
+            if not isinstance(spy_sigma_pct, (int, float)) or spy_sigma_pct <= 0:
+                spy_sigma_pct = (float(spy_sigma) / float(spy_px)) * 100.0
+            levels_methodology_text = (
+                f"These levels come from the VIX (market 'fear gauge'). "
+                f"With VIX at {float(vix_val):.1f}, SPY typically moves about +/-${float(spy_sigma):.2f} in a day "
+                f"({float(spy_sigma_pct):.2f}%). "
+                f"S1/R1 mark that usual range, S2/R2 are a wider range, and R3 is an extreme upside move. "
+                f"(QQQ and IWM are scaled versions of SPY.)"
+            )
+    except Exception:
+        levels_methodology_text = "No data provided"
+
     # Gapping text (AH & Premarket)
     gapping_text = ""
     if gapping_stocks:
@@ -871,6 +1486,7 @@ def _render_brief_user_prompt(headlines: list[dict], expected_range: dict, gappi
         date_str=date_str,
         range_text=range_text,
         vix_text=vix_text,
+        levels_methodology_text=levels_methodology_text,
         gapping_text=gapping_text,
         headlines_text=headlines_text,
         key_levels_feed=key_levels_feed,
@@ -922,11 +1538,14 @@ def _compose_weekly_inputs() -> tuple[str, str, str, str]:
         wh_lines.append(f"{i}. {title}\n   {summ}")
     weekly_headlines = "\n".join(wh_lines) or "No data provided"
 
-    # 3) Week ahead placeholder
-    try:
-        week_ahead = "No data provided"
-    except Exception:
-        week_ahead = "No data provided"
+    # 3) Week ahead — earnings/macro calendars are unavailable on the current
+    # data tier. Signal to GPT that it should omit the section rather than
+    # invent data.
+    week_ahead = (
+        "SECTION_UNAVAILABLE: Week-ahead macro and earnings calendars are not "
+        "provided by the current data tier. Omit the Week Ahead section from "
+        "the final brief."
+    )
 
     # 4) Weekly levels
     def _fmt_levels(levels: dict, label: str) -> str:
@@ -942,6 +1561,297 @@ def _compose_weekly_inputs() -> tuple[str, str, str, str]:
     ])
 
     return index_recap, weekly_headlines, week_ahead, weekly_levels
+
+def _compose_enhanced_weekly_inputs() -> dict:
+    """
+    Enhanced version of _compose_weekly_inputs() that gathers comprehensive data.
+    Returns a dictionary with all required fields for the enhanced template.
+    """
+    now = datetime.now(tz=NY)
+    week_mon, week_fri = _last_completed_week_range(now)
+    
+    # Calculate dates
+    week_of_str = f"Week of {week_mon.strftime('%B %d, %Y')}"
+    current_date = now.strftime('%A, %B %d, %Y')
+    week_mon_str = week_mon.strftime('%B %d')
+    week_fri_str = week_fri.strftime('%B %d')
+    
+    data: dict[str, Any] = {
+        "week_of_str": week_of_str,
+        "current_date": current_date,
+        "week_mon": week_mon_str,
+        "week_fri": week_fri_str,
+    }
+
+    # 1. INDEX PERFORMANCE & TECHNICALS - ENHANCED WITH COMPREHENSIVE DATA
+    try:
+        # Get comprehensive market data
+        comprehensive_data = fetch_comprehensive_weekly_market_data(week_mon, week_fri)
+
+        # Format index data
+        index_lines: list[str] = []
+        for ticker in ["SPY", "QQQ", "DIA", "IWM"]:
+            idx = (comprehensive_data.get("indices") or {}).get(ticker, {})
+            if idx:
+                name = idx["name"]
+                close = idx["week_close"]
+                pct = idx["pct_change"]
+                point = idx["point_change"]
+                range_str = idx["range"]
+                trend = idx["trend"]
+
+                index_lines.append(f"{name} ({ticker}): ${close:.2f}")
+                index_lines.append(
+                    f"  Week: {pct:+.1f}% ({point:+.2f} points) | Range: {range_str}"
+                )
+                index_lines.append(f"  Trend: {trend}\n")
+
+        data["index_recap"] = (
+            "\n".join(index_lines) if index_lines else "Index data unavailable"
+        )
+
+        # Store comprehensive data for later use (sectors, volatility, headlines, narrative)
+        data["_market_data"] = comprehensive_data
+
+    except Exception as e:
+        logger.warning(f"Error fetching comprehensive market data: {e}")
+        data["index_recap"] = "Index data unavailable"
+        data["_market_data"] = {}
+
+    # 2. VOLATILITY & SENTIMENT (using comprehensive data if available)
+    vol_lines: list[str] = []
+    market_data = data.get("_market_data") or {}
+    vol = (market_data.get("volatility") or {}) if isinstance(market_data, dict) else {}
+    try:
+        if vol:
+            vix_start = vol.get("vix_start")
+            vix_end = vol.get("vix_end")
+            vix_change = vol.get("vix_change")
+            vix_high = vol.get("vix_high")
+            vix_low = vol.get("vix_low")
+            regime = vol.get("regime", "unknown")
+
+            if all(
+                isinstance(x, (int, float))
+                for x in (vix_start, vix_end, vix_change, vix_high, vix_low)
+            ):
+                vol_lines.append(
+                    f"VIX: {vix_start:.2f} → {vix_end:.2f} ({vix_change:+.2f})"
+                )
+                vol_lines.append(
+                    f"  Weekly Range: {vix_low:.2f} - {vix_high:.2f} | Regime: {regime} volatility"
+                )
+        if not vol_lines:
+            vol_lines.append("Volatility data unavailable")
+    except Exception as e:
+        logger.warning(f"Error formatting volatility data: {e}")
+        vol_lines = ["Volatility data unavailable"]
+
+    data["volatility_data"] = (
+        "\n".join(vol_lines) if vol_lines else "No data available"
+    )
+
+    # 3. WEEKLY MOVERS - NOW WITH ACTUAL DATA (sector leaders/laggards)
+    try:
+        comprehensive_data = data.get("_market_data") or {}
+        sectors = comprehensive_data.get("sectors", [])
+
+        if isinstance(sectors, list) and len(sectors) >= 6:
+            movers_lines: list[str] = []
+            movers_lines.append("SECTOR LEADERS:")
+            for sector in sectors[:3]:
+                movers_lines.append(
+                    f"  {sector['name']} ({sector['ticker']}): "
+                    f"{sector['pct_change']:+.1f}%"
+                )
+
+            movers_lines.append("\nSECTOR LAGGARDS:")
+            for sector in sectors[-3:]:
+                movers_lines.append(
+                    f"  {sector['name']} ({sector['ticker']}): "
+                    f"{sector['pct_change']:+.1f}%"
+                )
+
+            data["weekly_movers"] = "\n".join(movers_lines)
+        else:
+            data["weekly_movers"] = "Sector performance data unavailable"
+
+    except Exception as e:
+        logger.warning(f"Error formatting weekly movers: {e}")
+        data["weekly_movers"] = "Sector performance data unavailable"
+
+    # 4. KEY HEADLINES - NOW WITH ACTUAL WEEKLY NEWS
+    headlines_lines: list[str] = []
+    try:
+        major_news = fetch_week_major_news(week_mon, week_fri)
+
+        if major_news:
+            headlines_lines.append("Major market-moving news from the week:\n")
+
+            for i, news_item in enumerate(major_news[:10], 1):
+                headline = news_item.get("headline", "No title")
+                summary = news_item.get("summary", "") or ""
+                source = news_item.get("source", "Unknown")
+
+                headlines_lines.append(f"{i}. {headline}")
+                if summary:
+                    summary_short = (
+                        summary[:200] + "..." if len(summary) > 200 else summary
+                    )
+                    headlines_lines.append(f"   {summary_short}")
+                headlines_lines.append(f"   Source: {source}\n")
+
+        data["weekly_headlines"] = (
+            "\n".join(headlines_lines)
+            if headlines_lines
+            else "No major news items found for the week"
+        )
+
+        # Keep major_news in data for potential downstream use (e.g., headline/narrative helpers)
+        data["_major_news"] = major_news
+
+    except Exception as e:
+        logger.warning(f"Error fetching weekly headlines: {e}")
+        data["weekly_headlines"] = "News data unavailable"
+    
+    # 6. ECONOMIC CALENDAR (Week Ahead)
+    econ_lines = []
+    try:
+        next_week_start = week_fri + timedelta(days=3)
+        next_week_end = next_week_start + timedelta(days=4)
+        
+        # Use existing economic calendar fetch
+        econ_events = fetch_economic_calendar_range(days_ahead=7, start=datetime.combine(next_week_start, dt_time.min).replace(tzinfo=NY))
+        
+        if econ_events:
+            # Group by day
+            by_day = {}
+            for event in econ_events:
+                event_date_str = event.get('date', '')
+                if event_date_str:
+                    try:
+                        # Handle ISO date string (YYYY-MM-DD format)
+                        if 'T' in event_date_str or '+' in event_date_str or 'Z' in event_date_str:
+                            event_date = datetime.fromisoformat(event_date_str.replace('Z', '+00:00')).astimezone(NY).date()
+                        else:
+                            # Simple date string YYYY-MM-DD
+                            event_date = datetime.strptime(event_date_str, '%Y-%m-%d').date()
+                        day_name = event_date.strftime('%A')
+                        if day_name not in by_day:
+                            by_day[day_name] = []
+                        by_day[day_name].append(event)
+                    except Exception as parse_err:
+                        logger.debug(f"Could not parse event date '{event_date_str}': {parse_err}")
+                        pass
+            
+            # Format by day
+            days_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+            for day in days_order:
+                if day in by_day:
+                    econ_lines.append(f"\n{day.upper()}:")
+                    for event in by_day[day][:5]:  # Limit to 5 per day
+                        time_et = event.get('time_et', event.get('time', ''))
+                        name = event.get('event', 'Unknown')
+                        estimate = event.get('estimate', '')
+                        previous = event.get('previous', '')
+                        
+                        line = f"  {time_et} - {name}" if time_et else f"  {name}"
+                        if estimate:
+                            line += f" (Est: {estimate}"
+                            if previous:
+                                line += f", Prev: {previous}"
+                            line += ")"
+                        econ_lines.append(line)
+        # If econ_events is empty we deliberately leave econ_lines empty so
+        # the section is marked unavailable below and GPT is told to omit it
+        # rather than fabricate releases.
+    except Exception as e:
+        logger.warning(f"Error fetching economic calendar: {e}")
+
+    if econ_lines:
+        data['economic_calendar'] = '\n'.join(econ_lines)
+    else:
+        data['economic_calendar'] = (
+            "SECTION_UNAVAILABLE: Economic calendar data is not provided by the "
+            "current data tier. Do not fabricate releases. Omit this section "
+            "from the final brief."
+        )
+
+    # 7. EARNINGS CALENDAR
+    # Not available on the current Polygon tier — flag it so GPT omits the
+    # section rather than inventing a release schedule.
+    data['earnings_calendar'] = (
+        "SECTION_UNAVAILABLE: Earnings calendar data is not provided by the "
+        "current data tier. Do not fabricate tickers, dates, or EPS estimates. "
+        "Omit this section from the final brief."
+    )
+
+    # 8. POLICY EVENTS
+    data['policy_events'] = (
+        "SECTION_UNAVAILABLE: Fed/policy-event calendar data is not provided by "
+        "the current data tier. Do not fabricate speakers or meeting times. "
+        "Omit this section from the final brief."
+    )
+    
+    # 9. OTHER CATALYSTS
+    catalyst_lines = []
+    next_week_start = week_fri + timedelta(days=3)
+    
+    # Check for monthly OPEX (3rd Friday)
+    if 15 <= next_week_start.day <= 21:
+        catalyst_lines.append("📅 Monthly Options Expiration (OPEX) this week")
+        catalyst_lines.append("   Expected: Increased volatility, potential pinning")
+    
+    catalyst_lines.append("\nOther factors: Quarter-end rebalancing, technical levels")
+    data['other_catalysts'] = '\n'.join(catalyst_lines)
+    
+    # 10. TECHNICAL LEVELS
+    try:
+        spy_pivots = _compute_daily_weekly_levels("SPY", now)
+        qqq_pivots = _compute_daily_weekly_levels("QQQ", now)
+        
+        spy_level_lines = []
+        if spy_pivots:
+            ds = spy_pivots.get('daily_supports', [])
+            dr = spy_pivots.get('daily_resistances', [])
+            ws = spy_pivots.get('weekly_supports', [])
+            wr = spy_pivots.get('weekly_resistances', [])
+            
+            if ds and len(ds) >= 2:
+                spy_level_lines.append(f"Daily Support: ${ds[0]:.2f}, ${ds[1]:.2f}")
+            if dr and len(dr) >= 2:
+                spy_level_lines.append(f"Daily Resistance: ${dr[0]:.2f}, ${dr[1]:.2f}")
+            if ws and len(ws) >= 2:
+                spy_level_lines.append(f"Weekly Support: ${ws[0]:.2f}, ${ws[1]:.2f}")
+            if wr and len(wr) >= 2:
+                spy_level_lines.append(f"Weekly Resistance: ${wr[0]:.2f}, ${wr[1]:.2f}")
+        
+        data['spy_levels'] = '\n'.join(spy_level_lines) if spy_level_lines else "No levels available"
+        
+        qqq_level_lines = []
+        if qqq_pivots:
+            ds = qqq_pivots.get('daily_supports', [])
+            dr = qqq_pivots.get('daily_resistances', [])
+            ws = qqq_pivots.get('weekly_supports', [])
+            wr = qqq_pivots.get('weekly_resistances', [])
+            
+            if ds and len(ds) >= 2:
+                qqq_level_lines.append(f"Daily Support: ${ds[0]:.2f}, ${ds[1]:.2f}")
+            if dr and len(dr) >= 2:
+                qqq_level_lines.append(f"Daily Resistance: ${dr[0]:.2f}, ${dr[1]:.2f}")
+            if ws and len(ws) >= 2:
+                qqq_level_lines.append(f"Weekly Support: ${ws[0]:.2f}, ${ws[1]:.2f}")
+            if wr and len(wr) >= 2:
+                qqq_level_lines.append(f"Weekly Resistance: ${wr[0]:.2f}, ${wr[1]:.2f}")
+        
+        data['qqq_levels'] = '\n'.join(qqq_level_lines) if qqq_level_lines else "No levels available"
+        
+    except Exception as e:
+        logger.warning(f"Error computing technical levels: {e}")
+        data['spy_levels'] = "Levels unavailable"
+        data['qqq_levels'] = "Levels unavailable"
+    
+    return data
 
 def generate_weekly_html_content(week_of_str: str, index_recap: str, weekly_headlines: str, 
                                 week_ahead: str, weekly_levels: str) -> str:
@@ -1134,6 +2044,55 @@ def generate_weekly_html_content(week_of_str: str, index_recap: str, weekly_head
     
     return html_content
 
+
+def generate_daily_recap_markdown() -> str:
+    """
+    Generate a daily market recap in markdown format using the optimized brief pipeline.
+    Focuses on the latest day's moves (indices, gapping stocks, headlines).
+
+    Returns:
+        Markdown string for use in email templates.
+
+    Raises:
+        BriefDataUnavailable: if required market data is unavailable.
+    """
+    try:
+        logger.info("Generating daily recap markdown for morning brief")
+
+        # Gate before news enrichment or OpenAI calls. Missing market data is
+        # not a degraded state for financial copy; it means do not generate.
+        stock_prices = fetch_stock_prices()
+        require_market_data(stock_prices)
+
+        # Fetch and filter headlines
+        headlines = fetch_news()
+        filtered_headlines = filter_market_headlines(headlines)
+
+        # Optionally enhance headlines with 2–5 sentence summaries
+        if HEADLINE_SUMMARIZER_AVAILABLE and OPENAI_API_KEY:
+            try:
+                filtered_headlines = summarize_headlines(filtered_headlines)
+                logger.info("Headlines enhanced with AI summaries for daily recap")
+            except Exception as e:
+                logger.warning(
+                    f"Headline summarization for daily recap failed, using originals: {e}"
+                )
+
+        expected_range = calculate_expected_range(stock_prices)
+
+        # Fetch gapping stocks for AH/premarket context
+        gapping_stocks = fetch_gapping_stocks()
+
+        # Use the main summarize_news pipeline (optimized → legacy fallback)
+        recap_md = summarize_news(filtered_headlines, expected_range, gapping_stocks)
+        return recap_md or ""
+
+    except BriefDataUnavailable:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating daily recap markdown: {e}")
+        return ""
+
 def generate_weekly_brief_file_only(force: bool=False) -> str:
     """Generate the weekly brief HTML and write static/uploads/brief_weekly_latest.html without emailing.
     Returns the absolute path written. Honors Sunday-only rule unless force=True.
@@ -1167,51 +2126,124 @@ def generate_weekly_brief_file_only(force: bool=False) -> str:
 
 def summarize_news_weekly() -> str:
     """
-    Generate weekly brief using optimized two-stage pipeline to reduce token usage by ~90%.
+    Generate weekly brief using enhanced prompts and comprehensive data collection.
+    Falls back to legacy method if enhanced version fails.
     """
     if not OPENAI_API_KEY:
         raise ValueError("OPENAI_API_KEY environment variable not set")
     
     try:
-        # Import the new pipeline
-        from pipeline.write_brief import build_brief
+        # Use the new enhanced data collection
+        data = _compose_enhanced_weekly_inputs()
         
-        # Get weekly data
-        now = datetime.now(tz=NY)
-        week_mon, week_fri = _last_completed_week_range(now)
-        week_of_str = f"Week of {week_mon.strftime('%B %d, %Y')}"
+        # Format the user prompt with comprehensive data
+        user_prompt = WEEKLY_USER_TEMPLATE_ENHANCED.format(**data)
         
-        index_recap, weekly_headlines, week_ahead, weekly_levels = _compose_weekly_inputs()
+        # Call OpenAI with enhanced system prompt
+        try:
+            from openai import OpenAI
+            global openai_client
+            openai_client = openai_client or OpenAI(api_key=OPENAI_API_KEY)
+        except Exception as e:
+            logger.error(f"Error initializing OpenAI client: {str(e)}")
+            raise
         
-        # Prepare raw inputs in the format expected by the pipeline
-        # For weekly briefs, we'll create a simplified structure
-        raw_inputs = {
-            "expected_range": {},  # Weekly briefs don't use the same range structure
-            "headlines": [{"headline": h} for h in weekly_headlines.split('\n') if h.strip()],
-            "gapping_stocks": [],  # Weekly briefs handle movers differently
-            "economic_catalysts": [],
-            "catalysts": [],
-            # Add weekly-specific data
-            "weekly_data": {
-                "week_of_str": week_of_str,
-                "index_recap": index_recap,
-                "week_ahead": week_ahead,
-                "weekly_levels": weekly_levels
-            }
-        }
+        logger.info("Using enhanced weekly brief generation")
+        response = openai_client.chat.completions.create(
+            model=BRIEF_MODEL,
+            messages=[
+                {"role": "system", "content": WEEKLY_SYSTEM_ENHANCED},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0.2,
+            max_tokens=3000  # Increased for longer comprehensive briefs
+        )
         
-        # Use the new optimized pipeline
-        logger.info("Using optimized weekly brief pipeline (90% token reduction)")
-        return build_brief(raw_inputs, polish=os.getenv("BRIEF_POLISH", "true").lower() == "true", is_weekly=True)
+        brief_content = response.choices[0].message.content
+        if brief_content:
+            logger.info(f"Generated enhanced weekly brief ({len(brief_content)} chars)")
+            return _rewrite_in_voice(brief_content)
+        else:
+            raise ValueError("Empty response from OpenAI")
         
-    except ImportError as e:
-        logger.error(f"Failed to import optimized pipeline: {e}")
-        logger.warning("Falling back to legacy weekly brief generation")
-        return _legacy_summarize_news_weekly()
     except Exception as e:
-        logger.error(f"Optimized weekly pipeline failed: {e}")
+        logger.error(f"Error generating enhanced weekly brief: {e}")
         logger.warning("Falling back to legacy weekly brief generation")
         return _legacy_summarize_news_weekly()
+
+
+def test_weekly_recap_data_collection(force: bool = False) -> None:
+    """
+    Test function to verify weekly recap data collection.
+    Prints comprehensive market data to console.
+
+    Args:
+        force: If True, run even if not Sunday
+    """
+    now = datetime.now(tz=NY)
+
+    if now.weekday() != 6 and not force:
+        print("Not Sunday. Use force=True to test anyway.")
+        return
+
+    week_mon, week_fri = _last_completed_week_range(now)
+
+    print(f"\n{'='*70}")
+    print("TESTING WEEKLY RECAP DATA COLLECTION")
+    print(f"Week: {week_mon.strftime('%b %d')} - {week_fri.strftime('%b %d, %Y')}")
+    print(f"{'='*70}\n")
+
+    # Test comprehensive market data
+    print("1. Fetching comprehensive market data...")
+    market_data = fetch_comprehensive_weekly_market_data(week_mon, week_fri)
+
+    print("\n   INDICES:")
+    for ticker, idx in (market_data.get("indices") or {}).items():
+        print(
+            f"   {ticker}: {idx.get('pct_change', 0.0):+.2f}% "
+            f"(${idx.get('point_change', 0.0):+,.2f})"
+        )
+
+    print("\n   SECTORS (Top 3 / Bottom 3):")
+    sectors = market_data.get("sectors", [])
+    if sectors:
+        for s in sectors[:3]:
+            print(f"   [LEAD] {s['name']}: {s['pct_change']:+.2f}%")
+        for s in sectors[-3:]:
+            print(f"   [LAG]  {s['name']}: {s['pct_change']:+.2f}%")
+
+    print("\n   VOLATILITY:")
+    vol = market_data.get("volatility") or {}
+    if vol:
+        print(
+            f"   VIX: {vol.get('vix_start', 0.0):.2f} -> "
+            f"{vol.get('vix_end', 0.0):.2f} "
+            f"({vol.get('vix_change', 0.0):+.2f})"
+        )
+        print(f"   Regime: {vol.get('regime', 'unknown')}")
+
+    # Test news fetching
+    print("\n2. Fetching major news for the week...")
+    news_items = fetch_week_major_news(week_mon, week_fri)
+    print(f"   Found {len(news_items)} major news items")
+    if news_items:
+        print("\n   Top 3 Headlines:")
+        for item in news_items[:3]:
+            print(f"   • {item['headline'][:80]}...")
+
+    # Test headline generation
+    print("\n3. Generating Investopedia-style headline...")
+    headline = format_weekly_recap_headline(market_data, news_items)
+    print(f"\n   {headline}\n")
+
+    # Test narrative generation
+    print("\n4. Generating week in review narrative...")
+    narrative = generate_week_in_review_narrative(market_data, news_items)
+    print(f"\n{narrative}\n")
+
+    print(f"\n{'='*70}")
+    print("TEST COMPLETE")
+    print(f"{'='*70}\n")
 
 
 def _legacy_summarize_news_weekly() -> str:
@@ -1293,26 +2325,23 @@ def send_weekly_market_brief_to_subscribers(force: bool=False) -> str:
     return out_path
 
 def _fetch_float_finnhub(symbol: str) -> Optional[int]:
-    """Try to obtain float via Finnhub metrics. Returns integer shares or None."""
-    if not FINNHUB_TOKEN:
-        return None
+    """Return an approximate float/shares-outstanding for ``symbol``.
+
+    Name preserved for backward compatibility; sources the value from
+    providers.DataProvider.get_company_profile (Polygon-backed) so we have
+    no runtime Finnhub dependency.
+    """
     try:
-        url = "https://finnhub.io/api/v1/stock/metric"
-        params = {"symbol": symbol, "metric": "all", "token": FINNHUB_TOKEN}
-        r = requests.get(url, params=params, timeout=8)
-        if r.status_code != 200:
-            return None
-        j = r.json() or {}
-        data = j.get("metric") or {}
-        for key in ("shareFloat", "freeFloat", "sharesOutstanding", "shareOutstanding"):
-            val = data.get(key)
-            if isinstance(val, (int, float)) and val > 0:
-                if val < 1:
-                    continue
-                return int(val)
-        return None
+        profile = get_default_provider().get_company_profile(symbol)
     except Exception:
+        profile = None
+    if not profile:
         return None
+    for key in ("shareFloat", "freeFloat", "sharesOutstanding", "shareOutstanding"):
+        val = profile.get(key)
+        if isinstance(val, (int, float)) and val >= 1:
+            return int(val)
+    return None
 
 def _format_move(pct: float) -> str:
     return f"{pct:+.2f}%"
@@ -1368,7 +2397,7 @@ def _junk_movers_tradier(now: Optional[datetime] = None) -> list[dict]:
     results = []
     for it in filtered[:30]:
         tags = []
-        f_shares = _fetch_float_finnhub(it["symbol"]) if FINNHUB_TOKEN else None
+        f_shares = _fetch_float_finnhub(it["symbol"])
         if f_shares is not None and f_shares <= JUNK_FLOAT_MAX:
             tags.append("LF")
         why_bits = [f"{'PM' if sess=='pm' else 'AH'} vol ~{_human_int(it['session_vol'])}"]
@@ -1385,189 +2414,52 @@ def _junk_movers_tradier(now: Optional[datetime] = None) -> list[dict]:
 
 
 def fetch_news() -> List[Dict[str, Any]]:
-    """Fetch top headlines - prioritize GPT, then Finnhub, then fallback to sample data"""
-    # First try GPT for news headlines
-    if os.getenv("OPENAI_API_KEY"):
-        gpt_headlines = fetch_news_with_gpt()
-        if gpt_headlines:
-            return gpt_headlines
-    
-    # Fallback to Finnhub
-    token = (current_app.config.get('FINNHUB_TOKEN') if current_app else None) or os.getenv('FINNHUB_TOKEN')
-    
-    if token:
-        # Test token validity first
+    """Fetch top market headlines via providers.DataProvider.
+
+    Aggregates recent news across bellwether tickers, de-duplicates,
+    normalizes to the legacy shape used throughout this module
+    (``headline``, ``summary``, ``datetime``, ``source``, ``url``), and
+    returns the newest ~20 items. No hardcoded sample headlines are
+    returned — if no provider key is configured we return an empty list
+    so downstream rendering shows a truthful empty state instead of
+    fabricated text.
+    """
+    dp = get_default_provider()
+    tickers = ["SPY", "QQQ", "DIA", "IWM", "AAPL", "MSFT", "NVDA", "TLT", "VIXY"]
+    seen: set[str] = set()
+    out: list[dict[str, Any]] = []
+    for tkr in tickers:
         try:
-            test_url = "https://finnhub.io/api/v1/quote"
-            test_params = {'symbol': 'AAPL', 'token': token}
-            test_response = requests.get(test_url, params=test_params, timeout=10)
-            if test_response.status_code != 200:
-                logger.warning(f"Finnhub token validation failed: {test_response.status_code}")
-                token = None
-        except Exception as e:
-            logger.warning(f"Finnhub token test failed: {e}")
-            token = None
-    
-    if token:
-        # Get current date in EST
-        now = datetime.now()
-        yesterday = now - timedelta(days=1)
-
-        # Fetch general market news
-        url = "https://finnhub.io/api/v1/news"
-        params = {
-            'category': 'general',
-            'token': token,
-            'from': yesterday.strftime('%Y-%m-%d'),
-            'to': now.strftime('%Y-%m-%d')
-        }
-
-        try:
-            response = requests.get(url, params=params, timeout=10)
-            response.raise_for_status()
-            news_data = response.json()
-
-            # Get top 20 headlines
-            top_headlines = news_data[:20]
-            logger.info(f"Fetched {len(top_headlines)} headlines from Finnhub")
-            return top_headlines
-
-        except Exception as e:
-            logger.error(f"Error fetching news from Finnhub: {str(e)}")
-            # Fall through to sample data
-    
-    # Fallback: return sample market headlines
-    sample_headlines = [
-        {
-            'headline': 'Federal Reserve signals potential rate adjustments in upcoming meetings',
-            'summary': 'Fed officials discuss economic outlook and monetary policy direction.',
-            'datetime': int(datetime.now().timestamp()),
-            'source': 'Market News'
-        },
-        {
-            'headline': 'Major tech earnings reports show mixed results for Q4',
-            'summary': 'Technology sector performance varies as companies report quarterly results.',
-            'datetime': int(datetime.now().timestamp()),
-            'source': 'Earnings Report'
-        },
-        {
-            'headline': 'Oil prices stabilize as OPEC+ maintains production targets',
-            'summary': 'Energy markets respond to OPEC+ decision on oil production levels.',
-            'datetime': int(datetime.now().timestamp()),
-            'source': 'Energy News'
-        },
-        {
-            'headline': 'Market volatility increases ahead of key economic data releases',
-            'summary': 'Traders prepare for upcoming CPI and jobs report announcements.',
-            'datetime': int(datetime.now().timestamp()),
-            'source': 'Economic Data'
-        },
-        {
-            'headline': 'Treasury yields fluctuate as investors assess inflation outlook',
-            'summary': 'Bond market reacts to changing expectations for interest rate policy.',
-            'datetime': int(datetime.now().timestamp()),
-            'source': 'Bond Market'
-        },
-        {
-            'headline': 'S&P 500 reaches new highs as earnings season progresses',
-            'summary': 'Market momentum continues as corporate earnings exceed expectations.',
-            'datetime': int(datetime.now().timestamp()),
-            'source': 'Market Update'
-        },
-        {
-            'headline': 'Cryptocurrency markets show increased volatility',
-            'summary': 'Digital asset prices fluctuate amid regulatory developments.',
-            'datetime': int(datetime.now().timestamp()),
-            'source': 'Crypto News'
-        }
-    ]
-    
-    logger.info(f"Using {len(sample_headlines)} sample headlines (Finnhub unavailable)")
-    return sample_headlines
-
-
-def fetch_news_with_gpt() -> List[Dict[str, Any]]:
-    """Fetch market headlines using ChatGPT API with enhanced summaries (no Source field)"""
-    logger = logging.getLogger(__name__)
-    
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        logger.warning("No OpenAI API key available")
-        return []
-    
-    try:
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        }
-        
-        prompt = """You are a financial professional day trader content creator news analyst. Create 7 realistic market headlines based on typical market events and trends. Use this exact format:
-
-1. [Headline Title]
-   Summary: [2–5 sentence summary, plain English, novice-trader friendly]
-
-Focus on major market-moving news (Fed, economic data, earnings, commodities, yields, tech, geopolitics).
-Return only the 7 items in this format — no extra text, no sources, no links, no explanations."""
-        
-        data = {
-            "model": "gpt-4o-mini",
-            "messages": [
-                {"role": "system", "content": "You are a financial news analyst providing current market headlines with trader-friendly summaries."},
-                {"role": "user", "content": prompt}
-            ],
-            "temperature": 1.0,
-            "max_completion_tokens": 1500
-        }
-        
-        response = requests.post(
-            "https://api.openai.com/v1/chat/completions",
-            headers=headers,
-            json=data,
-            timeout=30
-        )
-        
-        if response.status_code == 200:
-            result = response.json()
-            content = result["choices"][0]["message"]["content"]
-            
-            # Parse the response - improved parsing logic
-            headlines = []
-            current = {}
-            
-            for raw in content.strip().splitlines():
-                line = raw.strip()
-                if line[:2] in {"1.","2.","3.","4.","5.","6.","7."} or line[:3] in {"1) ","2) ","3) ","4) ","5) ","6) ","7) "}:
-                    # Save previous headline if exists
-                    if current:
-                        headlines.append(current)
-                    # Start new headline
-                    title = line.split(". ", 1)[1] if ". " in line else line.split(") ",1)[1]
-                    current = {
-                        "headline": title.strip(),
-                        "summary": "",
-                        "datetime": int(datetime.now().timestamp())
-                    }
-                elif line.lower().startswith("summary:"):
-                    if current:
-                        current["summary"] = line.split(":",1)[1].strip()
-                # Ignore any "Source:" lines if they appear
-                elif line.lower().startswith("source:"):
-                    continue  # Skip source lines entirely
-            
-            # Don't forget the last headline
-            if current:
-                headlines.append(current)
-            
-            logger.info(f"✅ Generated {len(headlines)} headlines using GPT (no Source field)")
-            return headlines[:7]  # Ensure we return exactly 7
-            
-        else:
-            logger.error(f"GPT API error: {response.status_code} - {response.text}")
-            return []
-            
-    except Exception as e:
-        logger.error(f"Error fetching news with GPT: {e}")
-        return []
+            items = dp.get_news(tkr, limit=10) or []
+        except Exception as exc:
+            logger.debug(f"get_news failed for {tkr}: {exc}")
+            continue
+        for it in items:
+            url = it.get("url") or ""
+            if url and url in seen:
+                continue
+            seen.add(url)
+            pub = it.get("published") or ""
+            try:
+                ts = int(
+                    datetime.strptime(pub.replace("Z", "+00:00"), "%Y-%m-%dT%H:%M:%S%z")
+                    .timestamp()
+                )
+            except Exception:
+                ts = 0
+            out.append(
+                {
+                    "headline": it.get("title") or "",
+                    "summary": it.get("description") or "",
+                    "datetime": ts,
+                    "source": it.get("source") or "",
+                    "url": url,
+                    "related": tkr,
+                }
+            )
+    out.sort(key=lambda x: x.get("datetime") or 0, reverse=True)
+    logger.info(f"Fetched {len(out[:20])} headlines via DataProvider")
+    return out[:20]
 
 
 def filter_market_headlines(headlines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -1594,178 +2486,123 @@ def filter_market_headlines(headlines: List[Dict[str, Any]]) -> List[Dict[str, A
     return [item for item, score in scored_headlines[:10] if score > 0]
 
 
-def fetch_stock_prices_tradier() -> Dict[str, Dict[str, float]]:
-    """Fetch current stock prices using Tradier API"""
-    tradier_token = os.getenv('TRADIER_API_TOKEN')
-    if not tradier_token:
-        logger.warning("Tradier API token not configured")
-        return {}
-    
-    symbols = ['SPY', 'QQQ', 'IWM', 'VIX']
-    prices = {}
-    
-    try:
-        headers = {
-            "Authorization": f"Bearer {tradier_token}",
-            "Accept": "application/json"
-        }
-        
-        url = "https://api.tradier.com/v1/markets/quotes"
-        params = {'symbols': ','.join(symbols)}
-        
-        response = requests.get(url, headers=headers, params=params, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-        
-        if 'quotes' in data and 'quote' in data['quotes']:
-            quotes = data['quotes']['quote']
-            if not isinstance(quotes, list):
-                quotes = [quotes]
-            
-            for quote in quotes:
-                symbol = quote.get('symbol', '').lower()
-                if symbol:
-                    prices[symbol] = {
-                        'current_price': float(quote.get('last', 0)),
-                        'change': float(quote.get('change', 0)),
-                        'change_percent': float(quote.get('change_percentage', 0))
-                    }
-        
-        logger.info(f"Fetched prices for {len(prices)} symbols from Tradier")
-        return prices
-        
-    except Exception as e:
-        logger.error(f"Error fetching prices from Tradier: {e}")
-        return {}
+def fetch_stock_prices() -> Dict[str, Dict[str, float]]:
+    """Fetch current SPY/QQQ/IWM/VIX prices via providers.DataProvider.
 
-def fetch_stock_prices_finnhub() -> Dict[str, Dict[str, float]]:
-    """Fetch current stock prices using Finnhub API"""
-    token = (current_app.config.get('FINNHUB_TOKEN') if current_app else None) or os.getenv('FINNHUB_TOKEN')
-    if not token:
-        logger.warning("Finnhub token not configured")
-        return {}
-    
-    symbols = ['SPY', 'QQQ', 'IWM', 'VIX']
-    prices = {}
-    
-    # Test token validity first
-    try:
-        test_url = "https://finnhub.io/api/v1/quote"
-        test_params = {'symbol': 'AAPL', 'token': token}
-        test_response = requests.get(test_url, params=test_params, timeout=10)
-        if test_response.status_code != 200:
-            logger.warning(f"Finnhub token validation failed: {test_response.status_code}")
-            return {}
-    except Exception as e:
-        logger.warning(f"Finnhub token test failed: {e}")
-        return {}
-    
+    VIX is sourced from the VIXY ETF proxy (see DataProvider.get_vix_proxy);
+    symbols that do not return a quote are returned with None price so
+    downstream code can render an honest "unavailable" instead of a
+    fabricated default.
+    """
+    dp = get_default_provider()
+    symbols = ["SPY", "QQQ", "IWM"]
+    prices: dict[str, dict[str, Any]] = {}
+
     for symbol in symbols:
         try:
-            url = "https://finnhub.io/api/v1/quote"
-            params = {'symbol': symbol, 'token': token}
-            response = requests.get(url, params=params, timeout=10)
-            response.raise_for_status()
-            data = response.json()
-            
+            q = dp.get_snapshot(symbol)
+        except Exception:
+            q = None
+        if q and q.get("price") is not None:
+            price = float(q["price"])
+            chg_pct = q.get("change_pct") or 0.0
+            prev_close = price / (1 + chg_pct / 100.0) if chg_pct else price
             prices[symbol.lower()] = {
-                'current_price': float(data.get('c', 0)),
-                'change': float(data.get('d', 0)),
-                'change_percent': float(data.get('dp', 0))
+                "current_price": price,
+                "change": round(price - prev_close, 2),
+                "change_percent": float(chg_pct),
             }
-        except Exception as e:
-            logger.error(f"Error fetching price for {symbol} from Finnhub: {e}")
-            prices[symbol.lower()] = {'current_price': 0, 'change': 0, 'change_percent': 0}
-    
-    logger.info(f"Fetched prices for {len(prices)} symbols from Finnhub")
-    return prices
+        else:
+            prices[symbol.lower()] = {
+                "current_price": None,
+                "change": None,
+                "change_percent": None,
+            }
 
-def fetch_stock_prices() -> Dict[str, Dict[str, float]]:
-    """Fetch stock prices with priority: Tradier -> Finnhub -> Default values"""
-    
-    # Try Tradier first
-    prices = fetch_stock_prices_tradier()
-    if prices:
-        return prices
-    
-    # Try Finnhub as alternative
-    prices = fetch_stock_prices_finnhub()
-    if prices:
-        return prices
-    
-    # Fallback to yfinance if both APIs failed
-    logger.info("Both Tradier and Finnhub failed, trying yfinance fallback")
-    symbols = ['SPY', 'QQQ', 'IWM', 'VIX']
-    prices = {}
-    
     try:
-        import yfinance as yf
-        for symbol in symbols:
-            try:
-                t = yf.Ticker(symbol)
-                hist = t.history(period="1d")
-                if not hist.empty:
-                    prices[symbol.lower()] = {
-                        'current_price': float(hist['Close'].iloc[-1]),
-                        'change': 0.0,
-                        'change_percent': 0.0
-                    }
-                else:
-                    logger.warning(f"No yfinance data for {symbol}")
-            except Exception as ye:
-                logger.error(f"yfinance error for {symbol}: {ye}")
-    except ImportError:
-        logger.warning("yfinance not available")
+        vix_bars = dp.get_vix_proxy()
+    except Exception:
+        vix_bars = []
+    # `get_vix_proxy` returns a list[dict] of daily VIXY bars over a short
+    # rolling window. Use the most recent bar's close as the VIX proxy price
+    # and compute pct change from the previous bar, if available.
+    latest = vix_bars[-1] if vix_bars else None
+    prev = vix_bars[-2] if vix_bars and len(vix_bars) >= 2 else None
+    if latest and latest.get("close") is not None:
+        last_close = float(latest["close"])
+        prev_close = float(prev["close"]) if (prev and prev.get("close") is not None) else last_close
+        change = round(last_close - prev_close, 2)
+        change_pct = round((change / prev_close) * 100.0, 2) if prev_close else 0.0
+        prices["vix"] = {
+            "current_price": last_close,
+            "change": change,
+            "change_percent": change_pct,
+        }
+    else:
+        prices["vix"] = {"current_price": None, "change": None, "change_percent": None}
 
-    # Set default values for any symbols that don't have prices
-    default_prices = {
-        'spy': 400.0,
-        'qqq': 300.0,
-        'iwm': 200.0,
-        'vix': 20.0
-    }
-    
-    for symbol in symbols:
-        sym_lower = symbol.lower()
-        if sym_lower not in prices or prices[sym_lower]['current_price'] == 0:
-            prices[sym_lower] = {
-                'current_price': default_prices.get(sym_lower, 0),
-                'change': 0.0,
-                'change_percent': 0.0
-            }
-            logger.info(f"Using default price for {symbol}: ${default_prices.get(sym_lower, 0)}")
-
+    logger.info(f"Fetched prices for {len(prices)} symbols via DataProvider")
     return prices
 
 
 def calculate_expected_range(stock_prices: Dict[str, float]) -> Dict[str, Any]:
-    """Calculate expected daily range based on VIX and historical data"""
-    vix = stock_prices.get('vix', {}).get('current_price', 20)
-    
-    # Simple range calculation based on VIX
-    # Higher VIX = wider expected range
-    spy_price = stock_prices.get('spy', {}).get('current_price', 400)
-    qqq_price = stock_prices.get('qqq', {}).get('current_price', 300)
-    
-    # Expected daily range as percentage of price
-    spy_range_pct = min(max(vix / 100, 0.01), 0.05)  # 1-5% range
-    qqq_range_pct = spy_range_pct * 1.2  # QQQ typically more volatile
-    
-    return {
-        'spy': {
-            'current_price': spy_price,
-            'expected_range': spy_price * spy_range_pct,
-            'support': spy_price * (1 - spy_range_pct/2),
-            'resistance': spy_price * (1 + spy_range_pct/2)
-        },
-        'qqq': {
-            'current_price': qqq_price,
-            'expected_range': qqq_price * qqq_range_pct,
-            'support': qqq_price * (1 - qqq_range_pct/2),
-            'resistance': qqq_price * (1 + qqq_range_pct/2)
-        },
-        'vix': stock_prices.get('vix', {})
+    """
+    Calculate expected range bands for key indices based on the VIX.
+
+    Methodology:
+      - Treat VIX as annualized 1-sigma volatility.
+      - Approximate 1-day 1-sigma move as: sigma($) = price * (VIX/100) * sqrt(1/252)
+      - Emit +/-1sigma, +/-2sigma, +3sigma bands as support/resistance levels.
+
+    Notes:
+      - We do not currently have VXN/RVX available on the current data tier,
+        so QQQ/IWM use simple historical-vol proxies vs SPY.
+    """
+
+    vix = stock_prices.get("vix", {}).get("current_price")
+    try:
+        vix = float(vix) if vix is not None else None
+    except Exception:
+        vix = None
+
+    if not isinstance(vix, (int, float)) or vix <= 0:
+        logger.warning("Expected range unavailable: missing valid VIX/VIXY data")
+        return {}
+
+    daily_vol = (float(vix) / 100.0) * math.sqrt(1.0 / 252.0)
+
+    def _levels(price: Optional[float], sigma_multiplier: float = 1.0) -> Dict[str, float]:
+        if not price or price <= 0:
+            return {}
+
+        px = float(price)
+        sigma = px * daily_vol * float(sigma_multiplier)
+        if sigma <= 0:
+            return {"current_price": round(px, 2)}
+
+        return {
+            "current_price": round(px, 2),
+            "sigma": round(sigma, 2),
+            "sigma_pct": round((sigma / px) * 100.0, 3),
+            "support": round(px - sigma, 2),
+            "support2": round(px - 2.0 * sigma, 2),
+            "resistance": round(px + sigma, 2),
+            "resistance2": round(px + 2.0 * sigma, 2),
+            "resistance3": round(px + 3.0 * sigma, 2),
+        }
+
+    spy_price = stock_prices.get("spy", {}).get("current_price")
+    qqq_price = stock_prices.get("qqq", {}).get("current_price")
+    iwm_price = stock_prices.get("iwm", {}).get("current_price")
+
+    ranges = {
+        "spy": _levels(spy_price, 1.0),
+        "qqq": _levels(qqq_price, 1.2),
+        "iwm": _levels(iwm_price, 1.1),
+        "vix": stock_prices.get("vix", {}),
     }
+
+    return {k: v for k, v in ranges.items() if v}
 
 
 def fetch_gapping_stocks_tradier() -> dict[str, list[dict[str, str]]]:
@@ -1857,265 +2694,114 @@ def fetch_gapping_stocks_tradier() -> dict[str, list[dict[str, str]]]:
         return {"after_hours": [], "premarket": []}
 
 def fetch_gapping_stocks_yfinance() -> List[Dict[str, Any]]:
-    """Fallback: Fetch gapping stocks using yfinance for after-hours and premarket"""
-    logger.info("Fetching full universe of stocks with yfinance...")
-    
-    gapping_stocks = []
-    
+    """Gapping-stocks scan via providers.DataProvider.
+
+    Uses Polygon's gainers+losers snapshots to return
+    stocks gapping >= 1.5% at the open. No yfinance dependency; no
+    fabricated sample data — returns an empty list if nothing qualifies.
+    The function name is retained for backward compatibility.
+    """
+    dp = get_default_provider()
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
     try:
-        import yfinance as yf
-        import pandas as pd
-        from datetime import datetime, timedelta
-        import requests
-        
-        # Get current time to determine if we're in premarket or after-hours
-        now = datetime.now()
-        current_hour = now.hour
-        
-        # Use a comprehensive stock list
-        comprehensive_stocks = [
-            'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA', 'META', 'NFLX', 'AMD', 'INTC',
-            'CRM', 'ADBE', 'PYPL', 'SQ', 'ZM', 'SHOP', 'SNOW', 'PLTR', 'CRWD', 'ZS',
-            'SPOT', 'UBER', 'LYFT', 'DASH', 'RBLX', 'HOOD', 'COIN', 'MSTR', 'RIOT', 'MARA',
-            'JPM', 'BAC', 'WFC', 'GS', 'MS', 'C', 'BLK', 'AXP', 'V', 'MA', 'DIS',
-            'NKE', 'SBUX', 'MCD', 'KO', 'PEP', 'WMT', 'TGT', 'COST', 'HD', 'LOW',
-            'JNJ', 'PFE', 'ABBV', 'UNH', 'CVS', 'ANTM', 'CI', 'HUM', 'ELV', 'DHR',
-            'PG', 'KO', 'PEP', 'CL', 'ULTA', 'NKE', 'UA', 'LULU', 'PLNT', 'PTON',
-            'XOM', 'CVX', 'COP', 'EOG', 'PXD', 'MPC', 'VLO', 'PSX', 'OXY', 'FANG',
-            'BA', 'CAT', 'DE', 'MMM', 'GE', 'HON', 'LMT', 'RTX', 'NOC', 'GD',
-            'T', 'VZ', 'TMUS', 'CMCSA', 'CHTR', 'DISH', 'PARA', 'FOX', 'NWSA', 'NWS',
-            'SPY', 'QQQ', 'IWM', 'VTI', 'VOO', 'VEA', 'VWO', 'BND', 'TLT', 'GLD',
-            'SLV', 'USO', 'UNG', 'DBA', 'DBC', 'VNQ', 'XLF', 'XLK', 'XLE', 'XLV',
-            'XLI', 'XLP', 'XLY', 'XLU', 'XLB', 'XLC', 'XLRE', 'XBI', 'XHE', 'XOP',
-            'XME', 'XRT', 'XHB', 'XSW', 'XPP', 'XPH', 'XTN', 'SOXX', 'SMH', 'XLK'
-        ]
-        
-        logger.info(f"Scanning {len(comprehensive_stocks)} stocks for gapping movers...")
-        
-        # Scan stocks for gaps (limit to top 100 for performance)
-        scanned_count = 0
-        for ticker in comprehensive_stocks[:100]:  # Limit to top 100 for performance
-            try:
-                t = yf.Ticker(ticker)
-                
-                # Get recent price data
-                hist = t.history(period="2d", interval="1d")
-                if hist.empty or len(hist) < 2:
-                    continue
-                
-                # Get current price (premarket/after-hours if available)
-                current_price = None
-                if current_hour < 9 or current_hour >= 16:  # After-hours or premarket
-                    try:
-                        # Try to get current price
-                        info = t.info
-                        if 'regularMarketPrice' in info and info['regularMarketPrice']:
-                            current_price = info['regularMarketPrice']
-                    except:
-                        pass
-                
-                if current_price is None:
-                    current_price = hist['Close'].iloc[-1]
-                
-                # Calculate gap percentage
-                prev_close = hist['Close'].iloc[-2]
-                gap_pct = ((current_price - prev_close) / prev_close) * 100
-                
-                # Get volume and market cap for liquidity filtering
-                volume = hist['Volume'].iloc[-1] if len(hist) > 0 else 0
-                market_cap = 0
-                try:
-                    market_cap = t.info.get('marketCap', 0) if hasattr(t, 'info') else 0
-                except:
-                    pass
-                
-                # Filter for liquid stocks with significant gaps
-                # Criteria: >2% gap, >1M volume, >$100M market cap
-                if (abs(gap_pct) >= 2.0 and 
-                    volume > 1000000 and 
-                    market_cap > 100000000):
-                    
-                    gapping_stocks.append({
-                        'ticker': ticker,
-                        'current_price': round(current_price, 2),
-                        'prev_close': round(prev_close, 2),
-                        'gap_pct': round(gap_pct, 2),
-                        'volume': volume,
-                        'market_cap': market_cap
-                    })
-                
-                scanned_count += 1
-                if scanned_count % 20 == 0:
-                    logger.info(f"Scanned {scanned_count} stocks, found {len(gapping_stocks)} gappers...")
-                
-            except Exception as e:
-                logger.warning(f"Error fetching data for {ticker}: {e}")
+        for mover in (dp.get_gainers(limit=25) or []) + (dp.get_losers(limit=25) or []):
+            tkr = (mover.get("ticker") or "").upper()
+            if not tkr or tkr in seen:
                 continue
-        
-        # Sort by absolute gap percentage (largest moves first)
-        gapping_stocks.sort(key=lambda x: abs(x['gap_pct']), reverse=True)
-        
-        # Return top 15 gapping stocks
-        result = gapping_stocks[:15]
-        logger.info(f"Full universe scan complete: Found {len(result)} liquid stocks with significant gaps")
-        return result
-        
-    except Exception as e:
-        logger.error(f"Error in full universe scan: {e}")
-        # Return sample data for testing
-        return [
-            {
-                'ticker': 'TSLA',
-                'current_price': 245.50,
-                'prev_close': 240.00,
-                'gap_pct': 2.29,
-                'volume': 50000000,
-                'market_cap': 800000000000
-            },
-            {
-                'ticker': 'NVDA',
-                'current_price': 890.25,
-                'prev_close': 875.00,
-                'gap_pct': 1.74,
-                'volume': 45000000,
-                'market_cap': 2200000000000
-            },
-            {
-                'ticker': 'AAPL',
-                'current_price': 175.80,
-                'prev_close': 178.50,
-                'gap_pct': -1.51,
-                'volume': 60000000,
-                'market_cap': 2800000000000
-            }
-        ]
+            seen.add(tkr)
+            price = mover.get("price")
+            pct = mover.get("change_pct")
+            vol = mover.get("volume") or 0
+            if price is None or pct is None:
+                continue
+            if abs(float(pct)) < 1.5 or float(vol) < 500_000:
+                continue
+            try:
+                prev = float(price) / (1.0 + float(pct) / 100.0)
+            except Exception:
+                prev = float(price)
+            out.append(
+                {
+                    "ticker": tkr,
+                    "current_price": round(float(price), 2),
+                    "prev_close": round(prev, 2),
+                    "gap_pct": round(float(pct), 2),
+                    "volume": int(vol) if isinstance(vol, (int, float)) else 0,
+                    "market_cap": 0,
+                }
+            )
+    except Exception as exc:
+        logger.warning(f"fetch_gapping_stocks_yfinance via DataProvider failed: {exc}")
+        return []
+
+    out.sort(key=lambda x: abs(x["gap_pct"]), reverse=True)
+    result = out[:15]
+    logger.info(
+        f"DataProvider gap scan: {len(result)} stocks gapping >= 1.5% with vol >= 500k"
+    )
+    return result
+
 
 def fetch_gapping_stocks() -> Dict[str, List[Dict[str, Any]]]:
-    """Main function to fetch gapping stocks - tries Tradier first, falls back to yfinance"""
-    try:
-        # Try Tradier first (sync)
-        return fetch_gapping_stocks_tradier()
-    except Exception as e:
-        logger.warning(f"Tradier gapping stocks failed, using yfinance fallback: {e}")
-        return fetch_gapping_stocks_yfinance()
+    """Enhanced function that returns empty buckets if no movers qualify.
 
+    Historically this returned fabricated sample data when providers failed;
+    that behavior has been removed because it was misleading to readers.
+    """
+    return fetch_gapping_stocks_enhanced()
 
 def fetch_stock_news(ticker: str) -> List[Dict[str, Any]]:
-    """Fetch recent news for a specific stock ticker with concise reasons"""
-    logger = logging.getLogger(__name__)
-    
-    # Try to get news from Finnhub if available
-    token = (current_app.config.get('FINNHUB_TOKEN') if current_app else None) or os.getenv('FINNHUB_TOKEN')
-    
-    if token:
+    """Fetch recent news for ``ticker`` via providers.DataProvider.
+
+    Prioritizes items whose headline or description contains classic
+    gap-inducing keywords. Returns an empty list when no news is
+    available — no fabricated sample news.
+    """
+    try:
+        items = get_default_provider().get_news(ticker, limit=10) or []
+    except Exception as exc:
+        logger.warning(f"Error fetching news for {ticker}: {exc}")
+        return []
+    if not items:
+        return []
+
+    gap_keywords = (
+        "earnings", "quarterly", "revenue", "profit", "loss", "beat", "miss",
+        "upgrade", "downgrade", "analyst", "target", "price target",
+        "merger", "acquisition", "buyout", "deal", "partnership",
+        "fda", "approval", "clinical", "trial", "drug", "treatment",
+        "layoff", "restructuring", "ceo", "executive", "resignation",
+        "bankruptcy", "chapter", "delisting", "reverse split",
+        "dividend", "buyback", "share repurchase", "stock split",
+        "guidance", "forecast", "outlook", "expectations",
+    )
+
+    def _to_legacy(it: dict) -> dict:
+        pub = it.get("published") or ""
         try:
-            url = "https://finnhub.io/api/v1/company-news"
-            params = {
-                'symbol': ticker,
-                'from': (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d'),
-                'to': datetime.now().strftime('%Y-%m-%d'),
-                'token': token
-            }
-            
-            response = requests.get(url, params=params, timeout=10)
-            if response.status_code == 200:
-                news_data = response.json()
-                # Filter and prioritize news that's likely to cause gaps
-                prioritized_news = []
-                for news in news_data[:10]:  # Check more news items
-                    headline = news.get('headline', '').lower()
-                    summary = news.get('summary', '').lower()
-                    
-                    # Keywords that typically cause significant price movements
-                    gap_keywords = [
-                        'earnings', 'quarterly', 'revenue', 'profit', 'loss', 'beat', 'miss',
-                        'upgrade', 'downgrade', 'analyst', 'target', 'price target',
-                        'merger', 'acquisition', 'buyout', 'deal', 'partnership',
-                        'fda', 'approval', 'clinical', 'trial', 'drug', 'treatment',
-                        'layoff', 'restructuring', 'ceo', 'executive', 'resignation',
-                        'bankruptcy', 'chapter', 'delisting', 'reverse split',
-                        'dividend', 'buyback', 'share repurchase', 'stock split',
-                        'guidance', 'forecast', 'outlook', 'expectations'
-                    ]
-                    
-                    # Check if news contains gap-causing keywords
-                    if any(keyword in headline or keyword in summary for keyword in gap_keywords):
-                        prioritized_news.append(news)
-                
-                # Return prioritized news or top 3 if no specific gap news found
-                return prioritized_news[:3] if prioritized_news else news_data[:3]
-                
-        except Exception as e:
-            logger.warning(f"Error fetching news for {ticker} from Finnhub: {e}")
-    
-    # Enhanced fallback: return more specific sample news based on ticker
-    sample_news = {
-        'TSLA': [
-            {
-                'headline': f'{ticker} announces new battery technology breakthrough',
-                'summary': f'{ticker} revealed significant improvements in battery efficiency and range, potentially reducing costs by 15%.',
-                'source': 'Company Press Release',
-                'datetime': int(datetime.now().timestamp())
-            }
-        ],
-        'NVDA': [
-            {
-                'headline': f'{ticker} reports strong quarterly earnings',
-                'summary': f'{ticker} exceeded analyst expectations with robust AI chip sales, revenue up 25% YoY.',
-                'source': 'Earnings Report',
-                'datetime': int(datetime.now().timestamp())
-            }
-        ],
-        'AAPL': [
-            {
-                'headline': f'{ticker} faces supply chain challenges',
-                'summary': f'{ticker} reports delays in new product launches due to component shortages, affecting Q4 guidance.',
-                'source': 'Market News',
-                'datetime': int(datetime.now().timestamp())
-            }
-        ],
-        'META': [
-            {
-                'headline': f'{ticker} announces AI partnership',
-                'summary': f'{ticker} partners with major tech company to develop next-generation AI capabilities.',
-                'source': 'Company News',
-                'datetime': int(datetime.now().timestamp())
-            }
-        ],
-        'AMZN': [
-            {
-                'headline': f'{ticker} expands cloud services',
-                'summary': f'{ticker} launches new AWS services, expanding market share in cloud computing.',
-                'source': 'Business News',
-                'datetime': int(datetime.now().timestamp())
-            }
-        ],
-        'GOOGL': [
-            {
-                'headline': f'{ticker} reports strong ad revenue',
-                'summary': f'{ticker} exceeds expectations with robust advertising revenue growth.',
-                'source': 'Earnings Report',
-                'datetime': int(datetime.now().timestamp())
-            }
-        ],
-        'MSFT': [
-            {
-                'headline': f'{ticker} cloud business grows',
-                'summary': f'{ticker} reports strong Azure growth, beating cloud revenue expectations.',
-                'source': 'Earnings Report',
-                'datetime': int(datetime.now().timestamp())
-            }
-        ]
-    }
-    
-    return sample_news.get(ticker, [
-        {
-            'headline': f'{ticker} shows significant premarket activity',
-            'summary': f'{ticker} is experiencing unusual trading volume and price movement, likely due to recent news or market sentiment.',
-            'source': 'Market Data',
-            'datetime': int(datetime.now().timestamp())
+            ts = int(
+                datetime.strptime(pub.replace("Z", "+00:00"), "%Y-%m-%dT%H:%M:%S%z")
+                .timestamp()
+            )
+        except Exception:
+            ts = int(datetime.now().timestamp())
+        return {
+            "headline": it.get("title") or "",
+            "summary": it.get("description") or "",
+            "source": it.get("source") or "",
+            "url": it.get("url") or "",
+            "datetime": ts,
         }
-    ])
+
+    prioritized: list[dict[str, Any]] = []
+    for it in items:
+        blob = f"{(it.get('title') or '').lower()} {(it.get('description') or '').lower()}"
+        if any(k in blob for k in gap_keywords):
+            prioritized.append(_to_legacy(it))
+    if prioritized:
+        return prioritized[:3]
+    return [_to_legacy(it) for it in items[:3]]
 
 
 def generate_gapping_stocks_summary(gapping_stocks: List[Dict[str, Any]]) -> str:
@@ -2186,7 +2872,7 @@ Make it professional, concise, and actionable for traders. Focus on what's drivi
                 {"role": "user", "content": prompt}
             ],
             max_completion_tokens=1500,
-            temperature=1.0
+            temperature=0.2
         )
         content = response.choices[0].message.content if response and response.choices else ""
         return content or generate_gapping_stocks_fallback(gapping_stocks)
@@ -2429,6 +3115,45 @@ def generate_fallback_summary(headlines: List[Dict[str, Any]], expected_range: D
     else:
         gapping_text += "No significant gapping stocks detected in premarket trading. Monitor major indices and key earnings reports for potential catalysts.\n\n"
     
+    def _fmt_price(value: Any) -> str:
+        try:
+            num = float(value) if value is not None else None
+        except (TypeError, ValueError):
+            num = None
+        if num is None or num <= 0:
+            return "n/a"
+        return f"${num:.2f}"
+
+    def _fmt_level(value: Any) -> str:
+        try:
+            num = float(value) if value is not None else None
+        except (TypeError, ValueError):
+            num = None
+        if num is None or num <= 0:
+            return "n/a"
+        return f"${num:.2f}"
+
+    def _fmt_vix(value: Any) -> str:
+        try:
+            num = float(value) if value is not None else None
+        except (TypeError, ValueError):
+            num = None
+        if num is None or num <= 0:
+            return "n/a"
+        return f"{num:.2f}"
+
+    spy_line = (
+        f"- SPY: {_fmt_price(spy_data.get('current_price'))} "
+        f"(Support: {_fmt_level(spy_data.get('support'))}, "
+        f"Resistance: {_fmt_level(spy_data.get('resistance'))})"
+    )
+    qqq_line = (
+        f"- QQQ: {_fmt_price(qqq_data.get('current_price'))} "
+        f"(Support: {_fmt_level(qqq_data.get('support'))}, "
+        f"Resistance: {_fmt_level(qqq_data.get('resistance'))})"
+    )
+    vix_line = f"- VIX: {_fmt_vix(vix_data.get('current_price'))}"
+
     summary = f"""
 ## Executive Summary
 Market conditions appear stable with key indices showing normal trading ranges. Focus on major economic catalysts and earnings reports for directional moves. The current market environment suggests a balanced risk-reward scenario for traders.{gapping_text}
@@ -2443,9 +3168,9 @@ Key support and resistance levels are being tested as markets consolidate. Monit
 Risk sentiment remains balanced with mixed signals from various sectors. Traders should watch for sector rotation opportunities and prepare for potential market shifts based on upcoming economic data releases.
 
 ## Key Levels to Watch
-- SPY: ${spy_data.get('current_price', 0):.2f} (Support: ${spy_data.get('support', 0):.2f}, Resistance: ${spy_data.get('resistance', 0):.2f})
-- QQQ: ${qqq_data.get('current_price', 0):.2f} (Support: ${qqq_data.get('support', 0):.2f}, Resistance: ${qqq_data.get('resistance', 0):.2f})
-- VIX: {vix_data.get('current_price', 0):.2f}
+{spy_line}
+{qqq_line}
+{vix_line}
 """
     return summary
 
@@ -2722,8 +3447,17 @@ def generate_html_content_with_summary(summary: str, headlines: List[Dict[str, A
                 gapping_stocks_html += '<h3 style="color: #e74c3c; margin: 15px 0 10px 0;">After-hours Movers</h3>'
                 for stock in ah_moves[:5]:
                     ticker = stock.get('ticker', '')
-                    move = stock.get('move', '')
-                    why = stock.get('why', '')
+                    # Handle both old format (move/why) and new format (gap_pct/current_price/prev_close)
+                    if stock.get('move') and stock.get('why'):
+                        move = stock.get('move', '')
+                        why = stock.get('why', '')
+                    else:
+                        # New format - create move and why from gap_pct and prices
+                        gap_pct = stock.get('gap_pct', 0)
+                        current_price = stock.get('current_price', 0)
+                        prev_close = stock.get('prev_close', 0)
+                        move = f"{gap_pct:+.2f}%"
+                        why = f"${current_price:.2f} vs ${prev_close:.2f}"
                     gapping_stocks_html += f"""
                     <div class="gapping-stock-item">
                         <strong class="ticker">{ticker}</strong>: <span class="move">{move}</span> - <span class="why">{why}</span>
@@ -2734,8 +3468,17 @@ def generate_html_content_with_summary(summary: str, headlines: List[Dict[str, A
                 gapping_stocks_html += '<h3 style="color: #27ae60; margin: 15px 0 10px 0;">Premarket Movers</h3>'
                 for stock in pre_moves[:5]:
                     ticker = stock.get('ticker', '')
-                    move = stock.get('move', '')
-                    why = stock.get('why', '')
+                    # Handle both old format (move/why) and new format (gap_pct/current_price/prev_close)
+                    if stock.get('move') and stock.get('why'):
+                        move = stock.get('move', '')
+                        why = stock.get('why', '')
+                    else:
+                        # New format - create move and why from gap_pct and prices
+                        gap_pct = stock.get('gap_pct', 0)
+                        current_price = stock.get('current_price', 0)
+                        prev_close = stock.get('prev_close', 0)
+                        move = f"{gap_pct:+.2f}%"
+                        why = f"${current_price:.2f} vs ${prev_close:.2f}"
                     gapping_stocks_html += f"""
                     <div class="gapping-stock-item">
                         <strong class="ticker">{ticker}</strong>: <span class="move">{move}</span> - <span class="why">{why}</span>
@@ -2744,8 +3487,17 @@ def generate_html_content_with_summary(summary: str, headlines: List[Dict[str, A
             # Old list structure
             for stock in gapping_stocks[:5]:
                 ticker = stock.get('ticker', '')
-                move = stock.get('move', '')
-                why = stock.get('why', '')
+                # Handle both old format (move/why) and new format (gap_pct/current_price/prev_close)
+                if stock.get('move') and stock.get('why'):
+                    move = stock.get('move', '')
+                    why = stock.get('why', '')
+                else:
+                    # New format - create move and why from gap_pct and prices
+                    gap_pct = stock.get('gap_pct', 0)
+                    current_price = stock.get('current_price', 0)
+                    prev_close = stock.get('prev_close', 0)
+                    move = f"{gap_pct:+.2f}%"
+                    why = f"${current_price:.2f} vs ${prev_close:.2f}"
                 gapping_stocks_html += f"""
                 <div class="gapping-stock-item">
                     <strong class="ticker">{ticker}</strong>: <span class="move">{move}</span> - <span class="why">{why}</span>
@@ -3151,6 +3903,370 @@ def generate_html_content_with_summary(summary: str, headlines: List[Dict[str, A
     return html_content
 
 
+# ---------------------------------------------------------------------------
+# Morning-brief email context builder
+# ---------------------------------------------------------------------------
+#
+# `send_market_brief_to_subscribers` historically built its email body via the
+# inline `generate_enhanced_html()` in `market_brief_generator_fixed.py` and
+# handed the already-complete HTML document to `emails.send_daily_brief_direct`,
+# which re-wrapped it inside a second `<html>/<body>` shell. That nested
+# structure caused Gmail/Outlook to strip the inner `<style>` block and
+# render the email unstyled.
+#
+# The helper below mirrors what the CLI tool `send_morning_brief.py` does:
+# it builds a context dict compatible with `templates/email/morning_brief.html.jinja`
+# and lets `emailer.render_morning_brief()` produce a single well-formed email
+# document (same pattern the weekly brief already uses).
+
+
+_RECAP_BOLD_LINE = re.compile(r"^\s*\*{2}([^*\n]+?)\*{2}\s*:?\s*$")
+_RECAP_INLINE_BOLD = re.compile(r"\*{2}(.+?)\*{2}")
+_RECAP_INLINE_ITALIC = re.compile(r"(?<!\*)\*(?!\s)([^*\n]+?)\*(?!\*)")
+_RECAP_LEADING_LABEL = re.compile(r"^\s*\*{2}[^*\n]+?\*{2}\s*:?\s*")
+_RECAP_SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z])")
+
+
+def _strip_markdown_for_subject(text: str) -> str:
+    """Return ``text`` with markdown emphasis stripped and whitespace collapsed.
+
+    Used when deriving the email's subject_theme / preheader from AI output
+    that may include ``**Market Overview**`` style labels. We:
+      1. Drop any leading ``**Label**`` line entirely (it's a section title,
+         not a sentence).
+      2. Replace remaining ``**bold**`` / ``*italic*`` spans with their
+         inner text.
+      3. Remove residual stray ``*`` characters.
+      4. Collapse runs of whitespace.
+    """
+    if not text:
+        return ""
+    cleaned = _RECAP_LEADING_LABEL.sub("", text, count=1)
+    cleaned = _RECAP_INLINE_BOLD.sub(r"\1", cleaned)
+    cleaned = _RECAP_INLINE_ITALIC.sub(r"\1", cleaned)
+    cleaned = cleaned.replace("**", "").replace("*", "")
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned
+
+
+def _truncate_at_word(text: str, limit: int) -> str:
+    """Truncate ``text`` to ``limit`` chars on a word boundary, adding an
+    ellipsis. Never cuts mid-word.
+    """
+    if len(text) <= limit:
+        return text
+    cut = text[:limit].rsplit(" ", 1)[0].rstrip(",;:-—")
+    if not cut:
+        cut = text[:limit].rstrip()
+    return cut + "…"
+
+
+def _derive_subject_theme(summary: str, fallback: str = "Morning Market Brief") -> str:
+    """Pick a clean, complete-thought title from ``summary``.
+
+    Prefers the first full sentence if it fits in ~80 chars; otherwise
+    returns the fallback so the h1 is never a truncated fragment.
+    """
+    cleaned = _strip_markdown_for_subject(summary)
+    if not cleaned:
+        return fallback
+    first = _RECAP_SENTENCE_SPLIT.split(cleaned, maxsplit=1)[0].strip()
+    first = first.rstrip(".!?").strip()
+    if not first:
+        return fallback
+    if len(first) <= 80:
+        return first
+    return fallback
+
+
+def _build_preheader_tagline(
+    n_premarket: int,
+    n_afterhours: int,
+    n_headlines: int,
+    spy_support: str,
+    spy_resistance: str,
+) -> str:
+    """Build a short, data-driven preheader that reads like an email tagline
+    describing what's inside the brief — NOT a truncated sentence from the
+    AI narrative.
+
+    Examples:
+      "8 premarket movers · SPY 528–533 · today's plan inside"
+      "3 after-hours movers · 6 top headlines · key levels & plan"
+      "Your morning brief — key levels, movers, and today's plan"
+
+    Kept under ~90 characters so Gmail's inbox preview doesn't truncate it.
+    """
+    parts: List[str] = []
+
+    if n_premarket > 0:
+        parts.append(f"{n_premarket} premarket mover{'s' if n_premarket != 1 else ''}")
+    elif n_afterhours > 0:
+        parts.append(f"{n_afterhours} after-hours mover{'s' if n_afterhours != 1 else ''}")
+
+    if spy_support and spy_support != "—" and spy_resistance and spy_resistance != "—":
+        parts.append(f"SPY {spy_support}–{spy_resistance}")
+    elif spy_resistance and spy_resistance != "—":
+        parts.append(f"SPY R {spy_resistance}")
+
+    if n_headlines > 0 and len(parts) < 2:
+        parts.append(f"{n_headlines} top headline{'s' if n_headlines != 1 else ''}")
+
+    if not parts:
+        return "Your morning brief — key levels, movers, and today's plan"
+
+    parts.append("today's plan inside")
+    return " · ".join(parts)
+
+
+def _render_recap_inline(text: str) -> str:
+    """Escape ``text`` then convert inline markdown emphasis to HTML.
+
+    Handles ``**bold**`` → ``<strong>`` and ``*italic*`` → ``<em>``.
+    Any stray/unmatched ``**`` tokens are stripped as a final defense so raw
+    asterisks never leak into the rendered email body.
+    """
+    from html import escape as _html_escape
+
+    out = _html_escape(text)
+    out = _RECAP_INLINE_BOLD.sub(r"<strong>\1</strong>", out)
+    out = _RECAP_INLINE_ITALIC.sub(r"<em>\1</em>", out)
+    return out.replace("**", "")
+
+
+def _markdown_to_recap_html(md: str) -> str:
+    """Render a small subset of markdown (headings, bullets, paragraphs) into the
+    `.llm-recap-body` structure that the morning/weekly email templates expect.
+
+    Supported markdown:
+      - ``# Title`` / ``## Heading`` / ``### Subheading``
+      - Standalone ``**Label**`` (or ``**Label**:``) lines — promoted to
+        ``<h3 class="llm-subheading">`` so the GPT pipeline's inline bold
+        section titles (e.g. ``**Market Overview**``) render as real styled
+        subheadings instead of paragraphs with raw asterisks.
+      - ``-`` / ``•`` / numbered bullets
+      - Inline ``**bold**`` and ``*italic*`` inside paragraphs + list items.
+
+    This is intentionally a local copy of the helper in `send_morning_brief.py`
+    to avoid cross-module imports from the CLI tool. Keep the two in sync if
+    either grows new markdown features.
+    """
+    from html import escape
+
+    if not md:
+        return ""
+
+    lines = md.splitlines()
+    html_lines: List[str] = []
+    in_list = False
+
+    def close_list() -> None:
+        nonlocal in_list
+        if in_list:
+            html_lines.append("</ul>")
+            in_list = False
+
+    for raw in lines:
+        stripped = raw.strip()
+        if not stripped:
+            close_list()
+            html_lines.append("")
+            continue
+        if stripped.startswith("### "):
+            close_list()
+            html_lines.append(f'<h3 class="llm-subheading">{escape(stripped[4:].strip())}</h3>')
+            continue
+        if stripped.startswith("## "):
+            close_list()
+            html_lines.append(f'<h2 class="llm-heading">{escape(stripped[3:].strip())}</h2>')
+            continue
+        if stripped.startswith("# "):
+            close_list()
+            html_lines.append(f'<h1 class="llm-title">{escape(stripped[2:].strip())}</h1>')
+            continue
+
+        # Standalone **Label** line → promote to styled subheading. Covers the
+        # Stage-A prompt's "**Market Overview**", "**Key Levels**", etc.
+        bold_match = _RECAP_BOLD_LINE.match(stripped)
+        if bold_match:
+            close_list()
+            label = bold_match.group(1).strip()
+            html_lines.append(f'<h3 class="llm-subheading">{escape(label)}</h3>')
+            continue
+
+        is_bullet = False
+        bullet_text = ""
+        if stripped.startswith(("- ", "• ")):
+            is_bullet = True
+            bullet_text = stripped[2:].strip()
+        else:
+            parts = stripped.split(". ", 1)
+            if len(parts) == 2 and parts[0].isdigit():
+                is_bullet = True
+                bullet_text = stripped
+
+        if is_bullet:
+            if not in_list:
+                html_lines.append('<ul class="llm-list">')
+                in_list = True
+            html_lines.append(f"<li>{_render_recap_inline(bullet_text)}</li>")
+            continue
+
+        close_list()
+        html_lines.append(f'<p class="llm-text">{_render_recap_inline(stripped)}</p>')
+
+    close_list()
+    body = "\n".join(html_lines).strip()
+    return f'<div class="llm-recap-body">{body}</div>' if body else ""
+
+
+def _build_morning_brief_context(
+    summary: str,
+    filtered_headlines: List[Dict[str, Any]],
+    expected_range: Dict[str, Any],
+    gapping_stocks: Any,
+    subscriber_summary: Optional[str],
+    subscriber_email: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Assemble a template context compatible with morning_brief.html.jinja.
+
+    Scheduler-side callers (`send_market_brief_to_subscribers` and the
+    standalone fallback path) pass their existing intermediate variables; this
+    helper normalizes them into the fields the Jinja template expects.
+    """
+    # Handle gapping_stocks being either dict or list (legacy shape).
+    if isinstance(gapping_stocks, dict):
+        ah_raw = gapping_stocks.get("after_hours", []) or []
+        pre_raw = gapping_stocks.get("premarket", []) or []
+    else:
+        ah_raw = gapping_stocks or []
+        pre_raw = []
+
+    def _norm_mover(m: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            "ticker": m.get("ticker") or m.get("symbol") or "",
+            "move": m.get("move") or m.get("change") or "",
+            "why": m.get("why") or m.get("reason") or m.get("summary") or "",
+            "source_url": m.get("source_url") or m.get("url") or "",
+        }
+
+    ah_moves = [_norm_mover(m) for m in ah_raw[:8] if m.get("ticker") or m.get("symbol")]
+    premarket_moves = [_norm_mover(m) for m in pre_raw[:8] if m.get("ticker") or m.get("symbol")]
+
+    # Normalize headlines: template expects {headline, summary}.
+    news_headlines: List[Dict[str, Any]] = []
+    for h in (filtered_headlines or [])[:6]:
+        title = h.get("headline") or h.get("title") or ""
+        if not title:
+            continue
+        blurb = h.get("summary_2to5") or h.get("summary") or h.get("description") or ""
+        news_headlines.append({"headline": title, "summary": blurb})
+
+    spy = (expected_range or {}).get("spy", {}) if isinstance(expected_range, dict) else {}
+
+    def _fmt_level(val: Any) -> str:
+        if val is None or val == "" or val == "N/A":
+            return "—"
+        try:
+            return f"{float(val):.2f}"
+        except (TypeError, ValueError):
+            return str(val)
+
+    # Build URLs for unsubscribe/preferences. The scheduler renders the email
+    # body ONCE and then sends it to many recipients, so we embed the sentinel
+    # token `__RECIPIENT_EMAIL__` and let `emails.send_daily_brief_direct` do a
+    # per-recipient `.replace()` before shipping each message. If a concrete
+    # subscriber_email is passed (e.g. CLI test sends), we render the real URL
+    # directly so no placeholder remains.
+    server_name = os.getenv("SERVER_NAME", "optionsplunge.com")
+    scheme = os.getenv("PREFERRED_URL_SCHEME", "https")
+    preferences_url = f"{scheme}://{server_name}/market_brief"
+    if subscriber_email:
+        unsubscribe_url = f"{scheme}://{server_name}/unsubscribe/{subscriber_email}"
+    else:
+        unsubscribe_url = f"{scheme}://{server_name}/unsubscribe/__RECIPIENT_EMAIL__"
+
+    # Render the GPT subscriber summary into the hero `.llm-recap-body` block.
+    llm_daily_recap_html = _markdown_to_recap_html(subscriber_summary) if subscriber_summary else ""
+
+    now_et = datetime.now(pytz.timezone("America/New_York"))
+    date_human = now_et.strftime("%A, %B %d, %Y")
+
+    # Derive a short subject theme from the first complete sentence of the
+    # summary (with markdown stripped) — fall back to the generic title when
+    # the first sentence is too long, so the <h1> is always a clean, complete
+    # thought and never a mid-word truncation like "remaine…".
+    subject_theme = _derive_subject_theme(summary, fallback="Morning Market Brief")
+
+    # Preheader: short, structured tagline describing WHAT the email contains
+    # (mover counts, key SPY levels, plan) — NOT a truncated sentence from
+    # the GPT narrative. This renders as the inbox preview and the small
+    # subtitle under the header <h1>.
+    spy_support_fmt = _fmt_level(spy.get("support"))
+    spy_resistance_fmt = _fmt_level(spy.get("resistance"))
+    preheader = _build_preheader_tagline(
+        n_premarket=len(premarket_moves),
+        n_afterhours=len(ah_moves),
+        n_headlines=len(news_headlines),
+        spy_support=spy_support_fmt,
+        spy_resistance=spy_resistance_fmt,
+    )
+
+    levels_methodology = None
+    try:
+        vix_val = (expected_range or {}).get("vix", {}).get("current_price") if isinstance(expected_range, dict) else None
+        vix_val = float(vix_val) if vix_val is not None else None
+        spy_px = float(spy.get("current_price")) if spy.get("current_price") is not None else None
+        spy_sigma = float(spy.get("sigma")) if spy.get("sigma") is not None else None
+        spy_sigma_pct = float(spy.get("sigma_pct")) if spy.get("sigma_pct") is not None else None
+
+        if vix_val and spy_px and spy_sigma and spy_sigma > 0:
+            if not spy_sigma_pct or spy_sigma_pct <= 0:
+                spy_sigma_pct = (spy_sigma / spy_px) * 100.0
+            levels_methodology = {
+                "vix": vix_val,
+                "spy_sigma_dollars": spy_sigma,
+                "spy_sigma_pct": spy_sigma_pct,
+                "caption": (
+                    f"These levels come from the VIX (market 'fear gauge'). "
+                    f"With VIX at {vix_val:.1f}, SPY typically moves about +/-${spy_sigma:.2f} in a day "
+                    f"({spy_sigma_pct:.2f}%). "
+                    f"S1/R1 mark that usual range, S2/R2 are a wider range, and R3 is an extreme upside move. "
+                    f"(QQQ and IWM are scaled versions of SPY.)"
+                ),
+            }
+    except Exception:
+        levels_methodology = None
+
+    return {
+        "subject_theme": subject_theme,
+        "date": date_human,
+        "preheader": preheader,
+        "logo_url": "",
+        "market_overview": summary or "",
+        "llm_daily_recap_html": llm_daily_recap_html,
+        "news_headlines": news_headlines,
+        "ah_moves": ah_moves,
+        "premarket_moves": premarket_moves,
+        "macro_data": "",
+        "earnings": [],
+        "sectors": "",
+        "spy_s1": _fmt_level(spy.get("support")),
+        "spy_s2": _fmt_level(spy.get("support2")),
+        "spy_r1": _fmt_level(spy.get("resistance")),
+        "spy_r2": _fmt_level(spy.get("resistance2")),
+        "spy_r3": _fmt_level(spy.get("resistance3")),
+        "extra_levels": "",
+        "levels_methodology": levels_methodology,
+        "day_plan": [],
+        "swing_plan": [],
+        "on_deck": "",
+        "cta_url": f"{scheme}://{server_name}",
+        "unsubscribe_url": unsubscribe_url,
+        "preferences_url": preferences_url,
+    }
+
+
 def send_market_brief_to_subscribers():
     """Main function to generate and send market brief to all subscribers"""
     try:
@@ -3211,10 +4327,28 @@ def send_market_brief_to_subscribers():
             logger.info("GPT summary not available, skipping")
         
         # Generate two variants:
-        # - Site content: omit Subscriber Summary to avoid duplication on the Market Brief page
-        # - Email content: omit Subscriber Summary to avoid duplication on the email for subscribers
+        # - Site content: keep legacy layout without the Subscriber Summary
+        # - Email content: rendered through the shared Jinja template
+        #   `templates/email/morning_brief.html.jinja` via emailer.render_morning_brief,
+        #   matching the weekly brief's render path. Produces a single well-formed
+        #   HTML document so downstream senders don't need to wrap it again.
         site_content = generate_html_content_with_summary(summary, filtered_headlines, expected_range, gapping_stocks, None)
-        email_content = generate_html_content_with_summary(summary, filtered_headlines, expected_range, gapping_stocks, None)
+
+        from emailer import render_morning_brief
+        email_context = _build_morning_brief_context(
+            summary=summary,
+            filtered_headlines=filtered_headlines,
+            expected_range=expected_range,
+            gapping_stocks=gapping_stocks,
+            subscriber_summary=subscriber_summary,
+        )
+        try:
+            email_content, _email_text = render_morning_brief(email_context)
+        except Exception as render_err:
+            # Fall back to the legacy site HTML if template rendering fails, so a
+            # missing dependency never prevents the brief from going out.
+            logger.error(f"render_morning_brief failed, falling back to site HTML: {render_err}")
+            email_content = site_content
 
         # Persist latest brief content to a static file for website display
         try:
@@ -3280,11 +4414,136 @@ def send_market_brief_to_subscribers():
         raise
 
 
+def _missing_required_symbols(
+    prices: Dict[str, Dict[str, float]],
+    required: Optional[List[str]] = None,
+) -> List[str]:
+    """Return required symbols that are absent or have invalid prices."""
+    required_symbols = [sym.lower() for sym in (required or DAILY_REQUIRED_MARKET_SYMBOLS)]
+    missing: List[str] = []
+    for symbol in required_symbols:
+        data = prices.get(symbol) if isinstance(prices, dict) else None
+        price = (data or {}).get('current_price') if isinstance(data, dict) else None
+        try:
+            valid = price is not None and float(price) > 0
+        except (TypeError, ValueError):
+            valid = False
+        if not valid:
+            missing.append(symbol.upper())
+    return missing
+
+
+def require_market_data(
+    prices: Dict[str, Dict[str, float]],
+    required: Optional[List[str]] = None,
+) -> None:
+    """Raise :class:`BriefDataUnavailable` if required market data is missing."""
+    missing = _missing_required_symbols(prices, required=required)
+    if missing:
+        raise BriefDataUnavailable(
+            "Market data unavailable: missing " + ", ".join(missing)
+        )
+
+
+def _write_brief_unavailable_sentinel(reason: str) -> str:
+    """Write an honest public placeholder when the daily brief is unavailable."""
+    try:
+        base_dir = Path(__file__).resolve().parent
+        out_dir = base_dir / "static" / "uploads"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        latest_file = out_dir / "brief_latest.html"
+        latest_date_file = out_dir / "brief_latest_date.txt"
+
+        reason_text = (reason or "market data unavailable").strip()
+        reason_html = escape(reason_text)
+        reason_tag = re.sub(r"[^a-zA-Z0-9_-]+", "-", reason_text.lower()).strip("-")
+        if not reason_tag:
+            reason_tag = "market-data-unavailable"
+
+        today = datetime.now().strftime("%Y-%m-%d")
+        html_content = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Options Plunge Morning Brief - Delayed</title>
+    <style>
+        body {{
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #0f172a;
+            background-color: #f4f6fb;
+            margin: 0;
+            padding: 28px;
+        }}
+        .container {{
+            max-width: 720px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 35px 80px rgba(15,23,42,0.08);
+        }}
+        .header {{
+            background: linear-gradient(135deg, #fff7d6 0%, #e0f2fe 100%);
+            color: #0f172a;
+            padding: 36px 32px;
+            text-align: center;
+        }}
+        .content {{
+            padding: 28px;
+        }}
+        .notice {{
+            background: #fff7ed;
+            border-left: 4px solid #f97316;
+            border-radius: 10px;
+            padding: 18px;
+        }}
+        .muted {{
+            color: #64748b;
+            font-size: 13px;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <p style="text-transform:uppercase;letter-spacing:0.22em;font-size:11px;margin:0 0 10px 0;">Options Plunge</p>
+            <h1 style="margin:0;font-size:26px;font-weight:300;">Morning Brief Delayed</h1>
+            <p style="margin:10px 0 0 0;font-size:15px;">{today}</p>
+        </div>
+        <div class="content">
+            <div class="notice">
+                <h2 style="margin:0 0 8px 0;font-size:18px;">Today's brief is delayed - market data provider unavailable.</h2>
+                <p style="margin:0;">We are waiting for verified SPY and QQQ market data before publishing today's brief.</p>
+                <p class="muted" style="margin:12px 0 0 0;">Reason: {reason_html}</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>"""
+
+        latest_file.write_text(html_content, encoding="utf-8")
+        latest_date_file.write_text(f"unavailable:{today}:{reason_tag}", encoding="utf-8")
+        logger.info("Wrote unavailable brief sentinel to %s", latest_file)
+        return str(latest_file)
+    except Exception as exc:
+        logger.error("Failed to write unavailable brief sentinel: %s", exc)
+        return ""
+
+
 def generate_daily_brief_file_only() -> str:
     """Generate the daily brief HTML and write static/uploads/brief_latest.html without emailing.
     Returns the absolute path written.
     """
     try:
+        stock_prices = fetch_stock_prices()
+        try:
+            require_market_data(stock_prices)
+        except BriefDataUnavailable as exc:
+            logger.error("Daily brief file generation aborted: %s", exc)
+            return _write_brief_unavailable_sentinel(str(exc))
+
         # Generate the brief
         headlines = fetch_news()
         filtered_headlines = filter_market_headlines(headlines)
@@ -3297,7 +4556,6 @@ def generate_daily_brief_file_only() -> str:
             except Exception as e:
                 logger.warning(f"Headline summarization failed, using original summaries: {e}")
 
-        stock_prices = fetch_stock_prices()
         expected_range = calculate_expected_range(stock_prices)
 
         # Fetch gapping stocks for the new section
@@ -3363,6 +4621,14 @@ if __name__ == "__main__":
         # If app import fails, just generate the brief without sending emails
         logger.info("Running in standalone mode - generating brief content only")
         try:
+            stock_prices = fetch_stock_prices()
+            try:
+                require_market_data(stock_prices)
+            except BriefDataUnavailable as exc:
+                logger.error("Standalone market brief generation aborted: %s", exc)
+                _write_brief_unavailable_sentinel(str(exc))
+                raise
+
             # Generate the brief
             headlines = fetch_news()
             filtered_headlines = filter_market_headlines(headlines)
@@ -3375,7 +4641,6 @@ if __name__ == "__main__":
                 except Exception as e:
                     logger.warning(f"Headline summarization failed, using original summaries: {e}")
             
-            stock_prices = fetch_stock_prices()
             expected_range = calculate_expected_range(stock_prices)
             
             # Fetch gapping stocks for the new section
@@ -3417,8 +4682,26 @@ if __name__ == "__main__":
             else:
                 logger.info("GPT summary not available, skipping")
             
-            # Generate email content with GPT summary
-            brief_content = generate_html_content_with_summary(summary, filtered_headlines, expected_range, gapping_stocks, subscriber_summary)
+            # Generate email content with GPT summary via the shared Jinja template
+            # so the standalone fallback produces the same well-formed document as
+            # the main scheduler path.
+            try:
+                from emailer import render_morning_brief
+                email_context = _build_morning_brief_context(
+                    summary=summary,
+                    filtered_headlines=filtered_headlines,
+                    expected_range=expected_range,
+                    gapping_stocks=gapping_stocks,
+                    subscriber_summary=subscriber_summary,
+                )
+                brief_content, _brief_text = render_morning_brief(email_context)
+            except Exception as render_err:
+                # Fall back to the site layout if template rendering isn't available
+                # (e.g. running outside a Flask context without templates).
+                logger.warning(f"render_morning_brief failed in standalone mode ({render_err}); using site HTML.")
+                brief_content = generate_html_content_with_summary(
+                    summary, filtered_headlines, expected_range, gapping_stocks, subscriber_summary
+                )
 
             # Persist latest brief content to a static file for website display
             try:
@@ -3435,3 +4718,85 @@ if __name__ == "__main__":
                 logger.warning(f"Failed to write latest brief HTML: {write_err}")
         except Exception as e:
             logger.error(f"Error in standalone market brief generation: {str(e)}") 
+
+def fetch_stock_prices_strict() -> Dict[str, Dict[str, float]]:
+    """Fetch prices via providers.DataProvider without synthetic defaults.
+
+    Returns ``{}`` when no provider yields a valid price for the required
+    symbols so that :func:`has_valid_price_data` can short-circuit the
+    brief instead of emitting fabricated levels.
+    """
+    prices = fetch_stock_prices()
+    if has_valid_price_data(prices):
+        return prices
+    return {}
+
+
+def has_valid_price_data(prices: Dict[str, Dict[str, float]], required: Optional[List[str]] = None) -> bool:
+    """Verify that required symbols have non-zero price data."""
+
+    required_symbols = [sym.lower() for sym in (required or ['spy', 'qqq'])]
+    for symbol in required_symbols:
+        data = prices.get(symbol)
+        if not data:
+            logger.warning("Missing price data for %s", symbol.upper())
+            return False
+
+        price = data.get('current_price')
+        if price is None or price <= 0:
+            logger.warning("Invalid price data for %s: %s", symbol.upper(), price)
+            return False
+
+    return True
+
+
+def build_market_snapshot(
+    prices: Dict[str, Dict[str, float]],
+    symbols: Optional[List[str]] = None,
+) -> Dict[str, Dict[str, Any]]:
+    """Return a normalized market snapshot for newsletter and post copy.
+
+    Only includes symbols whose ``current_price`` is a positive number. The
+    output shape is intentionally simple and stable so deployed generators
+    (newsletter, post-market, social) can consume it without re-implementing
+    formatting and never need a hardcoded ``$0.00`` fallback::
+
+        {"spy": {"price": 644.95, "change": 1.20, "change_percent": 0.18}, ...}
+
+    Symbols that are missing or invalid are simply omitted from the result;
+    callers should treat absence as "data unavailable" rather than zero.
+    """
+    requested = [sym.lower() for sym in (symbols or ['spy', 'qqq', 'iwm', 'vix'])]
+    snapshot: Dict[str, Dict[str, Any]] = {}
+    for symbol in requested:
+        data = prices.get(symbol) if isinstance(prices, dict) else None
+        if not isinstance(data, dict):
+            continue
+        price = data.get('current_price')
+        try:
+            price_f = float(price) if price is not None else None
+        except (TypeError, ValueError):
+            price_f = None
+        if price_f is None or price_f <= 0:
+            continue
+
+        def _coerce_float(value: Any) -> Optional[float]:
+            if value is None:
+                return None
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return None
+
+        snapshot[symbol] = {
+            "price": round(price_f, 2),
+            "change": _coerce_float(data.get('change')),
+            "change_percent": _coerce_float(data.get('change_percent')),
+        }
+    return snapshot
+
+
+#
+# NOTE: `calculate_expected_range` is defined earlier in this file.
+# A duplicate definition previously existed here; it has been removed to keep a
+# single source of truth for the expected-range / key-level computation.

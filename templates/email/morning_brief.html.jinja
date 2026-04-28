@@ -5,203 +5,473 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Options Plunge Morning Brief — {{ subject_theme }} ({{ date }})</title>
     <style>
+        * {
+            box-sizing: border-box;
+        }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             line-height: 1.6;
-            color: #333;
-            max-width: 700px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f8f9fa;
+            color: #0f172a;
+            background-color: #f4f6fb;
+            margin: 0;
+            padding: 28px;
         }
         .container {
-            background: white;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            max-width: 720px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 35px 80px rgba(15,23,42,0.08);
         }
         .header {
+            background: linear-gradient(135deg, #fff7d6 0%, #e0f2fe 100%);
+            color: #0f172a;
+            padding: 36px 32px;
             text-align: center;
-            margin-bottom: 30px;
-            border-bottom: 2px solid #3498db;
-            padding-bottom: 20px;
         }
-        .logo {
-            font-size: 28px;
-            font-weight: bold;
-            color: #2c3e50;
-            margin-bottom: 10px;
+        .header .eyebrow {
+            text-transform: uppercase;
+            letter-spacing: 0.22em;
+            font-size: 11px;
+            color: #475569;
+            margin: 0 0 10px 0;
+            font-weight: 600;
         }
-        .date {
-            color: #7f8c8d;
-            font-size: 16px;
+        .header h1 {
+            margin: 0;
+            font-size: 26px;
+            font-weight: 300;
         }
-        .section {
-            margin-bottom: 25px;
+        .header .date {
+            margin: 10px 0 0 0;
+            font-size: 15px;
+            color: #334155;
+            font-weight: 500;
         }
-        .section-title {
-            color: #2c3e50;
-            font-size: 18px;
-            font-weight: bold;
-            margin-bottom: 10px;
-            border-left: 4px solid #3498db;
-            padding-left: 10px;
-        }
-        .levels {
-            background: #ecf0f1;
-            padding: 15px;
-            border-radius: 5px;
-            margin: 20px 0;
-            font-family: 'Courier New', monospace;
+        .header .preheader {
+            margin: 10px 0 0 0;
             font-size: 14px;
+            color: #475569;
+            line-height: 1.5;
+        }
+        .content {
+            padding: 28px 28px 20px 28px;
+        }
+        .section-content {
+            background: #ffffff;
+            padding: 18px;
+            border-radius: 10px;
+            margin: 16px 0;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 12px 26px rgba(15,23,42,0.05);
+        }
+        .section-header {
+            color: #0f172a;
+            border-bottom: 2px solid #facc15;
+            padding-bottom: 8px;
+            margin: 0 0 12px 0;
+            font-size: 17px;
+            font-weight: 600;
+        }
+        .section-text {
+            margin: 8px 0;
+            color: #1f2933;
+        }
+        .two-col {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 14px;
+        }
+        .mover-card {
+            background: #fefce8;
+            padding: 14px;
+            border-radius: 8px;
+            border-left: 4px solid #f59e0b;
+            color: #0f172a;
+        }
+        .mover-card h3 {
+            margin: 0 0 8px 0;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: #78350f;
+            font-weight: 700;
+        }
+        .mover-card ul {
+            margin: 0;
+            padding-left: 18px;
+        }
+        .mover-card li {
+            margin: 4px 0;
+            font-size: 14px;
+            line-height: 1.45;
+        }
+        .mover-card li strong {
+            color: #0f172a;
+        }
+        .mover-card .muted {
+            color: #64748b;
+            font-style: italic;
+        }
+        .macro-item {
+            background: #ecfeff;
+            padding: 12px 14px;
+            border-radius: 8px;
+            margin: 8px 0;
+            border-left: 4px solid #0ea5e9;
+            color: #0f172a;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .styled-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .styled-list li {
+            padding: 10px 0;
+            border-bottom: 1px solid #e2e8f0;
+            color: #0f172a;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .styled-list li:last-child {
+            border-bottom: none;
+        }
+        .levels-strip {
+            background: linear-gradient(135deg, #fff9db 0%, #ffe6a7 100%);
+            padding: 14px 18px;
+            border-radius: 10px;
+            border-left: 4px solid #ffc107;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 13px;
+            font-weight: 600;
+            color: #0f172a;
             line-height: 1.8;
+            overflow-x: auto;
         }
-        .earnings-item {
-            background: #f8f9fa;
-            padding: 12px;
-            border-radius: 5px;
-            margin: 8px 0;
-            border-left: 3px solid #3498db;
+        .levels-strip .label {
+            color: #78350f;
+            margin-right: 6px;
         }
-        .ticker {
-            font-weight: bold;
-            color: #2c3e50;
+        .levels-strip .support {
+            color: #15803d;
         }
-        .plan-item {
-            background: #fff3cd;
-            border: 1px solid #ffeaa7;
-            padding: 12px;
-            border-radius: 5px;
-            margin: 8px 0;
+        .levels-strip .resistance {
+            color: #b91c1c;
+        }
+        .levels-strip .sep {
+            color: #94a3b8;
+            margin: 0 4px;
+        }
+        .levels-caption {
+            margin: 8px 0 0 0;
+            font-size: 12px;
+            line-height: 1.45;
+            color: #64748b;
+        }
+        .headline-item {
+            padding: 10px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .headline-item:last-child {
+            border-bottom: none;
+        }
+        .headline-item .title {
+            font-weight: 600;
+            color: #0f172a;
+            font-size: 14px;
+            line-height: 1.4;
+            margin: 0 0 4px 0;
+        }
+        .headline-item .summary {
+            margin: 0;
+            color: #475569;
+            font-size: 13px;
+            line-height: 1.5;
         }
         .footer {
             text-align: center;
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid #eee;
-            color: #666;
-            font-size: 14px;
+            margin: 8px 28px 28px 28px;
+            padding: 18px;
+            border-top: 1px solid #e2e8f0;
+            color: #64748b;
+            font-size: 13px;
         }
-        .optional-section {
-            opacity: 0.8;
+        .footer a {
+            color: #0ea5e9;
+            text-decoration: none;
+            margin: 0 6px;
+        }
+        .footer .brand {
+            display: block;
+            margin-bottom: 8px;
+            color: #0f172a;
+            font-weight: 600;
+        }
+        .disclaimer {
+            text-align: center;
+            font-size: 12px;
+            color: #64748b;
+            padding: 0 28px 8px 28px;
+        }
+        /* LLM recap styling */
+        .llm-recap-body {
+            font-family: inherit;
+            color: #0f172a;
+        }
+        .llm-recap-body .llm-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin: 0 0 10px 0;
+            color: #0f172a;
+        }
+        .llm-recap-body .llm-heading {
+            font-size: 16px;
+            font-weight: 700;
+            margin: 20px 0 8px 0;
+            padding-bottom: 6px;
+            border-bottom: 2px solid #facc15;
+            color: #0f172a;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+        .llm-recap-body .llm-heading:first-child {
+            margin-top: 0;
+        }
+        .llm-recap-body .llm-subheading {
+            font-size: 13px;
+            font-weight: 700;
+            margin: 18px 0 6px 0;
+            padding-bottom: 5px;
+            border-bottom: 2px solid #facc15;
+            color: #78350f;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+        }
+        .llm-recap-body .llm-subheading:first-child {
+            margin-top: 0;
+        }
+        .llm-recap-body .llm-text {
+            margin: 6px 0;
+            line-height: 1.65;
+            color: #1f2933;
+        }
+        .llm-recap-body .llm-subheading + .llm-text,
+        .llm-recap-body .llm-heading + .llm-text {
+            margin-top: 2px;
+        }
+        .llm-recap-body .llm-list {
+            margin: 6px 0 6px 1.25rem;
+            padding-left: 0.75rem;
+        }
+        .llm-recap-body .llm-subheading + .llm-list,
+        .llm-recap-body .llm-heading + .llm-list {
+            margin-top: 4px;
+        }
+        .llm-recap-body .llm-list li {
+            margin: 4px 0;
+            line-height: 1.55;
+            color: #1f2933;
+        }
+        .llm-recap-body strong {
+            color: #0f172a;
+            font-weight: 700;
+        }
+        @media (max-width: 640px) {
+            body {
+                padding: 16px;
+            }
+            .header {
+                padding: 28px 20px;
+            }
+            .content {
+                padding: 20px 18px 12px 18px;
+            }
+            .footer {
+                margin: 8px 18px 20px 18px;
+            }
+            .two-col {
+                grid-template-columns: 1fr;
+            }
+            .levels-strip {
+                font-size: 12px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <div class="logo">📈 Options Plunge</div>
-            <h1>Morning Brief</h1>
-            <div class="date">{{ date }}</div>
-            <p style="color: #7f8c8d; font-size: 14px; margin-top: 10px;">{{ preheader }}</p>
-        </div>
-        
-        <!-- Market Overview -->
-        <div class="section">
-            <div class="section-title">Market Overview</div>
-            <p>{{ market_overview }}</p>
-        </div>
-        
-        <!-- Macro/Data -->
-        <div class="section">
-            <div class="section-title">Macro/Data</div>
-            <p>{{ macro_data }}</p>
+            <p class="eyebrow">Options Plunge · Morning Brief</p>
+            <h1>{{ subject_theme or "Morning Market Brief" }}</h1>
+            <p class="date">{{ date }}</p>
+            {% if preheader %}<p class="preheader">{{ preheader }}</p>{% endif %}
         </div>
 
-        <!-- What's moving — After-hours & Premarket -->
-        <div class="section">
-            <div class="section-title">What’s moving — After-hours & Premarket</div>
+        <div class="content">
+            {# Hero: AI-generated subscriber recap / game plan #}
+            {% if llm_daily_recap_html %}
+            <div class="section-content">
+                <h2 class="section-header">Daily Market Recap</h2>
+                <div class="section-text llm-recap-body">
+                    {{ llm_daily_recap_html | safe }}
+                </div>
+            </div>
+            {% elif market_overview %}
+            <div class="section-content">
+                <h2 class="section-header">Market Overview</h2>
+                <p class="section-text">{{ market_overview }}</p>
+            </div>
+            {% endif %}
 
-            <div class="card" style="margin-bottom:16px; padding:12px; border:1px solid #ecf0f1; border-radius:6px;">
-                <strong>After-hours (yesterday)</strong>
-                <ul class="bullets" style="padding-left:18px; margin-top:6px;">
-                    {% for m in ah_moves %}
-                    <li style="margin-bottom:4px;"><strong>{{ m.ticker }}</strong> {{ m.move }} — {{ m.why }}{% if m.source_url %} <a href="{{ m.source_url }}">[source]</a>{% endif %}</li>
+            {% if market_snapshot %}
+            <div class="section-content">
+                <h2 class="section-header">Market Snapshot</h2>
+                <div class="levels-strip">
+                    {% for symbol, data in market_snapshot.items() %}
+                    <span class="label">{{ symbol|upper }}:</span>
+                    <span>${{ "%.2f"|format(data.price) }}</span>
+                    {% if data.change_percent is not none %}
+                    <span class="sep">({{ "%+.2f"|format(data.change_percent) }}%)</span>
+                    {% endif %}
+                    {% if not loop.last %}<span class="sep">|</span>{% endif %}
                     {% endfor %}
-                    {% if not ah_moves %}<li>No notable liquid movers.</li>{% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            {# What's moving — side-by-side on desktop, stacked on mobile #}
+            <div class="section-content">
+                <h2 class="section-header">What's Moving — After-Hours &amp; Premarket</h2>
+                <div class="two-col">
+                    <div class="mover-card">
+                        <h3>After-Hours (yesterday)</h3>
+                        <ul>
+                            {% for m in ah_moves %}
+                            <li><strong>{{ m.ticker }}</strong> {{ m.move }} — {{ m.why }}{% if m.source_url %} <a href="{{ m.source_url }}">[src]</a>{% endif %}</li>
+                            {% endfor %}
+                            {% if not ah_moves %}<li class="muted">No notable liquid movers.</li>{% endif %}
+                        </ul>
+                    </div>
+                    <div class="mover-card">
+                        <h3>Premarket (today)</h3>
+                        <ul>
+                            {% for m in premarket_moves %}
+                            <li><strong>{{ m.ticker }}</strong> {{ m.move }} — {{ m.why }}{% if m.source_url %} <a href="{{ m.source_url }}">[src]</a>{% endif %}</li>
+                            {% endfor %}
+                            {% if not premarket_moves %}<li class="muted">No notable liquid movers.</li>{% endif %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            {# Key Levels — compact monospace strip #}
+            <div class="section-content">
+                <h2 class="section-header">Key Levels</h2>
+                <div class="levels-strip">
+                    <span class="label">SPY:</span>
+                    <span class="support">S1 {{ spy_s1 }}</span>
+                    <span class="sep">|</span>
+                    <span class="support">S2 {{ spy_s2 }}</span>
+                    <span class="sep">|</span>
+                    <span class="resistance">R1 {{ spy_r1 }}</span>
+                    <span class="sep">|</span>
+                    <span class="resistance">R2 {{ spy_r2 }}</span>
+                    <span class="sep">|</span>
+                    <span class="resistance">R3 {{ spy_r3 }}</span>
+                    {% if extra_levels %}<br>{{ extra_levels }}{% endif %}
+                </div>
+                {% if levels_methodology and levels_methodology.caption %}
+                <p class="levels-caption">{{ levels_methodology.caption }}</p>
+                {% endif %}
+            </div>
+
+            {# Headlines — collapsed: title + 1-line summary #}
+            {% if news_headlines %}
+            <div class="section-content">
+                <h2 class="section-header">Top Headlines</h2>
+                {% for news in news_headlines %}
+                <div class="headline-item">
+                    <p class="title">{{ news.headline }}</p>
+                    {% if news.summary %}<p class="summary">{{ news.summary }}</p>{% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {# Macro/Data — only if populated #}
+            {% if macro_data %}
+            <div class="section-content">
+                <h2 class="section-header">Macro / Data</h2>
+                <p class="section-text">{{ macro_data }}</p>
+            </div>
+            {% endif %}
+
+            {# Earnings in Focus — only if populated (Polygon tier currently returns []) #}
+            {% if earnings %}
+            <div class="section-content">
+                <h2 class="section-header">Earnings in Focus</h2>
+                {% for item in earnings %}
+                <div class="macro-item"><strong>{{ item.ticker }}:</strong> {{ item.note }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {# Sectors — optional, rendered only when populated #}
+            {% if sectors %}
+            <div class="section-content">
+                <h2 class="section-header">Sectors</h2>
+                <p class="section-text">{{ sectors }}</p>
+            </div>
+            {% endif %}
+
+            {# Day Plan — unified styled list (matches weekly look) #}
+            {% if day_plan %}
+            <div class="section-content">
+                <h2 class="section-header">Day Plan</h2>
+                <ul class="styled-list">
+                    {% for item in day_plan %}
+                    <li>{{ item }}</li>
+                    {% endfor %}
                 </ul>
             </div>
+            {% endif %}
 
-            <div class="card" style="padding:12px; border:1px solid #ecf0f1; border-radius:6px;">
-                <strong>Premarket (today)</strong>
-                <ul class="bullets" style="padding-left:18px; margin-top:6px;">
-                    {% for m in premarket_moves %}
-                    <li style="margin-bottom:4px;"><strong>{{ m.ticker }}</strong> {{ m.move }} — {{ m.why }}{% if m.source_url %} <a href="{{ m.source_url }}">[source]</a>{% endif %}</li>
+            {# Swing Plan — unified styled list #}
+            {% if swing_plan %}
+            <div class="section-content">
+                <h2 class="section-header">Swing Plan</h2>
+                <ul class="styled-list">
+                    {% for item in swing_plan %}
+                    <li>{{ item }}</li>
                     {% endfor %}
-                    {% if not premarket_moves %}<li>No notable liquid movers.</li>{% endif %}
                 </ul>
             </div>
-        </div>
-        
-        <!-- Earnings in Focus -->
-        {% if earnings %}
-        <div class="section">
-            <div class="section-title">Earnings in Focus</div>
-            {% for item in earnings %}
-            <div class="earnings-item">
-                <span class="ticker">{{ item.ticker }}:</span> {{ item.note }}
+            {% endif %}
+
+            {# On Deck — optional #}
+            {% if on_deck %}
+            <div class="section-content">
+                <h2 class="section-header">On Deck</h2>
+                <p class="section-text">{{ on_deck }}</p>
             </div>
-            {% endfor %}
+            {% endif %}
         </div>
-        {% endif %}
-        
-        <!-- Sectors (Optional) -->
-        {% if sectors %}
-        <div class="section optional-section">
-            <div class="section-title">Sectors</div>
-            <p>{{ sectors }}</p>
+
+        <div class="disclaimer">
+            Educational commentary. Not investment advice.
         </div>
-        {% endif %}
-        
-        <!-- Key Levels -->
-        <div class="section">
-            <div class="section-title">Key Levels</div>
-            <div class="levels">
-                SPY: S1 {{ spy_s1 }} | S2 {{ spy_s2 }} | R1 {{ spy_r1 }} | R2 {{ spy_r2 }} | R3 {{ spy_r3 }}
-                {% if extra_levels %}<br>{{ extra_levels }}{% endif %}
-            </div>
-        </div>
-        
-        <!-- Day Plan -->
-        <div class="section">
-            <div class="section-title">Day Plan</div>
-            {% for item in day_plan %}
-            <div class="plan-item">
-                • {{ item }}
-            </div>
-            {% endfor %}
-        </div>
-        
-        <!-- Swing Plan -->
-        <div class="section">
-            <div class="section-title">Swing Plan</div>
-            {% for item in swing_plan %}
-            <div class="plan-item">
-                • {{ item }}
-            </div>
-            {% endfor %}
-        </div>
-        
-        <!-- On Deck (Optional) -->
-        {% if on_deck %}
-        <div class="section optional-section">
-            <div class="section-title">On Deck</div>
-            <p>{{ on_deck }}</p>
-        </div>
-        {% endif %}
-        
-        <!-- Educational Disclaimer -->
-        <div class="section disclaimer">
-            <p style="font-size: 12px; color: #666; text-align: center; margin: 20px 0;">
-                Educational commentary. Not investment advice. If this helped your prep, share it with a trader friend or subscribe for the weekly recap.
-            </p>
-        </div>
-        
+
         <div class="footer">
-            <p><strong>Powered by Options Plunge</strong></p>
+            <span class="brand">Powered by Options Plunge</span>
+            {% if unsubscribe_url or preferences_url %}
+                {% if unsubscribe_url %}<a href="{{ unsubscribe_url }}">Unsubscribe</a>{% endif %}
+                {% if unsubscribe_url and preferences_url %}·{% endif %}
+                {% if preferences_url %}<a href="{{ preferences_url }}">Preferences</a>{% endif %}
+            {% endif %}
         </div>
     </div>
 </body>
 </html>
-
-

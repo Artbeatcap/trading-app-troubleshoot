@@ -4,6 +4,14 @@ Options Plunge Morning Brief — {{ subject_theme }} ({{ date }})
 
 ================================================================================
 
+{% if llm_daily_recap_md %}
+DAILY MARKET RECAP
+================================================================================
+{{ llm_daily_recap_md }}
+
+================================================================================
+{% endif %}
+
 📈 Options Plunge - Morning Brief
 {{ date }}
 
@@ -12,10 +20,30 @@ Options Plunge Morning Brief — {{ subject_theme }} ({{ date }})
 MARKET OVERVIEW
 {{ market_overview }}
 
+{% if market_snapshot %}
+================================================================================
+
+MARKET SNAPSHOT
+{% for symbol, data in market_snapshot.items() %}
+{{ symbol|upper }}: ${{ "%.2f"|format(data.price) }}{% if data.change_percent is not none %} ({{ "%+.2f"|format(data.change_percent) }}%){% endif %}
+{% endfor %}
+
+{% endif %}
 ================================================================================
 
 MACRO/DATA
 {{ macro_data }}
+
+{% if news_headlines %}
+================================================================================
+
+MARKET HEADLINES
+{% for news in news_headlines %}
+• {{ news.headline }}
+  {{ news.summary }}
+
+{% endfor %}
+{% endif %}
 
 {% if earnings %}
 ================================================================================

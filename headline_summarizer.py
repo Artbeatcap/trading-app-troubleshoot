@@ -6,7 +6,7 @@ import json
 
 logger = logging.getLogger(__name__)
 
-MODEL = os.getenv("SUMMARY_MODEL", "gpt-4o-mini")
+MODEL = os.getenv("SUMMARY_MODEL", "gpt-5-nano")
 
 # Check if OpenAI is available
 try:
@@ -16,6 +16,7 @@ except ImportError:
     OPENAI_AVAILABLE = False
 
 CLIENT = None  # Lazily initialized to avoid import-time failures
+_OPENAI_ERROR_BODY_LOGGED = False
 
 def _ensure_client():
     """Create the OpenAI client if possible; stay silent on failure.
@@ -31,6 +32,36 @@ def _ensure_client():
         CLIENT = OpenAI(api_key=api_key)
     except Exception:
         CLIENT = None
+
+
+def _log_openai_error_once(source: str, exc: Exception = None, response_text: str = None) -> None:
+    """Log deterministic OpenAI request failures once with useful context."""
+    global _OPENAI_ERROR_BODY_LOGGED
+    if _OPENAI_ERROR_BODY_LOGGED:
+        return
+    _OPENAI_ERROR_BODY_LOGGED = True
+
+    status = getattr(exc, "status_code", None)
+    body = response_text
+    response = getattr(exc, "response", None)
+    if body is None and response is not None:
+        try:
+            body = response.text
+        except Exception:
+            body = None
+    message = str(exc) if exc else ""
+    detail = (body or message or "<no response body>").strip()
+    logger.warning(
+        "OpenAI headline summarization failed via %s%s; response body: %.1000s",
+        source,
+        f" (status={status})" if status else "",
+        detail,
+    )
+
+
+def _supports_custom_temperature(model: str) -> bool:
+    """Return False for models that only accept the default temperature."""
+    return not (model or "").startswith("gpt-5")
 
 SYSTEM = (
     "You are a professional day trader content creator market writer. For each headline, write a concise 2–5 "
@@ -58,9 +89,10 @@ def call_openai_api_directly(api_key: str, messages: list, model: str = "gpt-5-n
         data = {
             "model": model,
             "messages": messages,
-            "temperature": 1.0,
             "max_completion_tokens": 300
         }
+        if _supports_custom_temperature(model):
+            data["temperature"] = 1.0
         response = requests.post(
             "https://api.openai.com/v1/chat/completions",
             headers=headers,
@@ -71,7 +103,7 @@ def call_openai_api_directly(api_key: str, messages: list, model: str = "gpt-5-n
             result = response.json()
             return result["choices"][0]["message"]["content"]
         else:
-            logger.warning(f"OpenAI API error: {response.status_code} - {response.text}")
+            _log_openai_error_once("direct_api", response_text=response.text)
             return None
     except Exception as e:
         logger.warning(f"Direct API call failed: {e}")
@@ -98,12 +130,14 @@ def summarize_single_headline(headline_dict: Dict[str, Any]) -> Dict[str, Any]:
                 {"role": "system", "content": SYSTEM},
                 {"role": "user", "content": _prompt(title, seed_summary)}
             ]
-            resp = CLIENT.chat.completions.create(
-                model=MODEL,
-                messages=messages,
-                temperature=1.0,
-                max_completion_tokens=300,
-            )
+            kwargs = {
+                "model": MODEL,
+                "messages": messages,
+                "max_completion_tokens": 300,
+            }
+            if _supports_custom_temperature(MODEL):
+                kwargs["temperature"] = 0.2
+            resp = CLIENT.chat.completions.create(**kwargs)
             summary_text = resp.choices[0].message.content.strip()
             
             # Ensure we have at least 2 sentences
@@ -112,8 +146,8 @@ def summarize_single_headline(headline_dict: Dict[str, Any]) -> Dict[str, Any]:
             
             return {**headline_dict, "summary_2to5": summary_text}
             
-        except Exception:
-            # Quietly fall back to REST without noisy warnings
+        except Exception as exc:
+            _log_openai_error_once("client", exc=exc)
             pass
     
     # Try direct API call as fallback

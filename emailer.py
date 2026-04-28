@@ -128,9 +128,9 @@ def send_morning_brief_direct(html: str, text: str, subject: str, to_list: list[
     """
     try:
         # Get SendGrid key (support both var names)
-        sendgrid_key = os.getenv('SENDGRID_API_KEY') or os.getenv('SENDGRID_KEY')
+        sendgrid_key = os.getenv('SENDGRID_KEY') or os.getenv('SENDGRID_API_KEY')
         if not sendgrid_key:
-            logger.error("SENDGRID_API_KEY/SENDGRID_KEY not configured")
+            logger.error("SENDGRID_KEY or SENDGRID_API_KEY not configured")
             return False
         
         # Get email configuration
@@ -279,9 +279,9 @@ def send_weekly_brief_direct(html: str, text: str, subject: str, to_list: list[s
     """
     try:
         # Get SendGrid key (support both var names)
-        sendgrid_key = os.getenv('SENDGRID_API_KEY') or os.getenv('SENDGRID_KEY')
+        sendgrid_key = os.getenv('SENDGRID_KEY') or os.getenv('SENDGRID_API_KEY')
         if not sendgrid_key:
-            logger.error("SENDGRID_API_KEY/SENDGRID_KEY not configured")
+            logger.error("SENDGRID_KEY or SENDGRID_API_KEY not configured")
             return False
         
         # Get email configuration
