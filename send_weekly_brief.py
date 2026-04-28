@@ -4,8 +4,8 @@ Weekly Market Brief Sender (Hybrid)
 
 If a source JSON is provided, uses it. Otherwise builds a Weekly Brief with:
  - Week of <Mon–Fri> date range
- - Week-ahead catalysts (Finnhub ➜ Alpha Vantage fallback)
- - Movers snapshot (Alpha Vantage TOP_GAINERS_LOSERS, budget-friendly)
+ - Week-ahead catalysts (returns [] on the current Polygon Starter tier)
+ - Movers snapshot via providers.DataProvider (Polygon gainers/losers)
 Sends the email and writes a preview HTML for /brief/weekly.
 """
 
@@ -24,10 +24,84 @@ NY = timezone("America/New_York")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from emailer import render_weekly_brief, send_weekly_brief_direct, send_weekly_brief
-from market_brief_generator import build_weekly_brief
+from market_brief_generator import build_weekly_brief, BriefDataUnavailable, summarize_news_weekly
+from html import escape
 
 logger = logging.getLogger("weekly_brief_sender")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
+
+def _render_markdown_to_html(md: str) -> str:
+    """
+    Lightweight markdown-to-HTML renderer for weekly recap content.
+    Supports headings (#, ##, ###), basic bullet lists, and paragraphs.
+    Designed to match app typography (no monospace blocks).
+    """
+    lines = (md or "").splitlines()
+    html_lines: list[str] = []
+    in_list = False
+
+    def close_list():
+        nonlocal in_list
+        if in_list:
+            html_lines.append("</ul>")
+            in_list = False
+
+    for raw in lines:
+        line = raw.rstrip("\n")
+        stripped = line.strip()
+
+        # Blank line → paragraph break
+        if not stripped:
+            close_list()
+            html_lines.append("")
+            continue
+
+        # Headings
+        if stripped.startswith("### "):
+            close_list()
+            text = escape(stripped[4:].strip())
+            html_lines.append(f'<h3 class="llm-subheading">{text}</h3>')
+            continue
+        if stripped.startswith("## "):
+            close_list()
+            text = escape(stripped[3:].strip())
+            html_lines.append(f'<h2 class="llm-heading">{text}</h2>')
+            continue
+        if stripped.startswith("# "):
+            close_list()
+            text = escape(stripped[2:].strip())
+            html_lines.append(f'<h1 class="llm-title">{text}</h1>')
+            continue
+
+        # Bullets (unordered)
+        is_bullet = False
+        bullet_text = ""
+
+        if stripped.startswith(("- ", "• ")):
+            is_bullet = True
+            bullet_text = stripped[2:].strip()
+        else:
+            # Simple ordered list pattern: "1. text"
+            parts = stripped.split(". ", 1)
+            if len(parts) == 2 and parts[0].isdigit():
+                is_bullet = True
+                bullet_text = stripped
+
+        if is_bullet:
+            if not in_list:
+                html_lines.append('<ul class="llm-list">')
+                in_list = True
+            html_lines.append(f"<li>{escape(bullet_text)}</li>")
+            continue
+
+        # Plain paragraph
+        close_list()
+        html_lines.append(f'<p class="llm-text">{escape(stripped)}</p>')
+
+    close_list()
+    body = "\n".join(html_lines).strip()
+    return f'<div class="llm-recap-body">{body}</div>' if body else ""
 
 def load_weekly_context_from_json(path: Path) -> dict:
     """Load weekly context from a JSON file if present"""
@@ -83,7 +157,18 @@ def save_preview(html_content: str, label: str = "Weekly"):
         upload = base / "static" / "uploads"
         upload.mkdir(parents=True, exist_ok=True)
         (upload / "brief_weekly_latest.html").write_text(html_content, encoding="utf-8")
-        (upload / "brief_latest_date.txt").write_text(datetime.now(tz=NY).strftime("%Y-%m-%d %H:%M ET"), encoding="utf-8")
+        # Write a weekly-specific date file so the daily freshness banner
+        # on /brief/latest is not driven by the weekly send.
+        (upload / "brief_weekly_latest_date.txt").write_text(
+            datetime.now(tz=NY).strftime("%Y-%m-%d %H:%M ET"), encoding="utf-8"
+        )
+        try:
+            from tasks import mark_weekly_sent
+
+            mark_weekly_sent()
+        except Exception:
+            # Scheduler persistence is best-effort; failures shouldn't break the send.
+            logger.debug("Could not update weekly scheduler state", exc_info=True)
         logger.info(f"Saved {label} preview to {upload}")
     except Exception as e:
         logger.warning(f"Could not save preview: {e}")
@@ -95,6 +180,26 @@ def main():
     parser.add_argument("--test-email", help="Send to a single email for testing")
     args = parser.parse_args()
 
+    # -------------------------------------------------------------------
+    # Real-send safety gate.
+    # A production send to the full subscriber list is only permitted when
+    # WEEKLY_ALLOW_REAL_SEND=1 is set. That flag is set ONLY by the systemd
+    # weekly scheduler unit (via Environment= in its override.conf), so any
+    # ad-hoc invocation (shell, python REPL, cron, test harness) is
+    # automatically forced into --dry-run mode — even if CONFIRM_SEND=1 is
+    # already in the environment and even if the caller forgot --dry-run.
+    # Single-recipient `--test-email ...` runs are still allowed because they
+    # cannot blast the subscriber list.
+    # -------------------------------------------------------------------
+    allow_real = os.getenv("WEEKLY_ALLOW_REAL_SEND") == "1"
+    if not args.dry_run and not args.test_email and not allow_real:
+        logger.warning(
+            "WEEKLY_ALLOW_REAL_SEND is not set; forcing --dry-run to prevent "
+            "an accidental subscriber blast. Only the systemd weekly "
+            "scheduler service should set this flag."
+        )
+        args.dry_run = True
+
     context: dict
     if args.source:
         src = Path(args.source)
@@ -105,7 +210,23 @@ def main():
         logger.info(f"Loaded weekly context from {src}")
     else:
         logger.info("No --source provided; building weekly brief with hybrid pipeline.")
-        context = build_weekly_brief()
+        try:
+            context = build_weekly_brief()
+        except BriefDataUnavailable as err:
+            logger.error(f"Weekly brief aborted: {err}")
+            sys.exit(1)
+
+    # Optional: generate enhanced LLM weekly recap for inclusion in the email
+    try:
+        weekly_md = summarize_news_weekly()
+    except Exception as e:
+        logger.warning(f"Enhanced weekly recap generation failed: {e}")
+        weekly_md = ""
+
+    if weekly_md:
+        llm_html = _render_markdown_to_html(weekly_md)
+        context["llm_weekly_recap_md"] = weekly_md
+        context["llm_weekly_recap_html"] = llm_html
 
     # Subject
     dr = context.get("date_range", {})

@@ -3,7 +3,7 @@
 # Runs every Sunday at 12:00 PM ET
 
 # Set environment variables
-export DATABASE_URL="postgresql://optionsplunge:password@localhost/optionsplunge"
+export DATABASE_URL="postgresql://optionsplunge:<DB_PASSWORD>@localhost/optionsplunge"
 export SENDGRID_API_KEY="your_sendgrid_key_here"
 export EMAIL_FROM_NAME="Options Plunge"
 export EMAIL_FROM="support@optionsplunge.com"

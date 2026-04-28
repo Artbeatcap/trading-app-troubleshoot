@@ -4,13 +4,25 @@ Options Plunge Weekly Brief — {{ subject_theme }} ({{ date_human }})
 
 ================================================================================
 
+{% if llm_weekly_recap_md %}
+WEEKLY MARKET RECAP
+================================================================================
+{{ llm_weekly_recap_md }}
+
+================================================================================
+{% endif %}
+
+{# Legacy recap sections are only shown when no LLM recap is available #}
+{% if not llm_weekly_recap_md %}
 LAST WEEK IN 60S
 ================================================================================
 {{ recap.index_blurb }}
 
+{% if recap.sector_blurb %}
 SECTOR ROTATIONS & THEMES
 ================================================================================
 {{ recap.sector_blurb }}
+{% endif %}
 
 {% if recap.movers_bullets %}
 TOP MOVERS
@@ -21,32 +33,31 @@ TOP MOVERS
 {% endif %}
 
 {% if recap.flow_blurb %}
-OPTIONS SENTIMENT
+VOLATILITY & FLOW
 ================================================================================
 {{ recap.flow_blurb }}
 {% endif %}
 
+{% if levels %}
 LEVELS TO WATCH
 ================================================================================
-SPY: S1 {{ levels.spy.s1 }} | S2 {{ levels.spy.s2 }} | R1 {{ levels.spy.r1 }} | R2 {{ levels.spy.r2 }} | R3 {{ levels.spy.r3 }}
-{% if levels.qqq %}
-QQQ: S1 {{ levels.qqq.s1 }} | S2 {{ levels.qqq.s2 }} | R1 {{ levels.qqq.r1 }} | R2 {{ levels.qqq.r2 }} | R3 {{ levels.qqq.r3 }}
+{% for symbol, data in levels.items() %}
+{{ symbol|upper }} — Support {{ data.support }}{% if data.support2 %} / Support2 {{ data.support2 }}{% endif %} / Resistance {{ data.resistance }}{% if data.resistance2 %} / Resistance2 {{ data.resistance2 }}{% endif %}{% if data.resistance3 %} / Resistance3 {{ data.resistance3 }}{% endif %}
+{% endfor %}
 {% endif %}
-{% if levels.iwm %}
-IWM: S1 {{ levels.iwm.s1 }} | S2 {{ levels.iwm.s2 }} | R1 {{ levels.iwm.r1 }} | R2 {{ levels.iwm.r2 }} | R3 {{ levels.iwm.r3 }}
 {% endif %}
 
-WEEK AHEAD
-================================================================================
 {% if week_ahead.macro_bullets %}
-MACRO EVENTS:
+WEEK AHEAD — MACRO
+================================================================================
 {% for item in week_ahead.macro_bullets %}
 • {{ item }}
 {% endfor %}
 {% endif %}
 
 {% if week_ahead.earnings_bullets %}
-EARNINGS:
+WEEK AHEAD — EARNINGS
+================================================================================
 {% for item in week_ahead.earnings_bullets %}
 • {{ item }}
 {% endfor %}
@@ -64,8 +75,3 @@ SWING PLAYBOOK
 
 Powered by Options Plunge
 
-View Full Analysis: {{ cta_url }}
-
-You're receiving this because you confirmed your subscription to the Weekly Market Brief.
-Unsubscribe: {{ unsubscribe_url }}
-Update Preferences: {{ preferences_url }}

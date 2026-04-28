@@ -1,0 +1,19 @@
+[Unit]
+Description=Weekly Market Brief Scheduler
+After=network.target
+
+[Service]
+Type=simple
+User=tradingapp
+Group=tradingapp
+WorkingDirectory=/home/tradingapp/trading-analysis
+Environment=PATH=/home/tradingapp/trading-analysis/venv/bin
+Environment=DATABASE_URL=postgresql://tradingapp:<DB_PASSWORD>@localhost/trading_journal
+ExecStart=/home/tradingapp/trading-analysis/venv/bin/python weekly_brief_scheduler.py
+Restart=always
+RestartSec=10
+StandardOutput=append:/var/log/trading-analysis/weekly_scheduler.log
+StandardError=append:/var/log/trading-analysis/weekly_scheduler_error.log
+
+[Install]
+WantedBy=multi-user.target

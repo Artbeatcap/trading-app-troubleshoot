@@ -86,24 +86,45 @@ def start_weekly_brief_scheduler():
         return None
 
 def send_weekly_brief_job():
-    """Job function to send weekly brief."""
+    """Job function to send weekly brief.
+
+    Runs the hybrid weekly sender inside a real Flask application context so
+    `app.config` lookups and Flask-Mail `mail.send()` calls in emailer.py
+    work when invoked from this standalone scheduler process.
+    """
     try:
         logger.info("🚀 Starting weekly brief job...")
-        
+
         # Set confirmation flag
         os.environ['CONFIRM_SEND'] = '1'
-        
+
         # Import and run the main function (no source file needed - uses hybrid builder)
         import sys
         sys.argv = ['send_weekly_brief.py']
-        
-        # Run the weekly brief sender
-        send_weekly_brief()
-        
+
+        # Push the real Flask app context so downstream email helpers
+        # (Flask-Mail, app.config.get(...), url_for) work. Imported lazily
+        # to avoid a circular import at module load.
+        try:
+            from app import app as flask_app
+        except Exception as import_err:
+            logger.warning(f"Could not import Flask app for context ({import_err}); running without app context")
+            flask_app = None
+
+        if flask_app is not None:
+            with flask_app.app_context():
+                send_weekly_brief()
+        else:
+            send_weekly_brief()
+
         logger.info("✅ Weekly brief job completed successfully")
-        
+
+    except SystemExit as sysexit:
+        # send_weekly_brief.main() calls sys.exit(1) on failure; treat as a
+        # handled failure rather than a crash so the scheduler keeps running.
+        logger.error(f"❌ Weekly brief job failed (exit code {sysexit.code})")
     except Exception as e:
-        logger.error(f"❌ Weekly brief job failed: {e}")
+        logger.error(f"❌ Weekly brief job failed: {e}", exc_info=True)
 
 def main():
     """Main function to run the scheduler."""

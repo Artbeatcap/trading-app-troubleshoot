@@ -8,7 +8,7 @@ User=www-data
 Group=www-data
 WorkingDirectory=/srv/optionsplunge
 Environment=PATH=/srv/optionsplunge/venv/bin
-Environment=DATABASE_URL=postgresql://optionsplunge:password@localhost/optionsplunge
+Environment=DATABASE_URL=postgresql://optionsplunge:<DB_PASSWORD>@localhost/optionsplunge
 Environment=SENDGRID_API_KEY=your_sendgrid_key_here
 Environment=EMAIL_FROM_NAME=Options Plunge
 Environment=EMAIL_FROM=support@optionsplunge.com
