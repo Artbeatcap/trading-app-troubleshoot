@@ -3,6 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <script>
+        // Early mobile detection for critical CSS
+        (function() {
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+            
+            if (isMobile) {
+                document.documentElement.classList.add('is-mobile');
+                
+                // Set CSS custom property for safe area insets (notch handling)
+                document.documentElement.style.setProperty('--safe-area-top', 'env(safe-area-inset-top)');
+                document.documentElement.style.setProperty('--safe-area-bottom', 'env(safe-area-inset-bottom)');
+            }
+        })();
+    </script>
     <title>{% block title %}Options Plunge - AI Trading Analysis{% endblock %}</title>
     
     <!-- Favicon -->
@@ -184,18 +198,285 @@
         }
         
         .sidebar .nav-link {
-            color: rgba(255, 255, 255, 0.8);
+            color: rgba(255, 255, 255, 0.75);
             padding: 12px 20px;
-            margin: 5px 10px;
-            border-radius: 8px;
-            transition: all 0.3s ease;
+            margin: 2px 10px;
+            border-radius: 10px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            position: relative;
         }
         
-        .sidebar .nav-link:hover,
-        .sidebar .nav-link.active {
+        .sidebar .nav-link i {
+            width: 22px;
+            text-align: center;
+            font-size: 0.95rem;
+            opacity: 0.8;
+        }
+        
+        .sidebar .nav-link:hover {
             color: white;
             background-color: rgba(255, 255, 255, 0.1);
-            transform: translateX(5px);
+            transform: translateX(3px);
+        }
+        
+        .sidebar .nav-link:hover i {
+            opacity: 1;
+        }
+        
+        /* Active State - Much More Visible */
+        .sidebar .nav-link.active {
+            color: white;
+            background: linear-gradient(135deg, rgba(52, 152, 219, 0.3), rgba(41, 128, 185, 0.2));
+            font-weight: 600;
+            border-left: 3px solid #3498db;
+            margin-left: 7px;
+        }
+        
+        .sidebar .nav-link.active i {
+            opacity: 1;
+            color: #5dade2;
+        }
+        
+        /* ============================================
+           IMPROVED NAVIGATION STYLES
+           ============================================ */
+        
+        /* Section Headers */
+        .nav-section-header {
+            padding: 20px 20px 8px 20px;
+            margin-top: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .nav-section-header span {
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+        
+        .nav-section-header .pro-badge {
+            font-size: 0.6rem;
+            background: linear-gradient(135deg, #f39c12, #e67e22);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 700;
+        }
+        
+        /* Primary Add Trade Button */
+        .btn-add-trade {
+            background: linear-gradient(135deg, #27ae60, #2ecc71);
+            border: none;
+            color: white;
+            padding: 14px 20px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(39, 174, 96, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .btn-add-trade:hover {
+            background: linear-gradient(135deg, #2ecc71, #27ae60);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(39, 174, 96, 0.4);
+            color: white;
+        }
+        
+        .btn-add-trade.active {
+            background: linear-gradient(135deg, #1e8449, #27ae60);
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        
+        .btn-add-trade i {
+            font-size: 1.1rem;
+        }
+        
+        /* Nav Badge (for counts) */
+        .nav-badge {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-left: auto;
+            font-weight: 600;
+        }
+        
+        /* Upgrade Badge */
+        .upgrade-badge {
+            margin-left: auto;
+            font-size: 0.9rem;
+        }
+        
+        /* Highlight Link (for Login) */
+        .highlight-link {
+            color: rgba(255, 255, 255, 0.9) !important;
+        }
+        
+        /* Register Button Style */
+        .btn-register {
+            background: linear-gradient(135deg, rgba(52, 152, 219, 0.2), rgba(41, 128, 185, 0.1)) !important;
+            border: 1px solid rgba(52, 152, 219, 0.3) !important;
+            color: #5dade2 !important;
+            font-weight: 600 !important;
+        }
+        
+        .btn-register:hover {
+            background: linear-gradient(135deg, rgba(52, 152, 219, 0.3), rgba(41, 128, 185, 0.2)) !important;
+            color: white !important;
+        }
+        
+        /* Sidebar Footer */
+        .sidebar-footer {
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            margin-top: auto;
+        }
+        
+        .help-link {
+            color: rgba(255, 255, 255, 0.6);
+            text-decoration: none;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            transition: color 0.2s ease;
+        }
+        
+        .help-link:hover {
+            color: rgba(255, 255, 255, 0.9);
+        }
+        
+        .user-status {
+            font-size: 0.8rem;
+        }
+        
+        /* Lock Icon for Pro Features */
+        .nav-link .fa-lock {
+            margin-left: auto;
+            opacity: 0.7;
+        }
+        
+        /* Disabled Nav Link */
+        .sidebar .nav-link.disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        
+        /* Sidebar Content Scrolling */
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding-top: 10px;
+            padding-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .sidebar-content::-webkit-scrollbar {
+            width: 4px;
+        }
+        
+        .sidebar-content::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        
+        .sidebar-content::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+        }
+        
+        .sidebar-content::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        /* Ensure nav takes up available space, footer at bottom */
+        .sidebar-content .nav {
+            flex: 1;
+        }
+        
+        /* ============================================
+           MOBILE NAVIGATION IMPROVEMENTS
+           ============================================ */
+        
+        @media (max-width: 768px) {
+            .nav-section-header {
+                padding: 15px 15px 6px 15px;
+            }
+            
+            .nav-section-header span {
+                font-size: 0.65rem;
+            }
+            
+            .sidebar .nav-link {
+                padding: 14px 15px;
+                margin: 2px 8px;
+            }
+            
+            .btn-add-trade {
+                padding: 12px 15px;
+                font-size: 0.9rem;
+            }
+            
+            /* Collapsible sections on mobile */
+            .nav-section-header.collapsible {
+                cursor: pointer;
+            }
+            
+            .nav-section-header.collapsible::after {
+                content: '\f107';
+                font-family: 'Font Awesome 6 Free';
+                font-weight: 900;
+                color: rgba(255, 255, 255, 0.5);
+                transition: transform 0.2s ease;
+            }
+            
+            .nav-section-header.collapsible.collapsed::after {
+                transform: rotate(-90deg);
+            }
+            
+            .nav-section-content.collapsed {
+                display: none;
+            }
+        }
+        
+        /* ============================================
+           NAVIGATION TOOLTIPS
+           ============================================ */
+        
+        .nav-link[data-tooltip] {
+            position: relative;
+        }
+        
+        .nav-link[data-tooltip]:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            left: 100%;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #2c3e50;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            white-space: nowrap;
+            margin-left: 10px;
+            z-index: 1000;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+        
+        @media (max-width: 768px) {
+            .nav-link[data-tooltip]:hover::after {
+                display: none;
+            }
         }
         
         .sidebar .brand-link {
@@ -287,7 +568,7 @@
             text-align: center;
             padding: 15px;
             border-radius: 50%;
-            width: 80px;
+            width: 90px;
             height: 80px;
             display: flex;
             align-items: center;
@@ -580,6 +861,652 @@
                 }
             }
         }
+        
+        /* ============================================
+           ENHANCED MOBILE EXPERIENCE STYLES
+           ============================================ */
+
+        /* Extra small devices (phones, 576px and down) */
+        @media (max-width: 576px) {
+            /* Prevent horizontal scroll */
+            html, body {
+                overflow-x: hidden !important;
+                width: 100% !important;
+            }
+            
+            /* Better container padding */
+            .container-fluid {
+                padding-left: 10px;
+                padding-right: 10px;
+            }
+            
+            /* Main content adjustments */
+            .main-content {
+                padding: 10px !important;
+                padding-top: 70px !important;
+            }
+            
+            /* Card improvements */
+            .card {
+                border-radius: 12px;
+                margin-bottom: 15px;
+            }
+            
+            .card-body {
+                padding: 12px;
+            }
+            
+            .card-header {
+                padding: 12px;
+                font-size: 0.95rem;
+            }
+            
+            /* Button group fixes - stack vertically on very small screens */
+            .btn-group {
+                flex-wrap: wrap;
+            }
+            
+            .btn-group > .btn {
+                flex: 1 0 auto;
+                min-width: 40px;
+                padding: 8px 10px;
+                font-size: 0.8rem;
+            }
+            
+            /* Make buttons more touch-friendly */
+            .btn {
+                min-height: 44px;
+                padding: 10px 16px;
+                font-size: 0.95rem;
+            }
+            
+            .btn-sm {
+                min-height: 38px;
+                padding: 8px 12px;
+                font-size: 0.85rem;
+            }
+            
+            /* Form controls optimization */
+            .form-control, .form-select {
+                font-size: 16px !important; /* Prevents iOS zoom */
+                padding: 12px 14px;
+                min-height: 48px;
+                border-radius: 8px;
+            }
+            
+            .form-label {
+                font-size: 0.9rem;
+                margin-bottom: 6px;
+            }
+            
+            /* Table improvements */
+            .table {
+                font-size: 0.8rem;
+            }
+            
+            .table th, .table td {
+                padding: 8px 6px;
+                vertical-align: middle;
+            }
+            
+            /* Hide less important columns on mobile */
+            .table .hide-mobile {
+                display: none !important;
+            }
+            
+            /* Page headers */
+            .h2, h2 {
+                font-size: 1.4rem;
+            }
+            
+            .border-bottom {
+                padding-bottom: 10px !important;
+                margin-bottom: 15px !important;
+            }
+            
+            /* Alert styling */
+            .alert {
+                padding: 12px;
+                font-size: 0.9rem;
+                border-radius: 10px;
+            }
+            
+            /* Modal improvements */
+            .modal-dialog {
+                margin: 10px;
+                max-width: calc(100% - 20px);
+            }
+            
+            .modal-body {
+                padding: 15px;
+            }
+            
+            /* Stats cards on dashboard */
+            .stat-card .card-body {
+                padding: 15px;
+            }
+            
+            .stat-card h5 {
+                font-size: 1.5rem;
+            }
+            
+            /* Flex gap adjustments */
+            .gap-2 {
+                gap: 0.4rem !important;
+            }
+            
+            .gap-3 {
+                gap: 0.6rem !important;
+            }
+            
+            /* Row/column adjustments */
+            .row {
+                margin-left: -8px;
+                margin-right: -8px;
+            }
+            
+            .row > [class*="col-"] {
+                padding-left: 8px;
+                padding-right: 8px;
+            }
+        }
+
+        /* Small devices (landscape phones, 576px to 768px) */
+        @media (min-width: 576px) and (max-width: 768px) {
+            .main-content {
+                padding: 15px !important;
+                padding-top: 75px !important;
+            }
+            
+            .card-body {
+                padding: 15px;
+            }
+            
+            .btn-group > .btn {
+                padding: 8px 12px;
+                font-size: 0.85rem;
+            }
+        }
+
+        /* ============================================
+           MOBILE-SPECIFIC COMPONENT STYLES
+           ============================================ */
+
+        /* Mobile-friendly chart controls */
+        @media (max-width: 768px) {
+            /* Chart container */
+            #tradeChart {
+                height: 300px !important;
+                min-height: 280px;
+            }
+            
+            /* Chart controls - make scrollable horizontally */
+            .chart-controls-wrapper {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                padding-bottom: 10px;
+                margin-bottom: 10px;
+            }
+            
+            .chart-controls-wrapper::-webkit-scrollbar {
+                height: 4px;
+            }
+            
+            .chart-controls-wrapper::-webkit-scrollbar-thumb {
+                background: rgba(0,0,0,0.2);
+                border-radius: 2px;
+            }
+            
+            /* Zoom range buttons - horizontal scroll */
+            .zoom-controls {
+                display: flex;
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                gap: 4px;
+                padding: 5px 0;
+            }
+            
+            .zoom-controls .btn {
+                flex-shrink: 0;
+                padding: 6px 10px;
+                font-size: 0.75rem;
+            }
+            
+            /* Draw tools - collapsible on mobile */
+            .draw-tools-mobile {
+                display: none;
+            }
+            
+            .draw-tools-toggle.collapsed + .draw-tools-mobile {
+                display: none;
+            }
+            
+            .draw-tools-toggle:not(.collapsed) + .draw-tools-mobile {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 5px;
+                margin-top: 10px;
+            }
+            
+            /* Chart action buttons */
+            .chart-action-buttons {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+            
+            .chart-action-buttons .btn {
+                flex: 1 1 calc(50% - 8px);
+                min-width: 120px;
+                font-size: 0.85rem;
+                padding: 10px;
+            }
+            
+            /* S/R Controls - stack vertically */
+            .sr-controls {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .sr-controls .form-check-inline {
+                margin-right: 0;
+            }
+            
+            /* Extended hours controls */
+            .extended-hours-controls {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+        }
+
+        /* ============================================
+           MOBILE TRADE CARDS (Alternative to Tables)
+           ============================================ */
+
+        @media (max-width: 768px) {
+            /* Hide table on mobile, show cards */
+            .trades-table-desktop {
+                display: none !important;
+            }
+            
+            .trades-cards-mobile {
+                display: block !important;
+            }
+            
+            /* Trade card styling */
+            .trade-card-mobile {
+                background: white;
+                border-radius: 12px;
+                padding: 15px;
+                margin-bottom: 12px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+                border-left: 4px solid #3498db;
+            }
+            
+            .trade-card-mobile.profit {
+                border-left-color: #27ae60;
+                background: linear-gradient(135deg, #fff 0%, #f0fff4 100%);
+            }
+            
+            .trade-card-mobile.loss {
+                border-left-color: #e74c3c;
+                background: linear-gradient(135deg, #fff 0%, #fff5f5 100%);
+            }
+            
+            .trade-card-mobile .trade-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 10px;
+            }
+            
+            .trade-card-mobile .trade-symbol {
+                font-weight: 700;
+                font-size: 1.1rem;
+                color: #2c3e50;
+            }
+            
+            .trade-card-mobile .trade-pnl {
+                font-weight: 700;
+                font-size: 1rem;
+            }
+            
+            .trade-card-mobile .trade-pnl.positive {
+                color: #27ae60;
+            }
+            
+            .trade-card-mobile .trade-pnl.negative {
+                color: #e74c3c;
+            }
+            
+            .trade-card-mobile .trade-details {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+                font-size: 0.85rem;
+                color: #7f8c8d;
+            }
+            
+            .trade-card-mobile .trade-detail-item {
+                display: flex;
+                flex-direction: column;
+            }
+            
+            .trade-card-mobile .trade-detail-label {
+                font-size: 0.75rem;
+                text-transform: uppercase;
+                color: #95a5a6;
+            }
+            
+            .trade-card-mobile .trade-detail-value {
+                font-weight: 500;
+                color: #2c3e50;
+            }
+            
+            .trade-card-mobile .trade-actions {
+                margin-top: 12px;
+                padding-top: 12px;
+                border-top: 1px solid #eee;
+                display: flex;
+                gap: 8px;
+            }
+            
+            .trade-card-mobile .trade-actions .btn {
+                flex: 1;
+                font-size: 0.8rem;
+                padding: 8px;
+            }
+        }
+
+        /* Show table on desktop, hide cards */
+        @media (min-width: 769px) {
+            .trades-table-desktop {
+                display: block !important;
+            }
+            
+            .trades-cards-mobile {
+                display: none !important;
+            }
+        }
+
+        /* ============================================
+           MOBILE NAVIGATION IMPROVEMENTS
+           ============================================ */
+
+        @media (max-width: 768px) {
+            /* Better mobile menu button */
+            .mobile-menu-btn {
+                position: fixed;
+                top: 12px;
+                left: 12px;
+                z-index: 1060;
+                background: linear-gradient(135deg, #3498db, #2980b9);
+                border: none;
+                border-radius: 12px;
+                width: 48px;
+                height: 48px;
+                color: white;
+                font-size: 1.3rem;
+                box-shadow: 0 4px 15px rgba(52, 152, 219, 0.4);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all 0.3s ease;
+            }
+            
+            .mobile-menu-btn:active {
+                transform: scale(0.95);
+            }
+            
+            /* Sidebar improvements */
+            .sidebar {
+                width: 85%;
+                max-width: 300px;
+            }
+            
+            .sidebar .nav-link {
+                padding: 14px 18px;
+                font-size: 1rem;
+                border-radius: 10px;
+                margin: 3px 10px;
+            }
+            
+            .sidebar .nav-link i {
+                width: 24px;
+                font-size: 1.1rem;
+            }
+            
+            /* Sidebar header */
+            .sidebar-header {
+                padding: 20px 15px;
+                padding-top: 60px;
+            }
+            
+            .sidebar-header h5 {
+                font-size: 1.2rem;
+            }
+            
+            /* Close button */
+            .sidebar-close {
+                width: 40px;
+                height: 40px;
+                font-size: 1.2rem;
+            }
+        }
+
+        /* ============================================
+           MOBILE FORM IMPROVEMENTS
+           ============================================ */
+
+        @media (max-width: 768px) {
+            /* Form sections */
+            .form-section {
+                margin-bottom: 20px;
+            }
+            
+            /* Input groups */
+            .input-group {
+                flex-wrap: wrap;
+            }
+            
+            .input-group .form-control {
+                min-width: 100%;
+            }
+            
+            .input-group-text {
+                min-height: 48px;
+            }
+            
+            /* Date/time inputs */
+            input[type="date"],
+            input[type="time"],
+            input[type="datetime-local"] {
+                min-height: 48px;
+            }
+            
+            /* Checkbox/Radio improvements */
+            .form-check {
+                padding: 10px 0;
+                padding-left: 2rem;
+            }
+            
+            .form-check-input {
+                width: 1.25rem;
+                height: 1.25rem;
+                margin-top: 0.15rem;
+            }
+            
+            .form-check-label {
+                font-size: 0.95rem;
+                padding-left: 5px;
+            }
+            
+            /* Textarea */
+            textarea.form-control {
+                min-height: 100px;
+            }
+            
+            /* Form row */
+            .row.g-3 > [class*="col-"] {
+                margin-bottom: 15px;
+            }
+        }
+
+        /* ============================================
+           MOBILE-FRIENDLY BOTTOM ACTION BAR
+           ============================================ */
+
+        @media (max-width: 768px) {
+            .mobile-action-bar {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                background: white;
+                padding: 12px 15px;
+                box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
+                z-index: 1030;
+                display: flex;
+                gap: 10px;
+            }
+            
+            .mobile-action-bar .btn {
+                flex: 1;
+                padding: 12px;
+                font-size: 0.95rem;
+                border-radius: 10px;
+            }
+            
+            /* Add padding to main content to account for action bar */
+            body.has-mobile-action-bar .main-content {
+                padding-bottom: 80px !important;
+            }
+        }
+
+        /* ============================================
+           TOUCH-FRIENDLY IMPROVEMENTS
+           ============================================ */
+
+        @media (max-width: 768px) {
+            /* Increase touch targets */
+            a, button, .btn, .nav-link, .dropdown-item {
+                min-height: 44px;
+                display: inline-flex;
+                align-items: center;
+            }
+            
+            /* Clickable table rows */
+            .table-clickable tr {
+                cursor: pointer;
+            }
+            
+            .table-clickable tr:active {
+                background-color: rgba(52, 152, 219, 0.1);
+            }
+            
+            /* Swipeable cards indicator */
+            .swipe-indicator {
+                text-align: center;
+                color: #95a5a6;
+                font-size: 0.8rem;
+                padding: 5px;
+            }
+            
+            .swipe-indicator i {
+                animation: swipeHint 1.5s ease-in-out infinite;
+            }
+            
+            @keyframes swipeHint {
+                0%, 100% { transform: translateX(0); }
+                50% { transform: translateX(5px); }
+            }
+        }
+
+        /* ============================================
+           PULL-TO-REFRESH STYLES
+           ============================================ */
+
+        @media (max-width: 768px) {
+            .pull-to-refresh {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 60px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: linear-gradient(135deg, #3498db, #2980b9);
+                color: white;
+                transform: translateY(-100%);
+                transition: transform 0.3s ease;
+                z-index: 1000;
+            }
+            
+            .pull-to-refresh.visible {
+                transform: translateY(0);
+            }
+            
+            .pull-to-refresh .spinner-border {
+                width: 24px;
+                height: 24px;
+                margin-right: 10px;
+            }
+        }
+
+        /* ============================================
+           LOADING STATES FOR MOBILE
+           ============================================ */
+
+        @media (max-width: 768px) {
+            .loading-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(255,255,255,0.9);
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                z-index: 9999;
+            }
+            
+            .loading-overlay .spinner-border {
+                width: 50px;
+                height: 50px;
+                border-width: 4px;
+            }
+            
+            .loading-overlay .loading-text {
+                margin-top: 15px;
+                font-size: 1rem;
+                color: #2c3e50;
+            }
+        }
+
+        /* Safe area handling for notched devices */
+        @supports (padding-top: env(safe-area-inset-top)) {
+            .is-mobile .mobile-menu-btn {
+                top: calc(12px + env(safe-area-inset-top));
+            }
+            
+            .is-mobile .main-content {
+                padding-top: calc(70px + env(safe-area-inset-top)) !important;
+            }
+            
+            .is-mobile .sidebar-header {
+                padding-top: calc(60px + env(safe-area-inset-top));
+            }
+            
+            .is-mobile .mobile-action-bar {
+                padding-bottom: calc(12px + env(safe-area-inset-bottom));
+            }
+        }
+
         /* Dark mode overrides */
         body.dark-mode {
             background-color: #121212;
@@ -637,7 +1564,7 @@
         <div class="row">
             <!-- Sidebar -->
             {% if not hide_sidebar %}
-            <nav class="col-md-3 col-lg-2 d-md-block sidebar">
+            <nav class="col-md-2 col-lg-2 d-md-block sidebar">
                 <div class="position-sticky">
                     <!-- Mobile close button -->
                     <button class="sidebar-close d-md-none" type="button" id="sidebarClose">
@@ -650,113 +1577,199 @@
                             <h5 class="text-white mb-0">
                                 <i class="fas fa-chart-line me-2"></i>
                                 Options Plunge
-                                <small class="d-block text-white-50">AI Trading Analysis</small>
                             </h5>
                         </a>
-                        <small class="text-light">Welcome, {{ (current_user.display_name or current_user.username) if current_user.is_authenticated else 'Guest' }}</small>
+                        
+                        {% if current_user.is_authenticated %}
+                        <div class="user-welcome mt-2">
+                            <small class="text-white-50">Welcome back,</small>
+                            <div class="text-white fw-bold">{{ current_user.display_name or current_user.username }}</div>
+                            {% if current_user.has_pro_access() %}
+                            <span class="badge bg-warning text-dark mt-1" style="font-size: 0.65rem;">
+                                <i class="fas fa-crown me-1"></i>PRO
+                            </span>
+                            {% endif %}
+                        </div>
+                        {% else %}
+                        <small class="text-white-50 d-block mt-2">AI-Powered Trading Journal</small>
+                        {% endif %}
                     </div>
                     
                     <!-- Scrollable navigation content -->
                     <div class="sidebar-content">
-                    
-                    <ul class="nav flex-column">
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.endpoint in ['dashboard'] %}active{% endif %}" href="{{ url_for('dashboard') }}">
-                                <i class="fas fa-tachometer-alt me-2"></i>
-                                Dashboard
+                        
+                        <!-- Primary Action Button -->
+                        <div class="px-3 mb-3">
+                            <a href="{{ url_for('add_trade') }}" class="btn btn-add-trade w-100 {% if request.endpoint == 'add_trade' %}active{% endif %}">
+                                <i class="fas fa-plus-circle me-2"></i>
+                                Add New Trade
                             </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.endpoint in ['trades', 'view_trade', 'edit_trade'] %}active{% endif %}" href="{{ url_for('trades') }}">
-                                <i class="fas fa-exchange-alt me-2"></i>
-                                Trades
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.endpoint == 'add_trade' %}active{% endif %}" href="{{ url_for('add_trade') }}">
-                                <i class="fas fa-plus me-2"></i>
-                                Add Trade
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.endpoint in ['journal', 'add_edit_journal'] %}active{% endif %}" href="{{ url_for('journal') }}">
-                                <i class="fas fa-book me-2"></i>
-                                Journal
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.endpoint == 'analytics' %}active{% endif %}" href="{{ url_for('analytics') }}">
-                                <i class="fas fa-chart-bar me-2"></i>
-                                Analytics
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.endpoint == 'bulk_analysis' %}active{% endif %}" href="{{ url_for('bulk_analysis') }}">
-                                <i class="fas fa-robot me-2"></i>
-                                AI Analysis
+                        </div>
+                        
+                        <!-- Main Navigation -->
+                        <ul class="nav flex-column">
+                            
+                            <!-- SECTION: Overview -->
+                            <li class="nav-section-header">
+                                <span>Overview</span>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.endpoint == 'index' %}active{% endif %}" href="{{ url_for('index') }}">
+                                    <i class="fas fa-home me-2"></i>
+                                    Home
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}">
+                                    <i class="fas fa-tachometer-alt me-2"></i>
+                                    Dashboard
+                                </a>
+                            </li>
+                            
+                            <!-- SECTION: Trading -->
+                            <li class="nav-section-header">
+                                <span>Trading</span>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.endpoint in ['trades', 'view_trade', 'edit_trade'] %}active{% endif %}" href="{{ url_for('trades') }}">
+                                    <i class="fas fa-list-alt me-2"></i>
+                                    My Trades
+                                    {% if current_user.is_authenticated %}
+                                    <span class="nav-badge">{{ current_user.trades|length }}</span>
+                                    {% endif %}
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.endpoint in ['journal', 'add_edit_journal'] %}active{% endif %}" href="{{ url_for('journal') }}">
+                                    <i class="fas fa-book me-2"></i>
+                                    Trading Journal
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.endpoint == 'analytics' %}active{% endif %}" href="{{ url_for('analytics') }}">
+                                    <i class="fas fa-chart-pie me-2"></i>
+                                    Analytics
+                                </a>
+                            </li>
+                            
+                            <!-- SECTION: AI & Insights (Pro Features) -->
+                            <li class="nav-section-header">
+                                <span>AI & Insights</span>
                                 {% if not current_user.is_authenticated or not current_user.has_pro_access() %}
-                                <i class="fas fa-lock text-warning ms-1" style="font-size: 0.8em;"></i>
+                                <span class="pro-badge">PRO</span>
                                 {% endif %}
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.endpoint == 'bulk_analysis' %}active{% endif %}" href="{{ url_for('bulk_analysis') }}">
+                                    <i class="fas fa-robot me-2"></i>
+                                    AI Trade Analysis
+                                    {% if not current_user.is_authenticated or not current_user.has_pro_access() %}
+                                    <i class="fas fa-lock text-warning ms-auto" style="font-size: 0.75em;"></i>
+                                    {% endif %}
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.endpoint == 'market_brief' %}active{% endif %}" href="{{ url_for('market_brief') }}">
+                                    <i class="fas fa-newspaper me-2"></i>
+                                    Market Brief
+                                    {% if not current_user.is_authenticated or not current_user.has_pro_access() %}
+                                    <i class="fas fa-lock text-warning ms-auto" style="font-size: 0.75em;"></i>
+                                    {% endif %}
+                                </a>
+                            </li>
+                            
+                            <!-- SECTION: Tools -->
+                            <li class="nav-section-header">
+                                <span>Tools</span>
+                            </li>
+                            {% if config.OPTIONS_ENABLED %}
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.endpoint == 'options_calculator' %}active{% endif %}" href="{{ url_for('options_calculator') }}">
+                                    <i class="fas fa-calculator me-2"></i>
+                                    Options Calculator
+                                    {% if not current_user.is_authenticated or not current_user.has_pro_access() %}
+                                    <i class="fas fa-lock text-warning ms-auto" style="font-size: 0.75em;"></i>
+                                    {% endif %}
+                                </a>
+                            </li>
+                            {% endif %}
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.endpoint and request.endpoint.startswith('education') %}active{% endif %}" href="{{ url_for('education') }}">
+                                    <i class="fas fa-graduation-cap me-2"></i>
+                                    Education Center
+                                </a>
+                            </li>
+                            
+                            <!-- SECTION: Account -->
+                            <li class="nav-section-header">
+                                <span>Account</span>
+                            </li>
+                            {% if current_user.is_authenticated %}
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.endpoint == 'settings' %}active{% endif %}" href="{{ url_for('settings') }}">
+                                    <i class="fas fa-cog me-2"></i>
+                                    Settings
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.endpoint == 'pricing' %}active{% endif %}" href="{{ url_for('pricing') }}">
+                                    <i class="fas fa-crown me-2"></i>
+                                    {% if current_user.has_pro_access() %}
+                                        Manage Plan
+                                    {% else %}
+                                        Upgrade to Pro
+                                        <span class="upgrade-badge">✨</span>
+                                    {% endif %}
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('logout') }}">
+                                    <i class="fas fa-sign-out-alt me-2"></i>
+                                    Logout
+                                </a>
+                            </li>
+                            {% else %}
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.endpoint == 'pricing' %}active{% endif %}" href="{{ url_for('pricing') }}">
+                                    <i class="fas fa-crown me-2"></i>
+                                    View Plans
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link highlight-link {% if request.endpoint == 'login' %}active{% endif %}" href="{{ url_for('login') }}">
+                                    <i class="fas fa-sign-in-alt me-2"></i>
+                                    Log In
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link btn-register {% if request.endpoint == 'register' %}active{% endif %}" href="{{ url_for('register') }}">
+                                    <i class="fas fa-user-plus me-2"></i>
+                                    Create Free Account
+                                </a>
+                            </li>
+                            {% endif %}
+                            
+                        </ul>
+                        
+                        <!-- Help Link at Bottom -->
+                        <div class="sidebar-footer px-3 py-3">
+                            <a href="#" class="help-link" data-bs-toggle="modal" data-bs-target="#helpModal">
+                                <i class="fas fa-question-circle me-2"></i>
+                                Need Help?
                             </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.endpoint == 'market_brief' %}active{% endif %}" href="{{ url_for('market_brief') }}">
-                                <i class="fas fa-newspaper me-2"></i>
-                                Market Brief
-                                {% if not current_user.is_authenticated or not current_user.has_pro_access() %}
-                                <i class="fas fa-lock text-warning ms-1" style="font-size: 0.8em;"></i>
-                                {% endif %}
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.endpoint == 'options_calculator' %}active{% endif %}" href="{{ url_for('options_calculator') }}">
-                                <i class="fas fa-calculator me-2"></i>
-                                Options Calculator
-                                {% if not current_user.is_authenticated or not current_user.has_pro_access() %}
-                                <i class="fas fa-lock text-warning ms-1" style="font-size: 0.8em;"></i>
-                                {% endif %}
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.endpoint and request.endpoint.startswith('education') %}active{% endif %}" href="{{ url_for('education') }}">
-                                <i class="fas fa-graduation-cap me-2"></i>
-                                Education
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="{{ url_for('settings') }}" class="nav-link {% if request.endpoint == 'settings' %}active{% endif %} {% if not current_user.is_authenticated %}disabled{% endif %}" {% if not current_user.is_authenticated %}data-bs-toggle="tooltip" title="Please sign in"{% endif %}>
-                                <i class="fas fa-cog me-2"></i>
-                                Settings
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.endpoint == 'pricing' %}active{% endif %}" href="{{ url_for('pricing') }}">
-                                <i class="fas fa-crown me-2"></i>
-                                Pricing
-                            </a>
-                        </li>
-                        {% if current_user.is_authenticated %}
-                        <li class="nav-item mt-3">
-                            <a class="nav-link" href="{{ url_for('logout') }}">
-                                <i class="fas fa-sign-out-alt me-2"></i>
-                                Logout
-                            </a>
-                        </li>
-                        {% else %}
-                        <li class="nav-item mt-3">
-                            <a class="nav-link" href="{{ url_for('login') }}">
-                                <i class="fas fa-sign-in-alt me-2"></i>
-                                Login
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('register') }}">
-                                <i class="fas fa-user-plus me-2"></i>
-                                Register
-                            </a>
-                        </li>
-                        {% endif %}
-                    </ul>
+                            {% if current_user.is_authenticated %}
+                            <div class="user-status mt-2">
+                                <small class="text-white-50">
+                                    {% if current_user.has_pro_access() %}
+                                    <i class="fas fa-crown text-warning me-1"></i> Pro Member
+                                    {% else %}
+                                    <i class="fas fa-user me-1"></i> Free Plan
+                                    {% endif %}
+                                </small>
+                            </div>
+                            {% endif %}
+                        </div>
+                        
                     </div>
                 </div>
             </nav>
@@ -770,13 +1783,16 @@
 
             
             <!-- Main content -->
-            <main class="{% if hide_sidebar %}col-12{% else %}col-md-9 ms-sm-auto col-lg-10{% endif %} px-md-4 main-content">
+            <main class="{% if hide_sidebar %}col-12{% else %}col-md-10 ms-sm-auto col-lg-10{% endif %} px-md-4 main-content">
                 <!-- Mobile menu button -->
                 {% if not hide_sidebar %}
                 <button class="mobile-menu-btn d-md-none" type="button" id="sidebarToggle">
                     <i class="fas fa-bars"></i>
                 </button>
                 {% endif %}
+                
+                <!-- Email Verification Banner -->
+                {% include '_email_verification_banner.html' %}
                 
                 <!-- Flash messages -->
                 {% with messages = get_flashed_messages(with_categories=true) %}
@@ -963,33 +1979,88 @@
                 }
             });
             
-            // Add touch support for better mobile experience
+            // Enhanced touch support for better mobile experience
             let touchStartX = 0;
+            let touchStartY = 0;
             let touchEndX = 0;
+            let touchEndY = 0;
+            let touchStartTime = 0;
             
             document.addEventListener('touchstart', function(e) {
                 touchStartX = e.changedTouches[0].screenX;
-            });
+                touchStartY = e.changedTouches[0].screenY;
+                touchStartTime = Date.now();
+            }, { passive: true });
             
             document.addEventListener('touchend', function(e) {
                 touchEndX = e.changedTouches[0].screenX;
+                touchEndY = e.changedTouches[0].screenY;
                 handleSwipe();
-            });
+            }, { passive: true });
             
             function handleSwipe() {
-                const swipeThreshold = 50;
-                const swipeDistance = touchEndX - touchStartX;
+                const swipeThreshold = 80;
+                const swipeVelocityThreshold = 0.5; // pixels per ms
+                const maxVerticalDistance = 100; // Prevent diagonal swipes from triggering
                 
-                // Swipe right to open sidebar (only if sidebar is closed)
-                if (swipeDistance > swipeThreshold && !sidebar.classList.contains('show') && touchStartX < 50) {
-                    openSidebar();
+                const horizontalDistance = touchEndX - touchStartX;
+                const verticalDistance = Math.abs(touchEndY - touchStartY);
+                const swipeTime = Date.now() - touchStartTime;
+                const velocity = Math.abs(horizontalDistance) / swipeTime;
+                
+                // Only trigger if horizontal swipe with minimal vertical movement
+                if (verticalDistance > maxVerticalDistance) return;
+                if (velocity < swipeVelocityThreshold) return;
+                
+                const sidebar = document.querySelector('.sidebar');
+                const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+                const mainContent = document.querySelector('.main-content');
+                
+                // Swipe right to open sidebar (only from left edge)
+                if (horizontalDistance > swipeThreshold && 
+                    !sidebar.classList.contains('show') && 
+                    touchStartX < 30) {
+                    
+                    sidebar.classList.add('show');
+                    sidebarBackdrop?.classList.add('show');
+                    mainContent?.classList.add('sidebar-open');
+                    document.body.style.overflow = 'hidden';
+                    
+                    // Haptic feedback if available
+                    if (navigator.vibrate) {
+                        navigator.vibrate(10);
+                    }
                 }
                 
-                // Swipe left to close sidebar (only if sidebar is open)
-                if (swipeDistance < -swipeThreshold && sidebar.classList.contains('show')) {
-                    closeSidebar();
+                // Swipe left to close sidebar
+                if (horizontalDistance < -swipeThreshold && 
+                    sidebar.classList.contains('show')) {
+                    
+                    sidebar.classList.remove('show');
+                    sidebarBackdrop?.classList.remove('show');
+                    mainContent?.classList.remove('sidebar-open');
+                    document.body.style.overflow = '';
+                    
+                    // Haptic feedback if available
+                    if (navigator.vibrate) {
+                        navigator.vibrate(10);
+                    }
                 }
             }
+            
+            // Prevent pull-to-refresh when scrolling within the app
+            document.addEventListener('touchmove', function(e) {
+                // Allow scrolling in scrollable containers
+                const scrollableParent = e.target.closest('.sidebar-content, .main-content, .modal-body, .table-responsive');
+                if (scrollableParent && scrollableParent.scrollHeight > scrollableParent.clientHeight) {
+                    return;
+                }
+                
+                // Prevent overscroll bounce on iOS
+                if (document.body.scrollTop === 0) {
+                    // At top of page, prevent pull down
+                }
+            }, { passive: true });
             
             // Enhanced mobile viewport handling
             function ensureMobileViewport() {
@@ -1334,6 +2405,213 @@
     </script>
     
     {% block scripts %}{% endblock %}
+    
+    <!-- Onboarding Tour Library -->
+    <script src="https://cdn.jsdelivr.net/npm/driver.js@1.3.1/dist/driver.js.iife.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1.3.1/dist/driver.css"/>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Check if user has seen the tour
+        const hasSeenTour = localStorage.getItem('hasSeenTour');
+        const currentPath = window.location.pathname;
+        
+        // Only show on dashboard for authenticated users who haven't seen it
+        {% if current_user.is_authenticated %}
+        if (!hasSeenTour && (currentPath === '/dashboard' || currentPath === '/welcome')) {
+            // Small delay to ensure page is fully loaded
+            setTimeout(function() {
+                const driver = window.driver.js.driver;
+                
+                const driverObj = driver({
+                    showProgress: true,
+                    showButtons: ['next', 'previous', 'close'],
+                    steps: [
+                        {
+                            element: 'body',
+                            popover: {
+                                title: 'Welcome to Options Plunge! 👋',
+                                description: 'Let\'s take a quick 30-second tour of the main features. You can skip this anytime by pressing ESC or clicking "Close".',
+                                side: "center",
+                                align: 'center'
+                            }
+                        },
+                        {
+                            element: '[href="{{ url_for('add_trade') }}"]',
+                            popover: {
+                                title: 'Add Your Trades',
+                                description: 'Start by logging your trades here. Track stocks, options, and other instruments with detailed entry and exit information.',
+                                side: "right",
+                                align: 'start'
+                            }
+                        },
+                        {
+                            element: '[href="{{ url_for('trades') }}"]',
+                            popover: {
+                                title: 'View All Trades',
+                                description: 'See your complete trading history with performance metrics, win rates, and P&L analysis.',
+                                side: "right",
+                                align: 'start'
+                            }
+                        },
+                        {
+                            element: '[href="{{ url_for('journal') }}"]',
+                            popover: {
+                                title: 'Trading Journal',
+                                description: 'Document your daily thoughts, market observations, emotions, and lessons learned to improve your trading discipline.',
+                                side: "right",
+                                align: 'start'
+                            }
+                        },
+                        {
+                            element: '[href="{{ url_for('dashboard') }}"]',
+                            popover: {
+                                title: 'Your Dashboard',
+                                description: 'Get an overview of your performance, recent trades, and key statistics all in one place.',
+                                side: "right",
+                                align: 'start'
+                            }
+                        },
+                        {
+                            popover: {
+                                title: 'You\'re All Set! 🎉',
+                                description: 'Start by adding your first trade or explore the features at your own pace. Need help? Look for the help icon in the navigation.',
+                                side: "center",
+                                align: 'center'
+                            }
+                        }
+                    ],
+                    onDestroyStarted: () => {
+                        localStorage.setItem('hasSeenTour', 'true');
+                        driverObj.destroy();
+                    },
+                    onPopoverRender: (popover, { config, state }) => {
+                        const firstButton = document.createElement("button");
+                        firstButton.innerText = "Skip Tour";
+                        firstButton.className = "btn btn-sm btn-outline-secondary me-2";
+                        firstButton.addEventListener("click", () => {
+                            localStorage.setItem('hasSeenTour', 'true');
+                            driverObj.destroy();
+                        });
+                        popover.footerButtons.prepend(firstButton);
+                    }
+                });
+                
+                driverObj.drive();
+            }, 500);
+        }
+        {% endif %}
+        
+        // Add restart tour button functionality if it exists
+        const restartTourBtn = document.getElementById('restart-tour');
+        if (restartTourBtn) {
+            restartTourBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                localStorage.removeItem('hasSeenTour');
+                window.location.reload();
+            });
+        }
+    });
+    </script>
+    
+    <!-- Help Modal -->
+    <div class="modal fade" id="helpModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-question-circle text-primary me-2"></i>
+                        Need Help?
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="list-group list-group-flush">
+                        <a href="{{ url_for('education') }}" class="list-group-item list-group-item-action d-flex align-items-center">
+                            <i class="fas fa-graduation-cap text-primary me-3"></i>
+                            <div>
+                                <strong>Education Center</strong>
+                                <small class="d-block text-muted">Learn trading strategies and platform features</small>
+                            </div>
+                        </a>
+                        <a href="#" class="list-group-item list-group-item-action d-flex align-items-center" id="restartTourBtn">
+                            <i class="fas fa-route text-info me-3"></i>
+                            <div>
+                                <strong>Take Platform Tour</strong>
+                                <small class="d-block text-muted">Get a guided walkthrough of key features</small>
+                            </div>
+                        </a>
+                        <a href="mailto:support@optionsplunge.com" class="list-group-item list-group-item-action d-flex align-items-center">
+                            <i class="fas fa-envelope text-success me-3"></i>
+                            <div>
+                                <strong>Contact Support</strong>
+                                <small class="d-block text-muted">Email us at support@optionsplunge.com</small>
+                            </div>
+                        </a>
+                    </div>
+                    
+                    <div class="mt-4 p-3 bg-light rounded">
+                        <h6 class="mb-2">Quick Tips</h6>
+                        <ul class="small mb-0 ps-3">
+                            <li>Click the <strong>green + button</strong> to add trades</li>
+                            <li>Use the <strong>Journal</strong> to track your thoughts daily</li>
+                            <li>Check <strong>Analytics</strong> for performance insights</li>
+                            <li>Upgrade to <strong>Pro</strong> for AI-powered analysis</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // Restart tour from help modal
+    document.getElementById('restartTourBtn')?.addEventListener('click', function(e) {
+        e.preventDefault();
+        localStorage.removeItem('hasSeenTour');
+        
+        // Close modal first
+        const modal = bootstrap.Modal.getInstance(document.getElementById('helpModal'));
+        modal?.hide();
+        
+        // Redirect to dashboard to trigger tour
+        window.location.href = '{{ url_for("dashboard") }}';
+    });
+    
+    // Keyboard navigation for sidebar
+    document.addEventListener('keydown', function(e) {
+        // Only if sidebar is visible
+        const sidebar = document.querySelector('.sidebar');
+        if (!sidebar || window.getComputedStyle(sidebar).display === 'none') return;
+        
+        // Get all focusable nav links
+        const navLinks = sidebar.querySelectorAll('.nav-link:not(.disabled), .btn-add-trade');
+        const currentFocus = document.activeElement;
+        const currentIndex = Array.from(navLinks).indexOf(currentFocus);
+        
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            const nextIndex = (currentIndex + 1) % navLinks.length;
+            navLinks[nextIndex]?.focus();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            const prevIndex = currentIndex <= 0 ? navLinks.length - 1 : currentIndex - 1;
+            navLinks[prevIndex]?.focus();
+        }
+    });
+    
+    // Add focus styles
+    document.querySelectorAll('.sidebar .nav-link, .btn-add-trade').forEach(link => {
+        link.addEventListener('focus', function() {
+            this.style.outline = '2px solid rgba(52, 152, 219, 0.5)';
+            this.style.outlineOffset = '2px';
+        });
+        
+        link.addEventListener('blur', function() {
+            this.style.outline = 'none';
+        });
+    });
+    </script>
 </body>
 <script>
     document.addEventListener('DOMContentLoaded', function () {

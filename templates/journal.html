@@ -8,6 +8,10 @@
         <i class="fas fa-book text-primary me-2"></i>
         {% if current_user.is_authenticated %}Trading Journal{% else %}Sample Journal Entries{% endif %}
     </h1>
+    <p class="text-muted mb-3 text-center" style="max-width: 600px; margin: 0 auto;">
+        <i class="fas fa-info-circle me-2"></i>
+        Document your daily trading thoughts, market observations, and lessons learned. Track your performance and identify patterns to improve your trading strategy.
+    </p>
     <div class="btn-toolbar mb-2 mb-md-0">
         {% if current_user.is_authenticated %}
             <a href="{{ url_for('add_edit_journal') }}" class="btn btn-primary">
@@ -23,137 +27,249 @@
     </div>
 </div>
 
-{% if show_login_prompt %}
-    <div class="alert alert-info alert-dismissible fade show" role="alert">
-        <div class="d-flex align-items-center">
-            <i class="fas fa-info-circle me-3 fa-lg"></i>
-            <div class="flex-grow-1">
-                <strong>Demo Mode:</strong> You're viewing sample journal entries. 
-                <a href="{{ url_for('login', next=request.path) }}" class="alert-link">Sign in</a> or 
-                <a href="{{ url_for('register') }}" class="alert-link">create an account</a> to track your own trading journal!
-            </div>
-        </div>
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-{% endif %}
-
-{% if show_demo_data %}
-    <div class="alert alert-info alert-dismissible fade show" role="alert">
-        <div class="d-flex align-items-center">
-            <i class="fas fa-image me-3 fa-lg"></i>
-            <div class="flex-grow-1">
-                <strong>Demo View:</strong> Below is a sample trading journal for illustration purposes. Add your own entries to see your actual journal.
-            </div>
-        </div>
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-{% endif %}
+<!-- Unified Demo Banner -->
+{% include '_demo_banner.html' %}
 
 {% if journals.items %}
-    {% if show_demo_data %}
-        <!-- Demo image for logged-in users -->
-        <div class="text-center mb-4">
-            <div class="card border-0 shadow-sm" style="opacity: 0.8;">
-                <div class="card-body p-0">
-                    <div class="bg-light p-4">
-                        <div class="table-responsive">
-                            <table class="table table-sm table-borderless mb-0">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th class="text-muted small">Date</th>
-                                        <th class="text-muted small">Market Notes</th>
-                                        <th class="text-muted small">Trading Notes</th>
-                                        <th class="text-muted small">Daily P&L</th>
-                                        <th class="text-muted small">Score</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td class="text-muted small">2025-08-14</td>
-                                        <td class="text-muted small">Market showing strong momentum in tech sector...</td>
-                                        <td class="text-muted small">Executed 3 trades today: AAPL breakout (winner)...</td>
-                                        <td class="text-success small fw-bold">+$450.00</td>
-                                        <td><span class="badge bg-success">8.5/10</span></td>
-                                    </tr>
-                                    <tr>
-                                        <td class="text-muted small">2025-08-13</td>
-                                        <td class="text-muted small">Market choppy with mixed signals. Fed minutes...</td>
-                                        <td class="text-muted small">Only 1 trade: QQQ put spread (small loss)...</td>
-                                        <td class="text-danger small fw-bold">-$75.00</td>
-                                        <td><span class="badge bg-warning">7.0/10</span></td>
-                                    </tr>
-                                    <tr>
-                                        <td class="text-muted small">2025-08-12</td>
-                                        <td class="text-muted small">Strong bullish day with clear trend. All major...</td>
-                                        <td class="text-muted small">2 trades: SPY call (winner), IWM breakout...</td>
-                                        <td class="text-success small fw-bold">+$325.00</td>
-                                        <td><span class="badge bg-success">9.0/10</span></td>
-                                    </tr>
-                                </tbody>
-                            </table>
+    {% if show_demo_data or show_login_prompt %}
+    <!-- Demo Data Wrapper -->
+    <div class="demo-data-wrapper demo-watermark">
+    {% endif %}
+    
+    <div class="row">
+        {% for journal in journals.items %}
+        <div class="col-12 mb-4">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="far fa-calendar-alt me-2"></i>
+                        {% if journal.journal_date %}
+                            {% if journal.journal_date.strftime %}
+                                {{ journal.journal_date.strftime('%B %d, %Y') }}
+                            {% else %}
+                                {{ journal.journal_date }}
+                            {% endif %}
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </h5>
+                    {% if journal.daily_score %}
+                    <span class="badge bg-primary">
+                        Score: {{ journal.daily_score }}/10
+                    </span>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    {% if journal.market_notes %}
+                    <div class="mb-3">
+                        <h6 class="text-muted">
+                            <i class="fas fa-chart-line me-2"></i>Market Notes
+                        </h6>
+                        <p>{{ journal.market_notes }}</p>
+                    </div>
+                    {% endif %}
+                    
+                    {% if journal.trading_notes %}
+                    <div class="mb-3">
+                        <h6 class="text-muted">
+                            <i class="fas fa-clipboard me-2"></i>Trading Notes
+                        </h6>
+                        <p>{{ journal.trading_notes }}</p>
+                    </div>
+                    {% endif %}
+                    
+                    {% if journal.emotions %}
+                    <div class="mb-3">
+                        <h6 class="text-muted">
+                            <i class="fas fa-heart me-2"></i>Emotions
+                        </h6>
+                        <p>{{ journal.emotions }}</p>
+                    </div>
+                    {% endif %}
+                    
+                    {% if journal.lessons_learned %}
+                    <div class="mb-3">
+                        <h6 class="text-muted">
+                            <i class="fas fa-lightbulb me-2"></i>Lessons Learned
+                        </h6>
+                        <p>{{ journal.lessons_learned }}</p>
+                    </div>
+                    {% endif %}
+                    
+                    {% if journal.daily_pnl %}
+                    <div class="mb-3">
+                        <h6 class="text-muted">
+                            <i class="fas fa-dollar-sign me-2"></i>Daily P&L
+                        </h6>
+                        <p class="{% if journal.daily_pnl > 0 %}text-success{% elif journal.daily_pnl < 0 %}text-danger{% else %}text-muted{% endif %} fw-bold">
+                            {{ "+" if journal.daily_pnl > 0 else "" }}${{ "%.2f"|format(journal.daily_pnl) }}
+                        </p>
+                    </div>
+                    {% endif %}
+                    
+                    {% if journal.ai_daily_feedback %}
+                    <div class="alert alert-info mb-0">
+                        <h6 class="alert-heading">
+                            <i class="fas fa-robot me-2"></i>AI Feedback
+                        </h6>
+                        <p class="mb-0">{{ journal.ai_daily_feedback }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="card-footer text-end">
+                    {% if current_user.is_authenticated %}
+                    <a href="{{ url_for('add_edit_journal', journal_date=journal.journal_date.strftime('%Y-%m-%d') if journal.journal_date and journal.journal_date.strftime else journal.journal_date) }}" 
+                       class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-edit me-1"></i>Edit
+                    </a>
+                    {% else %}
+                    <button class="btn btn-sm btn-outline-primary" disabled title="Please log in to edit journal entries">
+                        <i class="fas fa-edit me-1"></i>Edit
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    
+    <!-- Pagination -->
+    {% if journals.pages is defined and journals.pages > 1 %}
+    <nav aria-label="Journal pagination" class="mt-4">
+        <ul class="pagination justify-content-center">
+            {% if journals.has_prev %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ journals.prev_num }}">Previous</a>
+            </li>
+            {% endif %}
+            
+            {% for page_num in range(1, journals.pages + 1) %}
+                {% if page_num == journals.page %}
+                <li class="page-item active">
+                    <span class="page-link">{{ page_num }}</span>
+                </li>
+                {% else %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_num }}">{{ page_num }}</a>
+                </li>
+                {% endif %}
+            {% endfor %}
+            
+            {% if journals.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ journals.next_num }}">Next</a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+    
+    {% if show_demo_data or show_login_prompt %}
+    </div> <!-- Close demo-data-wrapper -->
+    {% endif %}
+{% elif current_user.is_authenticated and (not journals or (journals.items is defined and not journals.items)) %}
+<!-- Empty State for Journal -->
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="text-center empty-state">
+                <div class="empty-state-icon mb-4">
+                    <i class="fas fa-book fa-5x text-muted"></i>
+                </div>
+                <h3 class="mb-3">No journal entries yet</h3>
+                <p class="text-muted mb-4">
+                    Start documenting your trading journey. Track your thoughts, emotions, 
+                    and lessons learned to become a more disciplined trader.
+                </p>
+                
+                <!-- Example Journal Entry -->
+                <div class="card mb-4 mx-auto text-start" style="max-width: 500px; background: #f8f9fa;">
+                    <div class="card-body">
+                        <h6 class="card-title">
+                            <i class="fas fa-lightbulb text-warning me-2"></i>
+                            Example Entry:
+                        </h6>
+                        <div class="small text-muted">
+                            <p class="mb-2"><strong>Market Notes:</strong> Tech sector showing strength, AAPL breaking out...</p>
+                            <p class="mb-2"><strong>My Trades:</strong> Entered AAPL long at $175, hit target at $182...</p>
+                            <p class="mb-2"><strong>Emotions:</strong> Felt confident and patient...</p>
+                            <p class="mb-0"><strong>Lessons:</strong> Waiting for confirmation paid off...</p>
                         </div>
                     </div>
                 </div>
+                
+                <a href="{{ url_for('add_edit_journal') }}" class="btn btn-primary btn-lg">
+                    <i class="fas fa-plus me-2"></i>Write Your First Entry
+                </a>
             </div>
-            <p class="text-muted small mt-2">
-                <i class="fas fa-info-circle me-1"></i>
-                Sample journal entries for demonstration purposes
-            </p>
         </div>
-    {% else %}
-        <!-- Real data table for unauthenticated users -->
-        <div class="table-responsive">
-            <table class="table table-hover">
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Market Notes</th>
-                        <th>Trading Notes</th>
-                        <th>Daily P&L</th>
-                        <th>Score</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for journal in journals.items %}
-                    <tr>
-                        <td>{{ journal.journal_date.strftime('%Y-%m-%d') }}</td>
-                        <td>{{ journal.market_notes[:100] + '...' if journal.market_notes and journal.market_notes|length > 100 else journal.market_notes }}</td>
-                        <td>{{ journal.trading_notes[:100] + '...' if journal.trading_notes and journal.trading_notes|length > 100 else journal.trading_notes }}</td>
-                        <td class="{% if journal.daily_pnl and journal.daily_pnl > 0 %}text-success{% elif journal.daily_pnl and journal.daily_pnl < 0 %}text-danger{% endif %}">
-                            {{ "$%.2f"|format(journal.daily_pnl) if journal.daily_pnl else '-' }}
-                        </td>
-                        <td>
-                            {% if journal.daily_score %}
-                            <div class="progress" style="height: 20px;">
-                                <div class="progress-bar {% if journal.daily_score >= 7 %}bg-success{% elif journal.daily_score >= 4 %}bg-warning{% else %}bg-danger{% endif %}" 
-                                     role="progressbar" 
-                                     style="width: {{ journal.daily_score * 10 }}%;" 
-                                     aria-valuenow="{{ journal.daily_score }}" 
-                                     aria-valuemin="0" 
-                                     aria-valuemax="10">
-                                    {{ journal.daily_score }}/10
-                                </div>
-                            </div>
-                            {% else %}
-                            -
-                            {% endif %}
-                        </td>
-                        <td>
-                            <button class="btn btn-sm btn-outline-primary" disabled title="Please log in to edit journal entries">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    {% endif %}
+    </div>
+</div>
+
+<style>
+.empty-state {
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.empty-state-icon {
+    opacity: 0.3;
+}
+</style>
 {% else %}
-    <div class="alert alert-info">
-        <i class="fas fa-info-circle me-2"></i>
-        No journal entries found. Start by adding your first entry!
+    <!-- No journal entries message -->
+    <div class="text-center py-5">
+        <i class="fas fa-book fa-3x text-muted mb-3"></i>
+        <h4>No journal entries yet</h4>
+        <p class="text-muted">Start documenting your trading journey today.</p>
+        <a href="{{ url_for('add_edit_journal') }}" class="btn btn-primary mt-3">
+            <i class="fas fa-plus me-2"></i>Write Your First Entry
+        </a>
     </div>
 {% endif %}
+
+<script>
+// Initialize Bootstrap tooltips for demo mode explanations
+document.addEventListener('DOMContentLoaded', function() {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    });
+    
+    // Add visual feedback when demo data is clicked
+    if (document.querySelector('.demo-data-wrapper')) {
+        document.querySelectorAll('.demo-data-wrapper .card').forEach(function(el) {
+            el.addEventListener('click', function(e) {
+                // Don't show alert if clicking actual action buttons
+                if (e.target.closest('.btn')) return;
+                
+                // Show reminder that this is demo data
+                const existingAlert = document.querySelector('.demo-click-alert');
+                if (!existingAlert) {
+                    const alert = document.createElement('div');
+                    alert.className = 'alert alert-info alert-dismissible fade show demo-click-alert position-fixed';
+                    alert.style.cssText = 'top: 100px; right: 20px; z-index: 9999; max-width: 350px;';
+                    alert.innerHTML = `
+                        <strong><i class="fas fa-info-circle me-2"></i>Demo Data</strong>
+                        <p class="mb-0 small">This is sample data. Create an account to track your own trades and journals.</p>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    `;
+                    document.body.appendChild(alert);
+                    
+                    // Auto-dismiss after 5 seconds
+                    setTimeout(() => {
+                        if (alert && alert.parentNode) {
+                            alert.remove();
+                        }
+                    }, 5000);
+                }
+            });
+        });
+    }
+});
+</script>
 {% endblock %}

@@ -1,59 +1,211 @@
 {% if show_pro_upsell %}
-<div class="alert alert-warning alert-dismissible fade show mb-4 no-auto-hide" role="alert">
-    <div class="d-flex align-items-start">
-        <i class="fas fa-crown me-3 fa-lg mt-1"></i>
-        <div class="flex-grow-1">
-            <h6 class="alert-heading mb-2">
-                {% if feature_name %}{{ feature_name }} - {% endif %}Pro Preview
-            </h6>
-            <p class="mb-3">
-                You're viewing a preview of this Pro feature. Upgrade to unlock full access and all capabilities.
-            </p>
-            
-            {% if limitations %}
-            <div class="mb-3">
-                <small class="text-muted">
-                    <strong>Preview limitations:</strong>
-                    <ul class="mb-0 mt-1">
-                        {% for limitation in limitations %}
-                        <li>{{ limitation }}</li>
-                        {% endfor %}
-                    </ul>
-                </small>
-            </div>
-            {% endif %}
-            
-            <div class="d-flex flex-wrap gap-2">
-                <button type="button" class="btn btn-primary btn-sm" onclick="startProCheckout('monthly')">
-                    <i class="fas fa-crown me-1"></i>Upgrade to Pro
-                </button>
+<div class="alert alert-pro-upsell alert-dismissible fade show mb-4" role="alert">
+    <div class="row align-items-center">
+        <div class="col-md-8">
+            <div class="d-flex align-items-start">
+                <div class="pro-icon me-3">
+                    <i class="fas fa-crown fa-2x"></i>
+                </div>
+                <div class="flex-grow-1">
+                    <h5 class="alert-heading mb-2">
+                        <i class="fas fa-sparkles me-1"></i>
+                        Unlock {{ feature_name or 'Professional Features' }}
+                    </h5>
+                    <p class="mb-2">
+                        Upgrade to Pro and get unlimited access to AI analysis, daily market briefs, 
+                        advanced charting tools, and more to accelerate your trading performance.
+                    </p>
+                    
+                    {% if limitations %}
+                    <div class="mb-3">
+                        <small class="text-muted">
+                            <strong>Free plan limitations:</strong>
+                            <ul class="mb-0 mt-1 ps-3">
+                                {% for limitation in limitations %}
+                                <li>{{ limitation }}</li>
+                                {% endfor %}
+                            </ul>
+                        </small>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="d-flex flex-wrap gap-2 align-items-center mt-3">
+                        <button type="button" class="btn btn-warning btn-sm shadow-sm" onclick="startProCheckout('monthly')">
+                            <i class="fas fa-crown me-1"></i>
+                            <strong>Upgrade to Pro</strong>
+                        </button>
+                        <a href="#pro-benefits-modal" data-bs-toggle="modal" class="btn btn-link btn-sm">
+                            See all Pro benefits →
+                        </a>
+                    </div>
+                </div>
             </div>
         </div>
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        <div class="col-md-4 d-none d-md-block">
+            <div class="pro-benefits-list">
+                <div class="benefit-item">
+                    <i class="fas fa-check-circle text-success me-2"></i>
+                    Unlimited AI Analysis
+                </div>
+                <div class="benefit-item">
+                    <i class="fas fa-check-circle text-success me-2"></i>
+                    Daily Market Briefs
+                </div>
+                <div class="benefit-item">
+                    <i class="fas fa-check-circle text-success me-2"></i>
+                    Advanced Chart Tools
+                </div>
+                <div class="benefit-item">
+                    <i class="fas fa-check-circle text-success me-2"></i>
+                    Trade Export & Reports
+                </div>
+                <div class="text-muted small mt-2 text-center">+ much more</div>
+            </div>
+        </div>
+    </div>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+
+<!-- Pro Benefits Modal -->
+<div class="modal fade" id="pro-benefits-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title">
+                    <i class="fas fa-crown me-2"></i>
+                    Pro Membership Benefits
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <div class="d-flex">
+                            <i class="fas fa-brain fa-2x text-primary me-3"></i>
+                            <div>
+                                <h6>Unlimited AI Trade Analysis</h6>
+                                <p class="text-muted small mb-0">Get AI-powered insights on every trade to identify patterns and improve decision-making.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex">
+                            <i class="fas fa-newspaper fa-2x text-info me-3"></i>
+                            <div>
+                                <h6>Daily Market Briefs</h6>
+                                <p class="text-muted small mb-0">Receive comprehensive market analysis and trading opportunities every morning.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex">
+                            <i class="fas fa-chart-line fa-2x text-success me-3"></i>
+                            <div>
+                                <h6>Advanced Charting Tools</h6>
+                                <p class="text-muted small mb-0">Access professional-grade charts with drawing tools, indicators, and analysis features.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex">
+                            <i class="fas fa-file-export fa-2x text-warning me-3"></i>
+                            <div>
+                                <h6>Export & Advanced Reports</h6>
+                                <p class="text-muted small mb-0">Download your trades to CSV and generate detailed performance reports.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex">
+                            <i class="fas fa-bell fa-2x text-danger me-3"></i>
+                            <div>
+                                <h6>Priority Support</h6>
+                                <p class="text-muted small mb-0">Get faster response times and dedicated support when you need help.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex">
+                            <i class="fas fa-flask fa-2x text-purple me-3"></i>
+                            <div>
+                                <h6>Early Access to Features</h6>
+                                <p class="text-muted small mb-0">Be the first to try new features and improvements before public release.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="text-center mt-4 pt-4 border-top">
+                    <h5 class="mb-3">Ready to upgrade?</h5>
+                    <button type="button" class="btn btn-warning btn-lg" onclick="startProCheckout('monthly')">
+                        <i class="fas fa-crown me-2"></i>
+                        Start Pro Membership
+                    </button>
+                    <p class="text-muted small mt-2 mb-0">Cancel anytime. No long-term commitment required.</p>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
+
+<style>
+.alert-pro-upsell {
+    background: linear-gradient(135deg, #fff9e6 0%, #fff3d0 100%);
+    border-left: 4px solid #f39c12;
+    border-radius: 8px;
+}
+
+.pro-icon {
+    color: #f39c12;
+}
+
+.pro-benefits-list {
+    background: white;
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.benefit-item {
+    padding: 0.4rem 0;
+    font-size: 0.9rem;
+}
+
+.text-purple {
+    color: #9b59b6;
+}
+</style>
 
 {% endif %}
 
 <script>
 async function startProCheckout(plan) {
     try {
+        // Show loading state
+        const button = event.target;
+        const originalText = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Loading...';
+        
         const response = await fetch('/api/billing/create-checkout-session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ plan: plan })
         });
+        
         if (response.ok) {
             const data = await response.json();
             window.location.href = data.checkout_url;
         } else {
             const errorData = await response.json();
             alert('Error starting checkout: ' + (errorData.error || 'Unknown error'));
+            button.disabled = false;
+            button.innerHTML = originalText;
         }
     } catch (error) {
         console.error('Checkout error:', error);
         alert('Error starting checkout. Please try again.');
+        button.disabled = false;
+        button.innerHTML = originalText;
     }
 }
 </script>
-

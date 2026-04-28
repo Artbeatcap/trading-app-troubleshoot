@@ -1,0 +1,68 @@
+{% if current_user.is_authenticated and not current_user.email_verified %}
+<div class="alert alert-warning alert-dismissible fade show email-verification-banner sticky-top" role="alert" style="margin-bottom: 0; border-radius: 0; border: none; border-bottom: 3px solid #f39c12; z-index: 1020;">
+    <div class="container-fluid">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <i class="fas fa-envelope me-2"></i>
+                <strong>Please verify your email address</strong>
+                <span class="d-none d-md-inline"> - Check your inbox for a verification link to unlock all features and receive market briefs.</span>
+            </div>
+            <div class="col-md-4 text-md-end mt-2 mt-md-0">
+                <form action="{{ url_for('resend_verification') }}" method="POST" class="d-inline" id="resendForm">
+                    <button type="submit" class="btn btn-sm btn-outline-dark me-2" id="resendBtn">
+                        <i class="fas fa-paper-plane me-1"></i>
+                        Resend Email
+                    </button>
+                </form>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Handle resend button with loading state
+document.getElementById('resendForm')?.addEventListener('submit', function(e) {
+    const btn = document.getElementById('resendBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Sending...';
+    
+    // Re-enable after 3 seconds
+    setTimeout(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-check me-1"></i>Sent! Check your email';
+    }, 3000);
+});
+</script>
+
+<style>
+.email-verification-banner {
+    animation: slideDown 0.5s ease-out;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+@keyframes slideDown {
+    from {
+        transform: translateY(-100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Adjust main content padding when banner is visible */
+.email-verification-banner ~ .main-content {
+    padding-top: 100px !important;
+}
+
+@media (max-width: 768px) {
+    .email-verification-banner {
+        font-size: 0.9rem;
+    }
+}
+</style>
+{% endif %}
+
+

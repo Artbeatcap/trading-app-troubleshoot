@@ -14,151 +14,422 @@
     </div>
 </div>
 
-{% if show_login_prompt %}
-<div class="alert alert-info">
-    <i class="fas fa-info-circle me-2"></i>
-    This is sample data to demonstrate the trading journal features. <strong>Log in or create an account</strong> to track your own trades and get personalized analytics.
-    <div class="mt-2">
-        <a href="{{ url_for('login') }}" class="btn btn-outline-primary btn-sm me-2">Log In</a>
-        <a href="{{ url_for('register') }}" class="btn btn-outline-success btn-sm">Create Account</a>
-    </div>
-</div>
-{% endif %}
+<!-- Unified Demo Banner -->
+{% include '_demo_banner.html' %}
 
-{% if show_demo_data %}
-<div class="alert alert-info alert-dismissible fade show" role="alert">
-    <div class="d-flex align-items-center">
-        <i class="fas fa-image me-3 fa-lg"></i>
-        <div class="flex-grow-1">
-            <strong>Demo View:</strong> Below is a sample trades table for illustration purposes. Add your own trades to see your actual data.
-        </div>
-    </div>
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-</div>
-{% endif %}
-
-{% if trades %}
-    <div class="container py-4">
-        <h1 class="h3 mb-3">{% if is_authenticated and not show_demo_data %}Your Trades{% else %}Sample Trades{% endif %}</h1>
-        
-        {% if show_demo_data %}
-            <!-- Demo image for logged-in users -->
-            <div class="text-center mb-4">
-                <div class="card border-0 shadow-sm" style="opacity: 0.8;">
-                    <div class="card-body p-0">
-                        <div class="bg-light p-4">
-                            <div class="table-responsive">
-                                <table class="table table-sm table-borderless mb-0">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th class="text-muted small">Date</th>
-                                            <th class="text-muted small">Symbol</th>
-                                            <th class="text-muted small">Type</th>
-                                            <th class="text-muted small">Setup</th>
-                                            <th class="text-muted small">Entry</th>
-                                            <th class="text-muted small">Exit</th>
-                                            <th class="text-muted small">P&L</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr>
-                                            <td class="text-muted small">2025-08-10</td>
-                                            <td class="fw-bold">AAPL</td>
-                                            <td class="text-muted small">Stock</td>
-                                            <td class="text-muted small">Breakout</td>
-                                            <td class="text-muted small">$150.25</td>
-                                            <td class="text-muted small">$155.75</td>
-                                            <td class="text-success small fw-bold">+$550.00</td>
-                                        </tr>
-                                        <tr>
-                                            <td class="text-muted small">2025-08-05</td>
-                                            <td class="fw-bold">TSLA</td>
-                                            <td class="text-muted small">Option Call</td>
-                                            <td class="text-muted small">Momentum</td>
-                                            <td class="text-muted small">$2.50</td>
-                                            <td class="text-muted small">$4.25</td>
-                                            <td class="text-success small fw-bold">+$1,750.00</td>
-                                        </tr>
-                                        <tr>
-                                            <td class="text-muted small">2025-08-01</td>
-                                            <td class="fw-bold">SPY</td>
-                                            <td class="text-muted small">Credit Put Spread</td>
-                                            <td class="text-muted small">Income</td>
-                                            <td class="text-muted small">$1.25</td>
-                                            <td class="text-muted small">$0.50</td>
-                                            <td class="text-success small fw-bold">+$375.00</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
+{% if current_user.is_authenticated and (not trades or (trades.items is defined and not trades.items)) %}
+<!-- Empty State for Authenticated Users with No Trades -->
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="text-center empty-state">
+                <div class="empty-state-icon mb-4">
+                    <i class="fas fa-chart-line fa-5x text-muted"></i>
+                </div>
+                <h3 class="mb-3">No trades yet</h3>
+                <p class="text-muted mb-4">
+                    Start tracking your trading journey by adding your first trade. 
+                    We'll help you analyze your performance and improve your results.
+                </p>
+                
+                <!-- Example Trade Card -->
+                <div class="card mb-4 mx-auto" style="max-width: 500px; background: #f8f9fa;">
+                    <div class="card-body text-start">
+                        <h6 class="card-title">
+                            <i class="fas fa-lightbulb text-warning me-2"></i>
+                            Example Trade:
+                        </h6>
+                        <div class="small">
+                            <div class="row mb-2">
+                                <div class="col-6"><strong>Symbol:</strong> AAPL</div>
+                                <div class="col-6"><strong>Direction:</strong> Long</div>
+                            </div>
+                            <div class="row mb-2">
+                                <div class="col-6"><strong>Entry:</strong> $175.50</div>
+                                <div class="col-6"><strong>Exit:</strong> $182.30</div>
+                            </div>
+                            <div class="row">
+                                <div class="col-12">
+                                    <strong>Result:</strong> 
+                                    <span class="text-success">+$680 profit (+3.87%)</span>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-                <p class="text-muted small mt-2">
-                    <i class="fas fa-info-circle me-1"></i>
-                    Sample data for demonstration purposes
-                </p>
+                
+                <a href="{{ url_for('add_trade') }}" class="btn btn-primary btn-lg mb-3">
+                    <i class="fas fa-plus me-2"></i>Add Your First Trade
+                </a>
+                
+                <div class="mt-3">
+                    <button class="btn btn-link text-muted" data-bs-toggle="modal" data-bs-target="#howToTradeModal">
+                        <i class="fas fa-question-circle me-1"></i>
+                        How do I add a trade?
+                    </button>
+                </div>
             </div>
-        {% else %}
-            <!-- Real data table for unauthenticated users -->
-            <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Symbol</th>
-                            <th>Type</th>
-                            <th>Setup</th>
-                            <th>Entry</th>
-                            <th>Exit</th>
-                            <th>P&L</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for trade in trades %}
-                            <tr class="trade-row {% if trade.profit_loss and trade.profit_loss > 0 %}profit{% elif trade.profit_loss %}loss{% endif %}">
-                                <td>{{ trade.entry_date.strftime('%Y-%m-%d') if trade.entry_date is not string else trade.entry_date }}</td>
-                                <td>
-                                    {{ trade.symbol }}
-                                    {% if trade.is_planned %}
-                                        <span class="badge bg-info ms-1">Planned</span>
-                                    {% endif %}
-                                </td>
-                                <td>{{ trade.trade_type.replace('_', ' ').title() }}</td>
-                                <td>{{ trade.setup_type }}</td>
-                                <td>${{ "%.2f"|format(trade.entry_price) }}</td>
-                                <td>
-                                    {% if trade.exit_price %}
-                                        ${{ "%.2f"|format(trade.exit_price) }}
-                                    {% else %}
-                                        -
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if trade.profit_loss %}
-                                        <span class="{% if trade.profit_loss > 0 %}text-success{% else %}text-danger{% endif %}">
-                                            ${{ "%.2f"|format(trade.profit_loss) }}
-                                        </span>
-                                    {% else %}
-                                        -
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <button class="btn btn-sm btn-info" disabled title="Please log in to view trade details">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                </td>
+        </div>
+    </div>
+</div>
+
+<!-- How-To Modal -->
+<div class="modal fade" id="howToTradeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">How to Add a Trade</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <ol class="ps-3">
+                    <li class="mb-3">
+                        <strong>Click "Add Trade"</strong>
+                        <p class="text-muted small mb-0">Find the button in the top right corner</p>
+                    </li>
+                    <li class="mb-3">
+                        <strong>Enter the stock symbol</strong>
+                        <p class="text-muted small mb-0">Example: AAPL, TSLA, SPY</p>
+                    </li>
+                    <li class="mb-3">
+                        <strong>Fill in trade details</strong>
+                        <p class="text-muted small mb-0">Entry price, exit price, quantity, and direction</p>
+                    </li>
+                    <li class="mb-3">
+                        <strong>Add notes (optional)</strong>
+                        <p class="text-muted small mb-0">Document why you took the trade</p>
+                    </li>
+                    <li class="mb-3">
+                        <strong>Save your trade</strong>
+                        <p class="text-muted small mb-0">Your trade is now tracked and analyzed!</p>
+                    </li>
+                </ol>
+                
+                <div class="alert alert-info mb-0">
+                    <i class="fas fa-magic me-2"></i>
+                    <strong>Pro Tip:</strong> After saving, you can get AI analysis to understand what worked and what didn't!
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.empty-state {
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.empty-state-icon {
+    opacity: 0.3;
+}
+</style>
+
+{% elif trades %}
+    {% if show_demo_data or show_login_prompt %}
+    <!-- Demo Data Wrapper -->
+    <div class="demo-data-wrapper demo-watermark">
+    {% endif %}
+    
+    <div class="container py-4">
+        <h3 class="mb-4">
+            {% if is_authenticated and not show_demo_data %}
+                Your Trades
+            {% else %}
+                Sample Trades
+                <small class="text-muted">(Example data to demonstrate features)</small>
+            {% endif %}
+        </h3>
+        
+        <!-- Desktop Table View -->
+            <!-- Desktop Table View -->
+            <div class="trades-table-desktop">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Symbol</th>
+                                <th>Type</th>
+                                <th>Setup</th>
+                                <th>Entry</th>
+                                <th>Exit</th>
+                                <th>P&L</th>
+                                <th>Actions</th>
                             </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            {% if trades.items is defined %}
+                                {% for trade in trades.items %}
+                                    <tr class="trade-row {% if trade.profit_loss and trade.profit_loss > 0 %}profit{% elif trade.profit_loss %}loss{% endif %}">
+                                        <td>{{ trade.entry_date.strftime('%Y-%m-%d') if trade.entry_date is not string else trade.entry_date }}</td>
+                                        <td>
+                                            {{ trade.symbol }}
+                                            {% if trade.is_planned %}
+                                                <span class="badge bg-info ms-1">Planned</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ trade.trade_type.replace('_', ' ').title() }}</td>
+                                        <td>{{ trade.setup_type }}</td>
+                                        <td>${{ "%.2f"|format(trade.entry_price) }}</td>
+                                        <td>
+                                            {% if trade.exit_price %}
+                                                ${{ "%.2f"|format(trade.exit_price) }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if trade.profit_loss %}
+                                                <span class="{% if trade.profit_loss > 0 %}text-success{% else %}text-danger{% endif %}">
+                                                    ${{ "%.2f"|format(trade.profit_loss) }}
+                                                </span>
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-sm btn-info" disabled title="Please log in to view trade details">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            {% if trade.chart_snapshot_path %}
+                                                <a href="{{ trade.chart_snapshot_path }}" target="_blank" title="View chart snapshot" class="btn btn-sm btn-outline-primary ms-1">
+                                                    <i class="fas fa-camera"></i>
+                                                </a>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            {% else %}
+                                {% for trade in trades %}
+                                    <tr class="trade-row {% if trade.profit_loss and trade.profit_loss > 0 %}profit{% elif trade.profit_loss %}loss{% endif %}">
+                                        <td>{{ trade.entry_date.strftime('%Y-%m-%d') if trade.entry_date is not string else trade.entry_date }}</td>
+                                        <td>
+                                            {{ trade.symbol }}
+                                            {% if trade.is_planned %}
+                                                <span class="badge bg-info ms-1">Planned</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ trade.trade_type.replace('_', ' ').title() }}</td>
+                                        <td>{{ trade.setup_type }}</td>
+                                        <td>${{ "%.2f"|format(trade.entry_price) }}</td>
+                                        <td>
+                                            {% if trade.exit_price %}
+                                                ${{ "%.2f"|format(trade.exit_price) }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if trade.profit_loss %}
+                                                <span class="{% if trade.profit_loss > 0 %}text-success{% else %}text-danger{% endif %}">
+                                                    ${{ "%.2f"|format(trade.profit_loss) }}
+                                                </span>
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-sm btn-info" disabled title="Please log in to view trade details">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            {% if trade.chart_snapshot_path %}
+                                                <a href="{{ trade.chart_snapshot_path }}" target="_blank" title="View chart snapshot" class="btn btn-sm btn-outline-primary ms-1">
+                                                    <i class="fas fa-camera"></i>
+                                                </a>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
-        {% endif %}
+
+            <!-- Mobile Card View -->
+            <div class="trades-cards-mobile">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <span class="text-muted small">
+                        {% if trades.items is defined %}
+                            {{ trades.total }} trades
+                        {% else %}
+                            {{ trades|length }} trades
+                        {% endif %}
+                    </span>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-secondary active" data-sort="date">
+                            <i class="fas fa-calendar"></i>
+                        </button>
+                        <button class="btn btn-outline-secondary" data-sort="pnl">
+                            <i class="fas fa-dollar-sign"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                {% if trades.items is defined %}
+                    {% for trade in trades.items %}
+                    {# Derive a direction for the badge when the ``direction`` column
+                       is missing (older rows). Options/spreads already imply a bias. #}
+                    {% set _derived_dir = trade.direction %}
+                    {% if not _derived_dir %}
+                        {% if trade.trade_type in ('option_call', 'credit_put_spread', 'stock_long') %}
+                            {% set _derived_dir = 'long' %}
+                        {% elif trade.trade_type in ('option_put', 'credit_call_spread', 'stock_short') %}
+                            {% set _derived_dir = 'short' %}
+                        {% endif %}
+                    {% endif %}
+                    <div class="trade-card-mobile {% if trade.profit_loss and trade.profit_loss > 0 %}profit{% elif trade.profit_loss and trade.profit_loss < 0 %}loss{% endif %}">
+                        <div class="trade-header">
+                            <div class="trade-symbol">
+                                {{ trade.symbol }}
+                                <span class="badge bg-{{ 'success' if _derived_dir == 'long' else ('danger' if _derived_dir == 'short' else 'secondary') }} ms-1" style="font-size: 0.7rem;">
+                                    {{ (_derived_dir|upper) if _derived_dir else 'N/A' }}
+                                </span>
+                                {% if trade.is_planned %}
+                                    <span class="badge bg-info ms-1" style="font-size: 0.7rem;">Planned</span>
+                                {% endif %}
+                            </div>
+                            <div class="trade-pnl {% if trade.profit_loss and trade.profit_loss > 0 %}positive{% elif trade.profit_loss and trade.profit_loss < 0 %}negative{% endif %}">
+                                {% if trade.profit_loss %}
+                                    {{ '+' if trade.profit_loss > 0 else '' }}${{ "%.2f"|format(trade.profit_loss) }}
+                                {% else %}
+                                    <span class="badge bg-warning">Open</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="trade-details">
+                            <div class="trade-detail-item">
+                                <span class="trade-detail-label">Entry</span>
+                                <span class="trade-detail-value">${{ "%.2f"|format(trade.entry_price) if trade.entry_price else '-' }}</span>
+                            </div>
+                            <div class="trade-detail-item">
+                                <span class="trade-detail-label">Exit</span>
+                                <span class="trade-detail-value">${{ "%.2f"|format(trade.exit_price) if trade.exit_price else '-' }}</span>
+                            </div>
+                            <div class="trade-detail-item">
+                                <span class="trade-detail-label">Date</span>
+                                <span class="trade-detail-value">{{ trade.entry_date.strftime('%m/%d/%y') if trade.entry_date else '-' }}</span>
+                            </div>
+                            <div class="trade-detail-item">
+                                <span class="trade-detail-label">Type</span>
+                                <span class="trade-detail-value">{{ trade.trade_type.replace('_', ' ').title() if trade.trade_type else '-' }}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="trade-actions">
+                            {% if current_user.is_authenticated %}
+                            <a href="{{ url_for('view_trade', id=trade.id) }}" class="btn btn-outline-primary btn-sm">
+                                <i class="fas fa-eye me-1"></i>View
+                            </a>
+                            <a href="{{ url_for('edit_trade', id=trade.id) }}" class="btn btn-outline-secondary btn-sm">
+                                <i class="fas fa-edit me-1"></i>Edit
+                            </a>
+                            {% else %}
+                            <button class="btn btn-outline-primary btn-sm" disabled title="Please log in to view trade details">
+                                <i class="fas fa-eye me-1"></i>View
+                            </button>
+                            {% endif %}
+                            {% if trade.chart_snapshot_path %}
+                            <a href="{{ trade.chart_snapshot_path }}" target="_blank" class="btn btn-outline-secondary btn-sm">
+                                <i class="fas fa-camera me-1"></i>Chart
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    {% for trade in trades %}
+                    {% set _derived_dir = trade.direction %}
+                    {% if not _derived_dir %}
+                        {% if trade.trade_type in ('option_call', 'credit_put_spread', 'stock_long') %}
+                            {% set _derived_dir = 'long' %}
+                        {% elif trade.trade_type in ('option_put', 'credit_call_spread', 'stock_short') %}
+                            {% set _derived_dir = 'short' %}
+                        {% endif %}
+                    {% endif %}
+                    <div class="trade-card-mobile {% if trade.profit_loss and trade.profit_loss > 0 %}profit{% elif trade.profit_loss and trade.profit_loss < 0 %}loss{% endif %}">
+                        <div class="trade-header">
+                            <div class="trade-symbol">
+                                {{ trade.symbol }}
+                                <span class="badge bg-{{ 'success' if _derived_dir == 'long' else ('danger' if _derived_dir == 'short' else 'secondary') }} ms-1" style="font-size: 0.7rem;">
+                                    {{ (_derived_dir|upper) if _derived_dir else 'N/A' }}
+                                </span>
+                                {% if trade.is_planned %}
+                                    <span class="badge bg-info ms-1" style="font-size: 0.7rem;">Planned</span>
+                                {% endif %}
+                            </div>
+                            <div class="trade-pnl {% if trade.profit_loss and trade.profit_loss > 0 %}positive{% elif trade.profit_loss and trade.profit_loss < 0 %}negative{% endif %}">
+                                {% if trade.profit_loss %}
+                                    {{ '+' if trade.profit_loss > 0 else '' }}${{ "%.2f"|format(trade.profit_loss) }}
+                                {% else %}
+                                    <span class="badge bg-warning">Open</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="trade-details">
+                            <div class="trade-detail-item">
+                                <span class="trade-detail-label">Entry</span>
+                                <span class="trade-detail-value">${{ "%.2f"|format(trade.entry_price) if trade.entry_price else '-' }}</span>
+                            </div>
+                            <div class="trade-detail-item">
+                                <span class="trade-detail-label">Exit</span>
+                                <span class="trade-detail-value">${{ "%.2f"|format(trade.exit_price) if trade.exit_price else '-' }}</span>
+                            </div>
+                            <div class="trade-detail-item">
+                                <span class="trade-detail-label">Date</span>
+                                <span class="trade-detail-value">{{ trade.entry_date.strftime('%m/%d/%y') if trade.entry_date else '-' }}</span>
+                            </div>
+                            <div class="trade-detail-item">
+                                <span class="trade-detail-label">Type</span>
+                                <span class="trade-detail-value">{{ trade.trade_type.replace('_', ' ').title() if trade.trade_type else '-' }}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="trade-actions">
+                            {% if current_user.is_authenticated %}
+                            <a href="{{ url_for('view_trade', id=trade.id) }}" class="btn btn-outline-primary btn-sm">
+                                <i class="fas fa-eye me-1"></i>View
+                            </a>
+                            <a href="{{ url_for('edit_trade', id=trade.id) }}" class="btn btn-outline-secondary btn-sm">
+                                <i class="fas fa-edit me-1"></i>Edit
+                            </a>
+                            {% else %}
+                            <button class="btn btn-outline-primary btn-sm" disabled title="Please log in to view trade details">
+                                <i class="fas fa-eye me-1"></i>View
+                            </button>
+                            {% endif %}
+                            {% if trade.chart_snapshot_path %}
+                            <a href="{{ trade.chart_snapshot_path }}" target="_blank" class="btn btn-outline-secondary btn-sm">
+                                <i class="fas fa-camera me-1"></i>Chart
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% endif %}
+                
+                {% if (trades.items is defined and trades.items|length == 0) or (trades.items is not defined and trades|length == 0) %}
+                <div class="text-center py-4 text-muted">
+                    <i class="fas fa-inbox fa-3x mb-3 opacity-50"></i>
+                    <p>No trades to display</p>
+                </div>
+                {% endif %}
+            </div>
     </div>
     
+    {% if show_demo_data or show_login_prompt %}
+    </div> <!-- Close demo-data-wrapper -->
+    {% endif %}
+    
     <!-- Pagination - only for authenticated users with real data -->
-    {% if is_authenticated and not show_demo_data and trades.pages > 1 %}
+    {% if is_authenticated and not show_demo_data and trades.pages is defined and trades.pages > 1 %}
     <nav aria-label="Page navigation">
         <ul class="pagination justify-content-center">
             {% if trades.has_prev %}
@@ -188,6 +459,7 @@
     </nav>
     {% endif %}
 {% else %}
+    <!-- Empty state for non-authenticated users -->
     <div class="text-center py-5 text-muted">
         <i class="fas fa-exchange-alt fa-3x mb-3"></i>
         <h5 class="mb-3">No trades recorded yet</h5>
@@ -196,4 +468,45 @@
         </a>
     </div>
 {% endif %}
+
+<script>
+// Initialize Bootstrap tooltips for demo mode explanations
+document.addEventListener('DOMContentLoaded', function() {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    });
+    
+    // Add visual feedback when demo data is clicked
+    if (document.querySelector('.demo-data-wrapper')) {
+        document.querySelectorAll('.demo-data-wrapper table tr, .demo-data-wrapper .trade-card-mobile').forEach(function(el) {
+            el.addEventListener('click', function(e) {
+                // Don't show alert if clicking actual action buttons
+                if (e.target.closest('.btn')) return;
+                
+                // Show reminder that this is demo data
+                const existingAlert = document.querySelector('.demo-click-alert');
+                if (!existingAlert) {
+                    const alert = document.createElement('div');
+                    alert.className = 'alert alert-info alert-dismissible fade show demo-click-alert position-fixed';
+                    alert.style.cssText = 'top: 100px; right: 20px; z-index: 9999; max-width: 350px;';
+                    alert.innerHTML = `
+                        <strong><i class="fas fa-info-circle me-2"></i>Demo Data</strong>
+                        <p class="mb-0 small">This is sample data. Create an account to track your own trades and journals.</p>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    `;
+                    document.body.appendChild(alert);
+                    
+                    // Auto-dismiss after 5 seconds
+                    setTimeout(() => {
+                        if (alert && alert.parentNode) {
+                            alert.remove();
+                        }
+                    }, 5000);
+                }
+            });
+        });
+    }
+});
+</script>
 {% endblock %}

@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% block title %}Welcome - Options Plunge{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <!-- Welcome Header -->
+            <div class="text-center mb-5">
+                <h1 class="display-4 mb-3">
+                    <i class="fas fa-rocket text-primary me-2"></i>
+                    Welcome to Options Plunge!
+                </h1>
+                <p class="lead text-muted">
+                    Let's get you started with tracking and improving your trading performance.
+                </p>
+            </div>
+
+            <!-- Feature Cards -->
+            <div class="row g-4 mb-5">
+                <div class="col-md-6">
+                    <div class="card h-100 border-primary">
+                        <div class="card-body text-center">
+                            <div class="mb-3">
+                                <i class="fas fa-chart-line fa-3x text-primary"></i>
+                            </div>
+                            <h5 class="card-title">Track Your Trades</h5>
+                            <p class="card-text text-muted">
+                                Log all your trades and see your complete trading history with detailed analytics.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card h-100 border-success">
+                        <div class="card-body text-center">
+                            <div class="mb-3">
+                                <i class="fas fa-brain fa-3x text-success"></i>
+                            </div>
+                            <h5 class="card-title">AI Analysis</h5>
+                            <p class="card-text text-muted">
+                                Get personalized insights on your trades to identify patterns and improve performance.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card h-100 border-info">
+                        <div class="card-body text-center">
+                            <div class="mb-3">
+                                <i class="fas fa-book fa-3x text-info"></i>
+                            </div>
+                            <h5 class="card-title">Trading Journal</h5>
+                            <p class="card-text text-muted">
+                                Document your daily thoughts, emotions, and lessons to become a more disciplined trader.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card h-100 border-warning">
+                        <div class="card-body text-center">
+                            <div class="mb-3">
+                                <i class="fas fa-envelope fa-3x text-warning"></i>
+                            </div>
+                            <h5 class="card-title">Market Briefs</h5>
+                            <p class="card-text text-muted">
+                                Receive weekly market insights and analysis delivered to your inbox.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Getting Started Checklist -->
+            <div class="card bg-light mb-4">
+                <div class="card-body">
+                    <h5 class="card-title mb-3">
+                        <i class="fas fa-list-check me-2"></i>Your Getting Started Checklist
+                    </h5>
+                    <div class="d-grid gap-2">
+                        <div class="d-flex align-items-center p-2 bg-white rounded">
+                            <i class="fas fa-circle-check text-success me-3"></i>
+                            <span>Create your account</span>
+                        </div>
+                        <div class="d-flex align-items-center p-2 bg-white rounded opacity-75">
+                            <i class="far fa-circle text-muted me-3"></i>
+                            <span>Add your first trade</span>
+                        </div>
+                        <div class="d-flex align-items-center p-2 bg-white rounded opacity-75">
+                            <i class="far fa-circle text-muted me-3"></i>
+                            <span>Get AI analysis on a trade</span>
+                        </div>
+                        <div class="d-flex align-items-center p-2 bg-white rounded opacity-75">
+                            <i class="far fa-circle text-muted me-3"></i>
+                            <span>Write your first journal entry</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CTA Buttons -->
+            <div class="text-center">
+                <a href="{{ url_for('add_trade') }}" class="btn btn-primary btn-lg px-5 mb-3">
+                    <i class="fas fa-plus me-2"></i>Add Your First Trade
+                </a>
+                <div class="text-muted mb-3">or</div>
+                <div class="d-flex gap-2 justify-content-center flex-wrap">
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-gauge me-1"></i>View Dashboard
+                    </a>
+                    <a href="{{ url_for('trades') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-list me-1"></i>See Sample Trades
+                    </a>
+                    <a href="{{ url_for('journal') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-book me-1"></i>Browse Journal
+                    </a>
+                </div>
+            </div>
+
+            <!-- Skip Link -->
+            <div class="text-center mt-4">
+                <a href="{{ url_for('dashboard') }}" class="text-muted small">
+                    Skip tour and go to dashboard →
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+

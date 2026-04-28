@@ -221,32 +221,124 @@
         background: rgba(255, 255, 255, 0.15);
     }
     
-    .testimonials-section {
-        padding: 100px 0;
+    /* Why Choose Section */
+    .why-choose-section {
+        background: linear-gradient(180deg, #f8f9fa 0%, #ffffff 100%);
+        padding: 80px 0;
+    }
+    
+    .why-card {
         background: white;
+        border-radius: 16px;
+        padding: 30px;
+        height: 100%;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        transition: all 0.3s ease;
+        border: 1px solid #eee;
     }
     
-    .testimonial-card {
-        background: #f8f9fa;
-        border-radius: 15px;
-        padding: 2rem;
-        text-align: center;
-        margin-bottom: 2rem;
-        border: none;
+    .why-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
     }
     
-    .testimonial-avatar {
+    .why-icon {
         width: 60px;
         height: 60px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, #667eea, #764ba2);
+        border-radius: 12px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         display: flex;
         align-items: center;
         justify-content: center;
-        margin: 0 auto 1rem;
+        margin-bottom: 20px;
+    }
+    
+    .why-icon i {
+        font-size: 1.5rem;
         color: white;
-        font-weight: bold;
-        font-size: 1.2rem;
+    }
+    
+    .why-card h5 {
+        font-weight: 700;
+        color: #2c3e50;
+        margin-bottom: 15px;
+    }
+    
+    .why-highlight {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 12px 15px;
+        margin-top: 15px;
+        font-size: 0.9rem;
+        color: #5a6c7d;
+    }
+    
+    .why-highlight i {
+        font-size: 0.8rem;
+        opacity: 0.6;
+    }
+    
+    /* Platform Stats */
+    .platform-stats {
+        margin-top: 60px;
+    }
+    
+    .stats-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 20px;
+        padding: 40px;
+        color: white;
+    }
+    
+    .stat-item {
+        padding: 10px;
+    }
+    
+    .stat-item i {
+        font-size: 1.5rem;
+        opacity: 0.9;
+        color: white !important;
+    }
+    
+    .stat-number {
+        font-size: 2rem;
+        font-weight: 800;
+        margin: 10px 0 5px;
+    }
+    
+    .stat-label {
+        font-size: 0.85rem;
+        opacity: 0.8;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    /* User Feedback Section */
+    .user-feedback {
+        padding-top: 40px;
+    }
+    
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .why-choose-section {
+            padding: 50px 0;
+        }
+        
+        .why-card {
+            padding: 25px;
+        }
+        
+        .stats-card {
+            padding: 25px 15px;
+        }
+        
+        .stat-number {
+            font-size: 1.5rem;
+        }
+        
+        .stat-label {
+            font-size: 0.75rem;
+        }
     }
     
     .pricing-section {
@@ -380,14 +472,14 @@
         <div class="row hero-content">
             <div class="col-lg-8 mx-auto text-center">
                 <h1 class="hero-title">
-                    Master Options Trading with AI-Powered Analysis
+                    Master Stock and Options Trading with AI-Powered Analysis
                 </h1>
                 <h2 class="hero-app-name" style="font-size: 2rem; font-weight: 600; margin-bottom: 1rem; color: rgba(255, 255, 255, 0.9);">
                     Options Plunge
                 </h2>
                 <p class="hero-subtitle">
-                    Join thousands of traders using professional-grade options calculators, 
-                    AI trade analysis, and comprehensive tracking tools to accelerate their success
+                    Professional-grade options calculators, AI trade analysis, and comprehensive
+                    tracking tools to help you think clearly and trade with discipline.
                 </p>
                 
                 <div class="cta-buttons">
@@ -397,23 +489,33 @@
                         </a>
                     {% else %}
                         <a href="{{ url_for('register') }}" class="btn btn-hero btn-hero-primary">
-                            <i class="fas fa-rocket me-2"></i>Get Started
+                            <i class="fas fa-rocket me-2"></i>Start Tracking Free
+                        </a>
+                        <a href="{{ url_for('register') }}" class="btn btn-hero btn-hero-secondary">
+                            <i class="fas fa-eye me-2"></i>Try Demo
                         </a>
                     {% endif %}
                 </div>
+                {% if not current_user.is_authenticated %}
+                <p class="text-center mt-3 opacity-75" style="font-size: 0.9rem;">
+                    <i class="fas fa-check-circle me-1"></i>No credit card required
+                    <span class="mx-2">•</span>
+                    <i class="fas fa-check-circle me-1"></i>Free forever plan
+                </p>
+                {% endif %}
                 
                 <div class="hero-stats">
                     <div class="stat-item">
-                        <span class="stat-number">10,000+</span>
-                        <span class="stat-label">Trades Analyzed</span>
+                        <span class="stat-number">AI-Powered</span>
+                        <span class="stat-label">Trade Analysis</span>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-number">95%</span>
-                        <span class="stat-label">Accuracy Rate</span>
+                        <span class="stat-number">Unlimited</span>
+                        <span class="stat-label">Trade Tracking</span>
                     </div>
                     <div class="stat-item">
                         <span class="stat-number">24/7</span>
-                        <span class="stat-label">AI Support</span>
+                        <span class="stat-label">Market Insights</span>
                     </div>
                 </div>
             </div>
@@ -430,6 +532,7 @@
         </p>
         <div class="tools-container">
             <div class="row g-4">
+                {% if config.OPTIONS_ENABLED %}
                 <!-- Tool 1: Advanced Options Calculator -->
                 <div class="col-lg-6">
                     <div class="tool-section">
@@ -505,6 +608,7 @@
                         </div>
                     </div>
                 </div>
+                {% endif %}
                 <!-- Tool 2: AI Trade Analysis -->
                 <div class="col-lg-6">
                     <div class="tool-section">
@@ -655,7 +759,7 @@
                             <div class="feature-example">
                                 <div class="card border-0 shadow-sm">
                                     <div class="card-header bg-warning text-dark py-2">
-                                        <small><strong>Trading Journal</strong> • Dec 15, 2024</small>
+                                        <small><strong>Trading Journal</strong> • Sample entry</small>
                                     </div>
                                     <div class="card-body p-2">
                                         <div class="d-flex align-items-center mb-2">
@@ -803,40 +907,80 @@
 
 
 
-<!-- Testimonials Section -->
-<section class="testimonials-section">
+<!-- Why Traders Choose Us Section -->
+<section class="why-choose-section py-5">
     <div class="container">
-        <h2 class="section-title">What Traders Are Saying</h2>
+        <h2 class="section-title">Why Traders Choose Options Plunge</h2>
         <p class="section-subtitle">
-            Join thousands of successful traders who have improved their performance
+            Real features that help real traders improve their performance
         </p>
         
         <div class="row g-4">
+            <!-- Feature 1: Trade Tracking -->
             <div class="col-lg-4">
-                <div class="testimonial-card">
-                    <div class="testimonial-avatar">JS</div>
-                    <h5>John Smith</h5>
-                    <p class="text-muted">Professional Trader</p>
-                    <p>"The AI analysis has completely transformed my trading. I've improved my win rate by 40% in just 3 months."</p>
+                <div class="why-card">
+                    <div class="why-icon">
+                        <i class="fas fa-clipboard-check"></i>
+                    </div>
+                    <h5>Effortless Trade Logging</h5>
+                    <p class="text-muted">
+                        Log trades in seconds with our streamlined interface. Track stocks, options, 
+                        and more with automatic P&L calculations.
+                    </p>
+                    <div class="why-highlight">
+                        <i class="fas fa-quote-left text-primary me-2"></i>
+                        <em>"Finally, a journal that doesn't feel like homework."</em>
+                    </div>
                 </div>
             </div>
             
+            <!-- Feature 2: AI Analysis -->
             <div class="col-lg-4">
-                <div class="testimonial-card">
-                    <div class="testimonial-avatar">MJ</div>
-                    <h5>Maria Johnson</h5>
-                    <p class="text-muted">Options Trader</p>
-                    <p>"The options calculator is incredible. Real-time data and Greeks analysis help me make better decisions instantly."</p>
+                <div class="why-card">
+                    <div class="why-icon">
+                        <i class="fas fa-brain"></i>
+                    </div>
+                    <h5>AI-Powered Insights</h5>
+                    <p class="text-muted">
+                        Get personalized feedback on every trade. Our AI identifies patterns, 
+                        mistakes, and opportunities you might have missed.
+                    </p>
+                    <div class="why-highlight">
+                        <i class="fas fa-quote-left text-primary me-2"></i>
+                        <em>"Like having a trading coach available 24/7."</em>
+                    </div>
                 </div>
             </div>
             
+            <!-- Feature 3: Performance Analytics -->
             <div class="col-lg-4">
-                <div class="testimonial-card">
-                    <div class="testimonial-avatar">DW</div>
-                    <h5>David Wilson</h5>
-                    <p class="text-muted">Day Trader</p>
-                    <p>"The trade tracking and analytics have given me insights I never had before. My consistency has improved dramatically."</p>
+                <div class="why-card">
+                    <div class="why-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <h5>Clear Performance Metrics</h5>
+                    <p class="text-muted">
+                        See your win rate, average return, best setups, and more. 
+                        Understand what's working and what needs improvement.
+                    </p>
+                    <div class="why-highlight">
+                        <i class="fas fa-quote-left text-primary me-2"></i>
+                        <em>"I finally know which strategies actually work for me."</em>
+                    </div>
                 </div>
+            </div>
+        </div>
+        
+        <!-- Optional: Real User Feedback Section -->
+        <div class="user-feedback mt-5">
+            <div class="text-center">
+                <h4 class="mb-3">Have feedback to share?</h4>
+                <p class="text-muted mb-3">
+                    We'd love to hear how Options Plunge has helped your trading journey.
+                </p>
+                <a href="mailto:feedback@optionsplunge.com?subject=My Options Plunge Experience" class="btn btn-outline-primary">
+                    <i class="fas fa-comment me-2"></i>Share Your Story
+                </a>
             </div>
         </div>
     </div>
