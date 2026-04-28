@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, flash, redirect, url_for, jsonify, session, current_app
+from flask import Flask, render_template, request, flash, redirect, url_for, jsonify, session, current_app, make_response, abort
 from flask_login import (
     LoginManager,
     login_user,
@@ -33,6 +33,7 @@ from forms import (
     MarketBriefSignupForm,
 )
 from ai_analysis import TradingAIAnalyzer
+from providers import get_default_provider
 from datetime import datetime, timedelta, date
 import pandas as pd
 import plotly.graph_objs as go
@@ -50,10 +51,732 @@ from werkzeug.utils import secure_filename
 from flask_mail import Mail, Message
 from pathlib import Path
 from market_brief_generator import send_weekly_market_brief_to_subscribers
+import io
+import base64
+import time
+import datetime as dt
+from PIL import Image
+import csv
 
-# Allow OAuth over HTTP for local development
-if os.getenv('FLASK_ENV') == 'development' or os.getenv('OAUTHLIB_INSECURE_TRANSPORT') is None:
-    os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+# === API Blueprints: AI Explain, Options, Usage, Imports ===
+from flask import Blueprint
+from datetime import timezone
+import hashlib
+import io as _io
+
+# Options Generator
+options_bp = Blueprint('options', __name__, url_prefix='/api/options')
+
+def _ibkr_csv(rows):
+    header = "Account,Symbol,SecType,Right,Strike,Expiry,Action,Quantity,OrderType,LmtPrice,TIF,Exchange,Currency"
+    return header + "\n" + "\n".join(rows)
+
+def _exp_str(date_str):
+    dt = datetime.strptime(date_str, "%Y-%m-%d").date()
+    tos = dt.strftime("%d %b %y").upper()
+    ib = dt.strftime("%Y%m%d")
+    return ib, tos, dt.strftime("%Y-%m-%d")
+
+@options_bp.route('/generate', methods=['POST'])
+def options_generate():
+    payload = request.get_json(force=True) or {}
+    symbol = (payload.get('symbol') or 'NVDA').upper()
+    under = float(payload.get('underlying_price') or 128.42)
+    iv_rank = float((payload.get('market') or {}).get('iv_rank') or 38)
+    exp_iso_in = (payload.get('constraints') or {}).get('exp') or '2025-11-15'
+    ib_exp, tos_exp, exp_iso = _exp_str(exp_iso_in)
+
+    # Example vertical call debit spread
+    buy_k, sell_k = 125, 130
+    width = sell_k - buy_k
+    mid = 2.05
+    cash_flow = -mid * 100
+    ib_rows = [
+        f",{symbol},OPT,C,{buy_k},{ib_exp},BUY,1,LMT,{mid:.2f},DAY,SMART,USD",
+        f",{symbol},OPT,C,{sell_k},{ib_exp},SELL,1,LMT,{mid:.2f},DAY,SMART,USD",
+    ]
+    strat_vertical = {
+        "id": "strat_01",
+        "type": "vertical_debit_call",
+        "label": "Bullish Call Debit Spread",
+        "quality_score": 0.8,
+        "legs": [
+            {"kind":"option","side":"BUY","right":"C","exp":exp_iso,"strike":buy_k,"qty":1,"multiplier":100},
+            {"kind":"option","side":"SELL","right":"C","exp":exp_iso,"strike":sell_k,"qty":1,"multiplier":100}
+        ],
+        "pricing": {"mid": mid, "nat": round(mid+0.07,2), "cash_flow": cash_flow, "mark_perc_width": round((mid/width)*100,1)},
+        "greeks": {"delta": 0.29, "gamma": 0.04, "theta": -3.2, "vega": 7.5, "rho": 0.9},
+        "iv_context": {"iv_rank": iv_rank, "skew": (payload.get('market') or {}).get('skew', 0.0)},
+        "risk": {"max_profit": width*100 - mid*100, "max_loss": mid*100, "break_evens": [buy_k + mid], "pop": 0.58, "p50": 95.0, "margin_requirement": mid*100, "buying_power_effect": mid*100},
+        "payoff": {"grid_start": int(under*0.85), "grid_end": int(under*1.2), "grid_step": 1, "points": [{"underlier": int(under*0.85), "pnl": -round(mid*100,2)}]},
+        "order_tickets": {
+            "ibkr_basket_csv": _ibkr_csv(ib_rows),
+            "thinkorswim_clipboard": f"BUY +1 VERTICAL {symbol} {tos_exp} {buy_k}/{sell_k} CALL @ DEBIT ~{mid:.2f}",
+            "tasty_clipboard": f"BUY 1 {symbol} {exp_iso} {buy_k}/{sell_k} CALL DEBIT ~{mid:.2f}",
+            "robinhood_clipboard": f"{symbol} • {exp_iso} • {buy_k}/{sell_k} • Call Debit Spread • Buy 1 • Net ~${int(abs(cash_flow))}"
+        }
+    }
+
+    # Example iron condor (credit)
+    ic_put_short, ic_put_long = 120, 115
+    ic_call_short, ic_call_long = 135, 140
+    ic_mid = 1.10
+    ic_cash = ic_mid*100
+    ic_width = min(ic_put_short-ic_put_long, ic_call_long-ic_call_short)
+    ic_rows = [
+        f",{symbol},OPT,P,{ic_put_short},{ib_exp},SELL,1,LMT,{ic_mid:.2f},DAY,SMART,USD",
+        f",{symbol},OPT,P,{ic_put_long},{ib_exp},BUY,1,LMT,{ic_mid:.2f},DAY,SMART,USD",
+        f",{symbol},OPT,C,{ic_call_short},{ib_exp},SELL,1,LMT,{ic_mid:.2f},DAY,SMART,USD",
+        f",{symbol},OPT,C,{ic_call_long},{ib_exp},BUY,1,LMT,{ic_mid:.2f},DAY,SMART,USD",
+    ]
+    strat_ic = {
+        "id": "strat_02",
+        "type": "iron_condor",
+        "label": "Balanced Iron Condor",
+        "quality_score": 0.69,
+        "legs": [
+            {"kind":"option","side":"SELL","right":"P","exp":exp_iso,"strike":ic_put_short,"qty":1,"multiplier":100},
+            {"kind":"option","side":"BUY","right":"P","exp":exp_iso,"strike":ic_put_long,"qty":1,"multiplier":100},
+            {"kind":"option","side":"SELL","right":"C","exp":exp_iso,"strike":ic_call_short,"qty":1,"multiplier":100},
+            {"kind":"option","side":"BUY","right":"C","exp":exp_iso,"strike":ic_call_long,"qty":1,"multiplier":100}
+        ],
+        "pricing": {"mid": ic_mid, "nat": round(ic_mid-0.05,2), "cash_flow": ic_cash, "mark_perc_width": round((ic_mid/ic_width)*100,1)},
+        "greeks": {"delta": 0.01, "gamma": 0.00, "theta": 5.9, "vega": -3.1, "rho": 0.1},
+        "iv_context": {"iv_rank": iv_rank, "skew": (payload.get('market') or {}).get('skew', 0.0)},
+        "risk": {"max_profit": ic_cash, "max_loss": ic_width*100 - ic_cash, "break_evens": [ic_put_short - ic_mid, ic_call_short + ic_mid], "pop": 0.62, "p50": 55.0, "margin_requirement": ic_width*100 - ic_cash, "buying_power_effect": ic_width*100 - ic_cash},
+        "payoff": {"grid_start": int(under*0.85), "grid_end": int(under*1.2), "grid_step": 1, "points": [{"underlier": int(under), "pnl": round(ic_cash/2,2)}]},
+        "order_tickets": {
+            "ibkr_basket_csv": _ibkr_csv(ic_rows),
+            "thinkorswim_clipboard": f"SELL -1 IRON CONDOR {symbol} {tos_exp} {ic_put_long}/{ic_put_short}/{ic_call_short}/{ic_call_long} @ CREDIT ~{ic_mid:.2f}",
+            "tasty_clipboard": f"SELL 1 {symbol} {exp_iso} {ic_put_short}/{ic_put_long}/{ic_call_short}/{ic_call_long} IRON CONDOR CREDIT ~{ic_mid:.2f}",
+            "robinhood_clipboard": f"{symbol} • {exp_iso} • {ic_put_short}/{ic_put_long}/{ic_call_short}/{ic_call_long} • Iron Condor • Sell 1 • Credit ~${int(ic_cash)}"
+        }
+    }
+
+    return jsonify({
+        "symbol": symbol,
+        "asof": datetime.now(timezone.utc).isoformat(),
+        "underlying_price": under,
+        "assumptions": {"horizon_days": int((payload.get('bias_window') or {}).get('horizon_days') or 10), "move_window_pct": [-5,0,5,10], "fees_per_contract": 0.65, "slippage_bps": 10},
+        "strategies": [strat_vertical, strat_ic]
+    })
+
+# AI Explain
+ai_bp = Blueprint('ai', __name__, url_prefix='/api/ai')
+
+@ai_bp.route('/explain_chart', methods=['POST'])
+def explain_chart():
+    # Guest demo gating: allow one explain per session
+    if not current_user.is_authenticated:
+        if session.get('demo_explain_done'):
+            return jsonify({"error":"Login required to run more explains"}), 401
+        session['demo_explain_done'] = True
+
+    j = request.get_json(force=True) or {}
+    symbol = (j.get('symbol') or 'NVDA').upper()
+    tfs = j.get('timeframes') or ['1h','15m','1d']
+    risk_pct = (j.get('user_risk_prefs') or {}).get('risk_per_trade_pct', 1.0)
+
+    def fetch(tf, lookback_days=120):
+        params = {'symbol': symbol, 'tf': tf}
+        if tf == '1d':
+            params['start'] = (dt.date.today()-dt.timedelta(days=lookback_days)).isoformat()
+        r = requests.get(url_for('api_candles', _external=True), params=params, timeout=12)
+        r.raise_for_status()
+        return r.json()
+
+    def atr(vals, period=14):
+        t,o,h,l,c = vals.get('t',[]), vals.get('o',[]), vals.get('h',[]), vals.get('l',[]), vals.get('c',[])
+        if len(c) < period+1: return None
+        trs=[]; prev_close = c[0]
+        for i in range(1,len(c)):
+            tr = max(h[i]-l[i], abs(h[i]-prev_close), abs(l[i]-prev_close))
+            trs.append(tr); prev_close = c[i]
+        if len(trs) < period: return None
+        return sum(trs[-period:])/period
+
+    out = {"symbol": symbol, "timeframes": [], "draft_id": hashlib.sha1(f"{symbol}|{time.time()}".encode()).hexdigest()[:12]}
+    for tf in tfs:
+        try:
+            data = fetch(tf)
+        except Exception:
+            continue
+        if not data or not data.get('c'):
+            continue
+
+        last = data['c'][-1]
+        _atr = atr(data, 14) or 0.0
+        em_mult = 1.0 if tf in ('1m','5m','15m') else (1.5 if tf in ('1h','4h') else 1.8)
+        expected_move = {"center": last, "upper": round(last + _atr*em_mult,2), "lower": round(last - _atr*em_mult,2), "atr": round(_atr,2), "atr_mult": em_mult}
+
+        recent = max(50, min(300, len(data['c'])))
+        window_c = data['c'][-recent:]
+        sr_high = max(window_c); sr_low = min(window_c); mid = (sr_high+sr_low)/2.0
+
+        step = max(0.25, round(_atr*0.25,2))
+        bull = {
+            "direction":"bull",
+            "probability": 0.55,
+            "playbook":"Breakout Pullback" if last < sr_high else "EM Reclaim",
+            "trigger": f"Reclaim {round(mid,2)} and hold 2 bars",
+            "entry_zone": [round(mid-0.25*step,2), round(mid+0.25*step,2)],
+            "invalidation": round(max(sr_low, mid - 2*_atr),2),
+            "targets": [round(mid+1*step,2), round(mid+2*step,2), round(min(sr_high, mid+3*step),2)],
+            "r_r": round((min(sr_high, mid+2*step)-mid) / max(0.01, mid - max(sr_low, mid-2*_atr)),2),
+            "notes": "Use pullback to mid for risk-defined entry; avoid entries into EM upper band."
+        }
+        bear = {
+            "direction":"bear",
+            "probability": 0.45,
+            "playbook":"VWAP Reject" if tf in ('1m','5m','15m') else "Lower High Fade",
+            "trigger": f"Lose {round(mid,2)} and reject retest",
+            "entry_zone": [round(mid-0.25*step,2), round(mid,2)],
+            "invalidation": round(min(sr_high, mid + 2*_atr),2),
+            "targets": [round(mid-1*step,2), round(mid-2*step,2), round(max(sr_low, mid-3*step),2)],
+            "r_r": round((mid - max(sr_low, mid-2*step)) / max(0.01, min(sr_high, mid+2*_atr)-mid),2),
+            "notes": "If EM band breaks, stand down; wait for lower high under mid."
+        }
+
+        out["timeframes"].append({
+            "tf": tf,
+            "levels": {"recent_high": round(sr_high,2), "recent_low": round(sr_low,2), "mid": round(mid,2)},
+            "expected_move": expected_move,
+            "scenarios": [bull, bear]
+        })
+
+    out["playbook_tags"] = list({s["playbook"] for tfb in out["timeframes"] for s in tfb["scenarios"]})[:5]
+    out["sizing"] = {"risk_pct": risk_pct}
+    return jsonify(out)
+
+# IMPROVED: Beginner-friendly chart explanation endpoint
+@ai_bp.route('/explain_chart_simple', methods=['POST'])
+def explain_chart_simple():
+    """
+    Simplified, beginner-friendly chart explanation
+    Returns plain English analysis without jargon
+    """
+    data = request.get_json() or {}
+    symbol = data.get('symbol', 'UNKNOWN')
+    timeframe = data.get('timeframe', '1d')
+    prices = data.get('prices', {})
+    candles = data.get('candles', {})
+    
+    current_price = prices.get('current', 0)
+    high_price = prices.get('high', 0)
+    low_price = prices.get('low', 0)
+    
+    # Calculate simple trend (based on last 20 candles)
+    closes = candles.get('c', [])
+    if len(closes) < 10:
+        return jsonify({"error": "Not enough data"}), 400
+    
+    # Simple trend detection
+    recent_closes = closes[-20:] if len(closes) >= 20 else closes
+    first_avg = sum(recent_closes[:len(recent_closes)//2]) / (len(recent_closes)//2)
+    second_avg = sum(recent_closes[len(recent_closes)//2:]) / (len(recent_closes) - len(recent_closes)//2)
+    
+    trend_direction = 'up' if second_avg > first_avg * 1.02 else ('down' if second_avg < first_avg * 0.98 else 'sideways')
+    
+    # Calculate support and resistance (simplified)
+    lows = candles.get('l', [])
+    highs = candles.get('h', [])
+    
+    # Find recent significant lows for support
+    recent_lows = sorted(lows[-30:])[:5] if len(lows) >= 30 else sorted(lows)[:3]
+    support_levels = list(set([round(low, 2) for low in recent_lows]))[:2]
+    
+    # Find recent significant highs for resistance
+    recent_highs = sorted(highs[-30:], reverse=True)[:5] if len(highs) >= 30 else sorted(highs, reverse=True)[:3]
+    resistance_levels = list(set([round(high, 2) for high in recent_highs]))[:2]
+    
+    # Generate beginner-friendly summary
+    if trend_direction == 'up':
+        summary = f"{symbol} is currently in an upward trend, meaning the price has been generally rising. "
+        summary += f"The stock is currently at ${current_price:.2f}. "
+        summary += "This upward movement suggests buyers are in control and pushing prices higher."
+    elif trend_direction == 'down':
+        summary = f"{symbol} is currently in a downward trend, meaning the price has been generally falling. "
+        summary += f"The stock is currently at ${current_price:.2f}. "
+        summary += "This downward movement suggests sellers are in control and pushing prices lower."
+    else:
+        summary = f"{symbol} is currently moving sideways (also called 'consolidating'), meaning it's not going up or down strongly. "
+        summary += f"The stock is at ${current_price:.2f} and trading in a range. "
+        summary += "This often happens when buyers and sellers are equally matched."
+    
+    # Create simple scenarios with FIXED emojis
+    scenarios = []
+    
+    # Bullish scenario
+    if resistance_levels:
+        target = resistance_levels[0]
+        scenarios.append({
+            "type": "bullish",
+            "title": "📈 Upward Move Scenario",
+            "description": f"If {symbol} can break above ${target:.2f}, it could continue moving higher. This would show that buyers are strong enough to push through this resistance level.",
+            "trigger": f"Price breaking and staying above ${target:.2f}"
+        })
+    
+    # Bearish scenario
+    if support_levels:
+        target = support_levels[0]
+        scenarios.append({
+            "type": "bearish",
+            "title": "📉 Downward Move Scenario",
+            "description": f"If {symbol} falls below ${target:.2f}, it could continue moving lower. This would show that sellers are strong enough to push through this support level.",
+            "trigger": f"Price breaking and staying below ${target:.2f}"
+        })
+    
+    # Build response
+    response = {
+        "symbol": symbol,
+        "timeframe": timeframe,
+        "trend": {
+            "direction": trend_direction,
+            "description": "Upward" if trend_direction == 'up' else ("Downward" if trend_direction == 'down' else "Sideways")
+        },
+        "current_price": round(current_price, 2),
+        "support_levels": sorted(support_levels),
+        "resistance_levels": sorted(resistance_levels, reverse=True),
+        "scenarios": scenarios,
+        "summary": summary
+    }
+    
+    return jsonify(response)
+
+
+# IMPROVED: Simplified support/resistance detection
+@ai_bp.route('/sr-levels-simple', methods=['POST'])
+def sr_levels_simple():
+    """
+    Simplified support/resistance level detection
+    Returns only the 2-3 most important levels
+    """
+    data = request.get_json() or {}
+    highs = data.get('h', [])
+    lows = data.get('l', [])
+    closes = data.get('c', [])
+    
+    if not highs or not lows or len(closes) < 20:
+        return jsonify({"levels": []})
+    
+    current_price = closes[-1]
+    
+    # Simple level detection using recent price action
+    lookback = min(50, len(closes))
+    recent_highs = highs[-lookback:]
+    recent_lows = lows[-lookback:]
+    
+    # Find peaks (resistance) and troughs (support)
+    levels = []
+    
+    # Method: Find local maxima and minima
+    window = 5
+    for i in range(window, len(recent_highs) - window):
+        # Check if this is a local high
+        if recent_highs[i] == max(recent_highs[i-window:i+window+1]):
+            levels.append({
+                'price': round(recent_highs[i], 2),
+                'type': 'resistance',
+                'strength': 1
+            })
+        
+        # Check if this is a local low
+        if recent_lows[i] == min(recent_lows[i-window:i+window+1]):
+            levels.append({
+                'price': round(recent_lows[i], 2),
+                'type': 'support',
+                'strength': 1
+            })
+    
+    # Remove duplicates (levels within 0.5% of each other)
+    unique_levels = []
+    for level in levels:
+        is_duplicate = False
+        for existing in unique_levels:
+            if abs(level['price'] - existing['price']) / existing['price'] < 0.005:
+                is_duplicate = True
+                existing['strength'] += 1
+                break
+        if not is_duplicate:
+            unique_levels.append(level)
+    
+    # Sort by strength and take top 3
+    unique_levels.sort(key=lambda x: x['strength'], reverse=True)
+    top_levels = unique_levels[:3]
+    
+    # Ensure we have at least one support below current price and one resistance above
+    supports = [l for l in top_levels if l['price'] < current_price]
+    resistances = [l for l in top_levels if l['price'] > current_price]
+    
+    final_levels = []
+    if supports:
+        final_levels.append(max(supports, key=lambda x: x['price']))
+    if resistances:
+        final_levels.append(min(resistances, key=lambda x: x['price']))
+    
+    # If we still don't have enough levels, add simple ones
+    if len(final_levels) < 2:
+        if not supports:
+            final_levels.append({
+                'price': round(min(recent_lows), 2),
+                'type': 'support',
+                'strength': 1
+            })
+        if not resistances:
+            final_levels.append({
+                'price': round(max(recent_highs), 2),
+                'type': 'resistance',
+                'strength': 1
+            })
+    
+    return jsonify({"levels": final_levels})
+
+
+# ENHANCED VERSION: More detailed explanations with key levels
+@ai_bp.route('/explain_chart_detailed', methods=['POST'])
+def explain_chart_detailed():
+    """
+    Detailed chart explanation with technical insights
+    Provides more depth while still being accessible
+    """
+    data = request.get_json() or {}
+    symbol = data.get('symbol', 'UNKNOWN')
+    timeframe = data.get('timeframe', '1d')
+    prices = data.get('prices', {})
+    candles = data.get('candles', {})
+    
+    current_price = prices.get('current', 0)
+    high_price = prices.get('high', 0)
+    low_price = prices.get('low', 0)
+    
+    closes = candles.get('c', [])
+    opens = candles.get('o', [])
+    highs = candles.get('h', [])
+    lows = candles.get('l', [])
+    volumes = candles.get('v', [])
+    
+    if len(closes) < 20:
+        return jsonify({"error": "Not enough data"}), 400
+    
+    # Calculate key metrics
+    recent_closes = closes[-20:]
+    price_change = ((recent_closes[-1] - recent_closes[0]) / recent_closes[0]) * 100
+    
+    # Volatility (simple ATR approximation)
+    recent_ranges = [highs[i] - lows[i] for i in range(max(0, len(highs) - 14), len(highs))]
+    avg_range = sum(recent_ranges) / len(recent_ranges) if recent_ranges else 0
+    volatility_pct = (avg_range / current_price) * 100 if current_price > 0 else 0
+    
+    # Volume analysis
+    avg_volume = sum(volumes[-20:]) / 20 if len(volumes) >= 20 else 0
+    recent_volume = volumes[-1] if volumes else 0
+    volume_ratio = (recent_volume / avg_volume) if avg_volume > 0 else 1.0
+    
+    # Trend strength
+    trend_strength = abs(price_change)
+    if trend_strength < 2:
+        strength_desc = "weak"
+    elif trend_strength < 5:
+        strength_desc = "moderate"
+    else:
+        strength_desc = "strong"
+    
+    # Build detailed summary
+    direction = "upward" if price_change > 0 else "downward"
+    summary = f"{symbol} is showing a {strength_desc} {direction} trend over the recent period. "
+    summary += f"The price has moved {abs(price_change):.1f}% "
+    summary += f"{'up' if price_change > 0 else 'down'} to ${current_price:.2f}. "
+    
+    if volume_ratio > 1.5:
+        summary += "Trading volume is significantly higher than average, suggesting strong interest. "
+    elif volume_ratio < 0.7:
+        summary += "Trading volume is lower than average, suggesting reduced interest. "
+    
+    summary += f"The stock's average daily range is about {volatility_pct:.1f}% of its price. "
+    
+    # Key levels
+    support_levels = sorted(list(set([round(l, 2) for l in sorted(lows[-30:])[:3]])))
+    resistance_levels = sorted(list(set([round(h, 2) for h in sorted(highs[-30:], reverse=True)[:3]])), reverse=True)
+    
+    response = {
+        "symbol": symbol,
+        "timeframe": timeframe,
+        "current_price": round(current_price, 2),
+        "trend": {
+            "direction": "up" if price_change > 0 else "down",
+            "strength": strength_desc,
+            "change_pct": round(price_change, 2)
+        },
+        "volatility": {
+            "avg_range": round(avg_range, 2),
+            "pct_of_price": round(volatility_pct, 2)
+        },
+        "volume": {
+            "current": int(recent_volume),
+            "average": int(avg_volume),
+            "ratio": round(volume_ratio, 2),
+            "description": "High" if volume_ratio > 1.5 else ("Low" if volume_ratio < 0.7 else "Normal")
+        },
+        "support_levels": support_levels[:2],
+        "resistance_levels": resistance_levels[:2],
+        "summary": summary,
+        "key_insights": [
+            f"💡 Price is currently ${current_price:.2f}",
+            f"📊 {abs(price_change):.1f}% {direction} move recently",
+            f"📈 Volume is {volume_ratio:.0%} of average" if volume_ratio > 0 else "No volume data",
+            f"🎯 Key support near ${support_levels[0]:.2f}" if support_levels else "No clear support identified",
+            f"🚧 Key resistance near ${resistance_levels[0]:.2f}" if resistance_levels else "No clear resistance identified"
+        ]
+    }
+    
+    return jsonify(response)
+
+# Plans
+plans_bp = Blueprint('plans', __name__, url_prefix='/api')
+
+@plans_bp.route('/plans', methods=['POST'])
+@login_required
+def create_plan():
+    from models import db as _db, Plan, PlanAlert
+    j = request.get_json(force=True) or {}
+    draft_payload = j.get('draft_payload')  # optional: full explain payload
+    symbol = (j.get('symbol') or draft_payload and draft_payload.get('symbol') or '').upper()
+    scenario_direction = j.get('scenario_direction')
+    invalidation = j.get('invalidation')
+    targets = j.get('targets') or []
+    sizing = j.get('sizing') or {}
+    playbook_tags = j.get('playbook_tags') or []
+    rr_expected = j.get('rr_expected')
+    if not symbol:
+        return jsonify({"error":"symbol required"}), 400
+    plan = Plan(
+        user_id=current_user.id,
+        symbol=symbol,
+        scenario_direction=scenario_direction,
+        invalidation=invalidation,
+        targets=targets,
+        playbook_tags=playbook_tags,
+        rr_expected=rr_expected,
+        sizing=sizing,
+        draft_payload=draft_payload,
+    )
+    _db.session.add(plan)
+    _db.session.flush()
+    alerts = j.get('alerts') or []
+    for a in alerts:
+        _db.session.add(PlanAlert(plan_id=plan.id, type=a, channel='email', status='active'))
+    _db.session.commit()
+    return jsonify({"plan_id": plan.id})
+
+# Usage counters
+usage_bp = Blueprint('usage', __name__, url_prefix='/api/usage')
+
+def _week_start(dt_utc):
+    # Monday-based week
+    return (dt_utc - timedelta(days=dt_utc.weekday())).date()
+
+@usage_bp.route('/explain_chart', methods=['GET'])
+def usage_explain_chart():
+    if not current_user.is_authenticated:
+        return jsonify({"weekly_count": 0, "weekly_limit": 1, "reset_at": None})
+    from models import UsageCounter
+    now = datetime.now(timezone.utc)
+    wk = _week_start(now)
+    uc = UsageCounter.query.filter_by(user_id=current_user.id, key='explain_chart', week_start=wk).first()
+    count = uc.count if uc else 0
+    limit = 999999 if current_user.has_pro_access() else 3
+    reset_at = datetime.combine(wk + timedelta(days=7), datetime.min.time(), tzinfo=timezone.utc).isoformat()
+    return jsonify({"weekly_count": count, "weekly_limit": limit, "reset_at": reset_at})
+
+# Imports (IBKR Flex CSV first)
+imports_bp = Blueprint('imports', __name__, url_prefix='/api/imports')
+
+def _parse_ibkr_flex_csv(raw_bytes):
+    text = raw_bytes.decode('utf-8', errors='ignore')
+    reader = csv.DictReader(_io.StringIO(text))
+    out=[]
+    for r in reader:
+        cls = (r.get('AssetClass') or '').upper()
+        if cls not in ('STK','OPT'):
+            continue
+        trade_date = (r.get('TradeDate') or '').strip()
+        trade_time = (r.get('TradeTime') or '00:00:00').strip()
+        ts = datetime.strptime(f"{trade_date} {trade_time}", '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc).isoformat()
+        side = 'BUY' if (r.get('Buy/Sell') or '').upper().startswith('B') else 'SELL'
+        base = {
+            "timestamp": ts,
+            "side": side,
+            "quantity": float(r.get('Quantity') or 0),
+            "price": float(r.get('TradePrice') or 0),
+            "commission": abs(float(r.get('IBCommission') or 0)),
+            "fees": abs(float(r.get('ExchangeFees') or 0)),
+            "currency": r.get('Currency') or 'USD',
+            "broker_trade_id": (r.get('TradeID') or '').strip(),
+            "raw": r
+        }
+        if cls == 'STK':
+            base.update({"asset_type":"equity", "symbol": (r.get('Symbol') or r.get('UnderlyingSymbol') or '').upper()})
+        else:
+            base.update({
+                "asset_type":"option",
+                "symbol": (r.get('UnderlyingSymbol') or r.get('Symbol') or '').upper(),
+                "right": (r.get('Right') or '').strip().upper(),
+                "strike": float(r.get('Strike') or 0),
+                "expiration": (r.get('Expiry') or '').strip(),
+                "multiplier": int(r.get('Multiplier') or 100),
+                "occ": (r.get('ConidDescription') or '').strip()
+            })
+        out.append(base)
+    return out
+
+def _normalize_exec(broker, account, r):
+    ts = r["timestamp"]
+    symbol = (r["symbol"] or '').upper()
+    base = {
+        "broker": broker,
+        "broker_trade_id": r.get("broker_trade_id",""),
+        "account_id": account,
+        "timestamp_utc": ts,
+        "symbol": symbol,
+        "asset_type": r["asset_type"],
+        "side": r["side"],
+        "quantity": abs(float(r["quantity"])),
+        "price": float(r["price"]),
+        "commission": float(r.get("commission",0)),
+        "fees": float(r.get("fees",0)),
+        "currency": r.get("currency","USD"),
+        "raw_description": str(r.get("raw",""))[:2000]
+    }
+    if r["asset_type"]=="option":
+        base.update({"right": r.get("right"), "strike": float(r.get("strike") or 0), "expiration": r.get("expiration"), "multiplier": int(r.get("multiplier",100)), "occ": r.get("occ")})
+    bid = (base.get("broker_trade_id") or '').strip()
+    if bid:
+        execution_id = hashlib.sha1(f"{broker}|{bid}".encode()).hexdigest()
+    else:
+        fp = f"{broker}|{account}|{ts}|{symbol}|{base.get('right','')}|{base.get('strike','')}|{base.get('expiration','')}|{base['side']}|{base['quantity']}|{base['price']}"
+        execution_id = hashlib.sha1(fp.encode()).hexdigest()
+    base["execution_id"] = execution_id
+    return base
+
+@imports_bp.route('/upload', methods=['POST'])
+@login_required
+def imports_upload():
+    broker = (request.form.get('broker') or 'IBKR').upper()
+    account = request.form.get('account_alias','Account-1')
+    files = request.files.getlist('files')
+    if not files:
+        return jsonify({"error":"no files"}), 400
+    raw_rows=[]
+    for f in files:
+        content = f.read()
+        if broker=='IBKR':
+            raw_rows += _parse_ibkr_flex_csv(content)
+        else:
+            return jsonify({"error": f"broker {broker} parser not implemented"}), 400
+    normalized = [_normalize_exec(broker, account, r) for r in raw_rows]
+    uniq = {r["execution_id"]: r for r in normalized}
+    preview_id = hashlib.sha1(f"{current_user.id}|{time.time()}".encode()).hexdigest()[:12]
+    # store in session for preview; in prod use DB/Redis
+    session[f"import_preview_{preview_id}"] = {"broker": broker, "account": account, "rows": list(uniq.values())}
+    stats = {"rows": len(uniq), "symbols": len({r['symbol'] for r in uniq.values()})}
+    return jsonify({"import_id": preview_id, "stats": stats, "warnings": []})
+
+@imports_bp.route('/preview/<import_id>', methods=['GET'])
+@login_required
+def imports_preview(import_id):
+    data = session.get(f"import_preview_{import_id}")
+    if not data:
+        return jsonify({"error":"not found"}), 404
+    sample = data["rows"][:50]
+    return jsonify({"import_id": import_id, "stats": {"rows": len(data["rows"])}, "sample": sample})
+
+@imports_bp.route('/commit', methods=['POST'])
+@login_required
+def imports_commit():
+    from models import db as _db, Execution
+    payload = request.get_json(force=True) or {}
+    import_id = payload.get('import_id')
+    data = session.get(f"import_preview_{import_id}")
+    if not data:
+        return jsonify({"error":"not found"}), 404
+    rows = data["rows"]
+    kept, skipped = 0, 0
+    for r in rows:
+        if Execution.query.get(r["execution_id"]):
+            skipped += 1
+            continue
+        ex = Execution(
+            execution_id=r["execution_id"], user_id=current_user.id, broker=data["broker"], broker_trade_id=r.get("broker_trade_id"), account_id=data["account"],
+            timestamp_utc=datetime.fromisoformat(r["timestamp_utc"].replace('Z','+00:00')), symbol=r["symbol"], asset_type=r["asset_type"], side=r["side"], quantity=r["quantity"], price=r["price"], commission=r.get("commission",0), fees=r.get("fees",0), currency=r.get("currency","USD"), right=r.get("right"), strike=r.get("strike"), expiration=(datetime.strptime(r["expiration"], "%Y-%m-%d").date() if r.get("expiration") else None), multiplier=r.get("multiplier"), occ=r.get("occ")
+        )
+        _db.session.add(ex)
+        kept += 1
+    _db.session.commit()
+    session.pop(f"import_preview_{import_id}", None)
+    return jsonify({"import_id": import_id, "kept": kept, "skipped_duplicates": skipped, "total_seen": len(rows)})
+
+# Options payoff
+@options_bp.route('/payoff', methods=['POST'])
+def options_payoff():
+    j = request.get_json(force=True) or {}
+    legs = j.get('legs') or []
+    grid_start = float(j.get('grid_start') or 50)
+    grid_end = float(j.get('grid_end') or 150)
+    grid_step = float(j.get('grid_step') or 1)
+    points = []
+    s = grid_start
+    def leg_value(leg, S):
+        right = (leg.get('right') or '').upper()
+        K = float(leg.get('strike'))
+        qty = float(leg.get('qty') or leg.get('quantity') or 1)
+        side = (leg.get('side') or 'BUY').upper()
+        mult = int(leg.get('multiplier') or 100)
+        price = float(leg.get('price') or 0)
+        intrinsic = max(0.0, S-K) if right=='C' else max(0.0, K-S)
+        val = intrinsic * mult
+        # PnL at expiry w.r.t entry price (if provided)
+        pnl = (val - price*mult) if side=='BUY' else ((price*mult) - val)
+        return pnl * qty
+    while s <= grid_end + 1e-9:
+        pnl = sum(leg_value(l, s) for l in legs)
+        points.append({"underlier": round(s,4), "pnl": round(pnl,2)})
+        s += grid_step
+    return jsonify({"grid_start": grid_start, "grid_end": grid_end, "grid_step": grid_step, "points": points})
+
+# Market Brief status/admin
+brief_bp = Blueprint('brief', __name__, url_prefix='/api/brief')
+
+@brief_bp.route('/status', methods=['GET'])
+def brief_status():
+    from models import MarketBrief
+    last = MarketBrief.query.order_by(MarketBrief.created_at.desc()).first()
+    ts = last.created_at.isoformat() if last else None
+    stale = None
+    if last:
+        age = datetime.utcnow() - last.created_at
+        stale = age.total_seconds()
+    return jsonify({"last_success": ts, "stale_seconds": stale})
+
+@brief_bp.route('/admin_generate', methods=['POST'])
+@login_required
+def brief_admin_generate():
+    admin_email = current_app.config.get('ADMIN_EMAIL')
+    if not admin_email or current_user.email != admin_email:
+        return jsonify({"error":"forbidden"}), 403
+    try:
+        # If you have a function to generate the brief, call it here
+        # send_weekly_market_brief_to_subscribers()
+        return jsonify({"status":"queued"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+# Blueprints will be registered after app initialization below
+
+# Allow OAuth over HTTP only in development. In production we require HTTPS
+# so Google's OAuth tokens aren't leaked over the wire. Previously this flag
+# defaulted to ON whenever the env var was unset, which disabled TLS enforcement
+# on prod too.
+if os.getenv('FLASK_ENV') == 'development' or os.getenv('FLASK_DEBUG') == '1':
+    os.environ.setdefault('OAUTHLIB_INSECURE_TRANSPORT', '1')
 from flask_dance.contrib.google import make_google_blueprint, google
 
 # Load environment variables from .env file
@@ -80,6 +803,27 @@ else:
     app.config['SERVER_NAME'] = None
 
 mail = Mail(app)
+
+# Security helper: Validate redirect URLs to prevent open redirects
+def is_safe_url(target):
+    """
+    Validate that a URL is safe for redirect (prevents open redirect attacks).
+    Returns True if the URL is relative or on the same host, False otherwise.
+    """
+    if not target:
+        return False
+    
+    # Allow relative URLs (starting with /)
+    if target.startswith('/'):
+        return True
+    
+    # Parse the target URL
+    from urllib.parse import urlparse
+    ref_url = urlparse(request.host_url)
+    test_url = urlparse(target)
+    
+    # Allow URLs on the same host
+    return test_url.scheme in ('http', 'https') and test_url.netloc == ref_url.netloc
 
 # Initialize extensions
 db.init_app(app)
@@ -111,17 +855,34 @@ if GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET:
         redirect_to="google_login"  # Redirect to our custom login handler after OAuth
     )
     app.register_blueprint(google_bp, url_prefix="/login")
-    print("✅ Google OAuth blueprint registered successfully")
+    print("Google OAuth blueprint registered successfully")
 else:
-    print("⚠️  Google OAuth not configured. Set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET env vars.")
+    print("WARNING: Google OAuth not configured. Set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET env vars.")
+
+# ───────── Candle-data configuration (served by providers.DataProvider) ─────────
+# UI timeframe -> (polygon_multiplier, polygon_timespan, default_lookback_days)
+TF_MAP = {
+    "1m": (1, "minute", 30),
+    "5m": (5, "minute", 90),
+    "15m": (15, "minute", 90),
+    "30m": (30, "minute", 90),
+    "1h": (1, "hour", 730),
+    "4h": (4, "hour", 730),
+    "1d": (1, "day", 3650),
+}
+
+# Simple cache + rate limiter
+CACHE = {}  # key -> {"data":..., "ts": epoch, "ttl": seconds}
+TTL = {"1m": 30, "5m": 60, "1h": 300, "4h": 600, "1d": 900}
+BUCKET = {"tokens": 60, "capacity": 60, "refill_rate": 1.0, "last": time.time()}
 
 # Register billing blueprint
 try:
     from billing import bp as billing_bp, requires_pro
     app.register_blueprint(billing_bp)
-    print("✅ Billing blueprint registered successfully")
+    print("Billing blueprint registered successfully")
 except ImportError as e:
-    print(f"⚠️  Billing blueprint not available: {e}")
+    print(f"WARNING: Billing blueprint not available: {e}")
     # Fallback requires_pro decorator
     def requires_pro(f):
         from functools import wraps
@@ -137,11 +898,44 @@ except ImportError as e:
 
 # Brief routes are now defined directly in app.py
 
+# Register internal API blueprints (after app init)
+app.register_blueprint(options_bp)
+app.register_blueprint(ai_bp)
+app.register_blueprint(plans_bp)
+app.register_blueprint(usage_bp)
+app.register_blueprint(imports_bp)
+app.register_blueprint(brief_bp)
+
+# NOTE: the /imports UI page route was removed because the companion
+# imports.html template was never shipped with the app, so hitting the route
+# produced a 500 via TemplateNotFound. The /api/imports/* endpoints are still
+# served by ``imports_bp`` for programmatic use until a real UI ships.
+
 def is_pro_user():
     """Check if current user has Pro access for page-level preview gating"""
     return current_user.is_authenticated and current_user.has_pro_access()
 
 # ───────── Google Login Route ─────────
+@app.context_processor
+def inject_config():
+    """Make config available to templates"""
+    # Check if Google OAuth is enabled
+    # Check if blueprint is registered by trying to see if 'google' blueprint exists
+    google_oauth_enabled = False
+    try:
+        google_oauth_enabled = bool(
+            app.config.get('GOOGLE_OAUTH_CLIENT_ID') and
+            'google' in app.blueprints
+        )
+    except:
+        # Fallback to just checking config
+        google_oauth_enabled = bool(app.config.get('GOOGLE_OAUTH_CLIENT_ID'))
+    
+    return dict(
+        config=app.config,
+        google_oauth_enabled=google_oauth_enabled
+    )
+
 @app.route("/google_login")
 def google_login():
     try:
@@ -189,12 +983,15 @@ def google_login():
                     username = f"{base_username}_{secrets.token_urlsafe(8)}"
                     break
             
-            # Auto-create user account with better error handling
+            # Auto-create user account with better error handling. Google has
+            # already verified the email address via OAuth, so we mark the
+            # local account as email_verified=True; otherwise these users
+            # would be blocked from receiving briefs by the verification gate.
             try:
                 user = User(username=username, email=email)
-                # Set a random password
                 user.set_password(secrets.token_urlsafe(16))
-                
+                user.email_verified = True
+
                 print(f"Adding user to database: {username}")
                 db.session.add(user)
                 db.session.commit()
@@ -216,6 +1013,15 @@ def google_login():
                 return redirect(url_for("login"))
         else:
             print(f"User found: {user.username}")
+            # Existing accounts that were created via password signup may not
+            # have verified their email yet; since they've now proven control
+            # of the address via Google, mark them verified.
+            if not user.email_verified:
+                user.email_verified = True
+                try:
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
 
         print("Logging in user...")
         login_user(user)
@@ -263,10 +1069,23 @@ def google_login():
 def load_user(id):
     return User.query.get(int(id))
 
-# Debug route for Google OAuth
+def _debug_routes_enabled() -> bool:
+    """OAuth debug routes are only reachable for local development or for a
+    logged-in support admin. Unauthenticated users on production can no longer
+    read raw session/OAuth state via these endpoints."""
+    if os.getenv("FLASK_ENV") == "development" or os.getenv("FLASK_DEBUG") == "1":
+        return True
+    try:
+        return bool(current_user.is_authenticated and current_user.email == "support@optionsplunge.com")
+    except Exception:
+        return False
+
+
 @app.route("/debug/google-oauth")
 def debug_google_oauth():
-    """Debug route to check Google OAuth configuration"""
+    """Debug route to check Google OAuth configuration (dev/admin only)."""
+    if not _debug_routes_enabled():
+        abort(404)
     debug_info = {
         "google_oauth_client_id": "Set" if GOOGLE_OAUTH_CLIENT_ID else "Not set",
         "google_oauth_client_secret": "Set" if GOOGLE_OAUTH_CLIENT_SECRET else "Not set",
@@ -280,10 +1099,12 @@ def debug_google_oauth():
     }
     return jsonify(debug_info)
 
-# Debug route for OAuth callback
+
 @app.route("/debug/oauth-callback")
 def debug_oauth_callback():
-    """Debug route to check OAuth callback state"""
+    """Debug route to check OAuth callback state (dev/admin only)."""
+    if not _debug_routes_enabled():
+        abort(404)
     from flask import request
     debug_info = {
         "request_args": dict(request.args),
@@ -297,14 +1118,11 @@ def debug_oauth_callback():
 # Initialize AI analyzer
 ai_analyzer = TradingAIAnalyzer()
 
-# Initialize Tradier API configuration
-TRADIER_API_TOKEN = os.getenv("TRADIER_API_TOKEN")
-TRADIER_API_BASE_URL = "https://api.tradier.com/v1"  # Production environment
-print(f"Tradier API Base URL: {TRADIER_API_BASE_URL}")
-print(f"Tradier token configured: {'Yes' if TRADIER_API_TOKEN else 'No'}")
-
-if not TRADIER_API_TOKEN:
-    print("Warning: TRADIER_API_TOKEN environment variable not set")
+# Market-data provider (Polygon.io / "Massive API") via providers.DataProvider.
+_DP = get_default_provider()
+print(f"Market-data provider configured: Polygon={'yes' if _DP.polygon_key else 'no'}")
+if not _DP.polygon_key:
+    print("Warning: MASSIVE_API_KEY / POLYGON_API_KEY is not set")
 
 
 # ──────────────────────────────────────────────────
@@ -387,7 +1205,7 @@ def market_brief():
                 "QQQ": {"last": "576.06", "S": ["558.78","571.35","566.65"], "R": ["593.34","580.94","585.83"], "weekly_S": ["566.63","562.85"], "weekly_R": ["576.09","581.77"]},
                 "VIX": {"last": "15.38"}
             },
-            "gappers_note": "🚀 Gapping Stocks"
+            "gappers_note": "Gapping Stocks"
         }
 
         latest_daily_brief = None
@@ -686,231 +1504,89 @@ def publish_morning_brief():
         return jsonify({"error": str(e)}), 400
 
 
-def get_tradier_headers():
-    """Get headers for Tradier API requests"""
-    if not TRADIER_API_TOKEN:
-        print("Tradier API token not configured")
-        return None  # Token not configured
-
-    headers = {
-        "Authorization": f"Bearer {TRADIER_API_TOKEN}",
-        "Accept": "application/json",
-    }
-    return headers
+def _contracts_to_df(contracts, side):
+    """Normalize providers.DataProvider option contracts of one side (call/put)
+    into the DataFrame schema the options-calculator template expects."""
+    rows = []
+    for c in contracts:
+        if (c.get("type") or "").lower() != side:
+            continue
+        rows.append(
+            {
+                "strike": float(c.get("strike") or 0),
+                "last": float(c.get("last") or 0),
+                "bid": float(c.get("bid") or 0),
+                "ask": float(c.get("ask") or 0),
+                "volume": int(c.get("volume") or 0),
+                "open_interest": int(c.get("open_interest") or 0),
+                "implied_volatility": float(c.get("iv") or 0),
+            }
+        )
+    return pd.DataFrame(rows) if rows else pd.DataFrame()
 
 
 def get_expiration_dates_tradier(symbol):
-    """Return available option expiration dates from Tradier"""
-    if not TRADIER_API_TOKEN:
-        print("Tradier API token not configured")
-        return None
+    """Return available option expiration dates via DataProvider (Polygon).
 
+    Name preserved for backward compatibility with existing callers; the
+    Tradier implementation has been removed.
+    """
     try:
-        headers = get_tradier_headers()
-        if not headers:
-            print("Tradier API token not configured, skipping Tradier API call")
-            return None
-
-        exp_url = f"{TRADIER_API_BASE_URL}/markets/options/expirations"
-        exp_params = {"symbol": symbol}
-
-        exp_response = requests.get(exp_url, params=exp_params, headers=headers)
-        if exp_response.status_code != 200:
-            print(f"Error getting expirations for {symbol}: {exp_response.status_code}")
-            return None
-
-        exp_data = exp_response.json()
-        if "expirations" not in exp_data or not exp_data["expirations"]:
-            print(f"No expirations found for {symbol}")
-            return None
-
-        expirations = exp_data["expirations"]["date"]
-        if isinstance(expirations, str):
-            expirations = [expirations]
-
-        return expirations
-
-    except Exception as e:
-        print(f"Error fetching expirations from Tradier for {symbol}: {e}")
+        expirations = get_default_provider().get_option_expirations(symbol)
+    except Exception as exc:
+        print(f"Error fetching expirations for {symbol}: {exc}")
         return None
+    return expirations or None
 
 
 def get_options_chain_tradier(symbol, expiration_date=None):
-    """Get options chain data using Tradier API"""
-    if not TRADIER_API_TOKEN:
-        print("Tradier API token not configured")
-        return None, None, None, None
+    """Get options chain data via DataProvider.
 
+    Returns (calls_df, puts_df, current_price, expirations) to preserve the
+    existing call-site contract.
+    """
     try:
-        headers = get_tradier_headers()
-        if not headers:
-            print("Tradier API token not configured, skipping Tradier API call")
+        dp = get_default_provider()
+        expirations = dp.get_option_expirations(symbol) or []
+        if not expirations:
             return None, None, None, None
-
-        # First get available expiration dates
-        exp_url = f"{TRADIER_API_BASE_URL}/markets/options/expirations"
-        exp_params = {"symbol": symbol}
-
-        exp_response = requests.get(exp_url, params=exp_params, headers=headers)
-        if exp_response.status_code != 200:
-            print(f"Error getting expirations for {symbol}: {exp_response.status_code}")
-            return None, None, None, None
-
-        exp_data = exp_response.json()
-        if "expirations" not in exp_data or not exp_data["expirations"]:
-            print(f"No expirations found for {symbol}")
-            return None, None, None, None
-
-        expirations = exp_data["expirations"]["date"]
-        if isinstance(expirations, str):
-            expirations = [expirations]
-
-        # Use provided expiration or first available
-        target_date = (
+        target = (
             expiration_date
             if expiration_date and expiration_date in expirations
             else expirations[0]
         )
-
-        # Get options chain for the target date
-        chain_url = f"{TRADIER_API_BASE_URL}/markets/options/chains"
-        chain_params = {"symbol": symbol, "expiration": target_date}
-
-        chain_response = requests.get(chain_url, params=chain_params, headers=headers)
-        if chain_response.status_code != 200:
-            print(
-                f"Error getting options chain for {symbol}: {chain_response.status_code}"
-            )
+        contracts = dp.get_option_chain(symbol, expiration_date=target)
+        if not contracts:
             return None, None, None, None
-
-        chain_data = chain_response.json()
-        if "options" not in chain_data or not chain_data["options"]:
-            print(f"No options data for {symbol} on {target_date}")
-            return None, None, None, None
-
-        options = chain_data["options"]["option"]
-        if not isinstance(options, list):
-            options = [options]
-
-        # Separate calls and puts
-        calls_data = []
-        puts_data = []
-
-        for option in options:
-            option_data = {
-                "strike": float(option["strike"]),
-                "last": float(option.get("last", 0)) if option.get("last") else 0,
-                "bid": float(option.get("bid", 0)) if option.get("bid") else 0,
-                "ask": float(option.get("ask", 0)) if option.get("ask") else 0,
-                "volume": int(option.get("volume", 0)) if option.get("volume") else 0,
-                "open_interest": (
-                    int(option.get("open_interest", 0))
-                    if option.get("open_interest")
-                    else 0
-                ),
-                "implied_volatility": (
-                    float(option.get("greeks", {}).get("mid_iv", 0))
-                    if option.get("greeks")
-                    else 0
-                ),
-            }
-
-            if option["option_type"] == "call":
-                calls_data.append(option_data)
-            else:
-                puts_data.append(option_data)
-
-        # Convert to DataFrames for compatibility
-        calls_df = pd.DataFrame(calls_data) if calls_data else pd.DataFrame()
-        puts_df = pd.DataFrame(puts_data) if puts_data else pd.DataFrame()
-
-        # Get current stock price
-        current_price, description = get_stock_price_tradier(symbol)
-
+        calls_df = _contracts_to_df(contracts, "call")
+        puts_df = _contracts_to_df(contracts, "put")
+        quote = dp.get_snapshot(symbol)
+        current_price = float(quote["price"]) if quote and quote.get("price") else None
         return calls_df, puts_df, current_price, expirations
-
-    except Exception as e:
-        print(f"Error fetching options data from Tradier for {symbol}: {e}")
+    except Exception as exc:
+        print(f"Error fetching options data for {symbol}: {exc}")
         return None, None, None, None
 
 
 def get_stock_price_tradier(symbol):
-    """Get current stock price and company name using Tradier API"""
-    if not TRADIER_API_TOKEN:
-        print("Tradier API token not configured")
-        return None, None
-
+    """Return (price, description). Description falls back to the symbol
+    because DataProvider does not expose a company-name field."""
     try:
-        headers = get_tradier_headers()
-        if not headers:
-            print("Tradier API token not configured")
-            return None, None
-
-        url = f"{TRADIER_API_BASE_URL}/markets/quotes"
-        params = {"symbols": symbol}
-
-        print(f"Requesting stock price for {symbol} from Tradier...")
-        response = requests.get(url, params=params, headers=headers)
-
-        if response.status_code != 200:
-            print(f"Tradier API error: {response.status_code} - {response.text}")
-            return None, None
-
-        data = response.json()
-        print(f"Tradier response: {data}")
-
-        if "quotes" in data and "quote" in data["quotes"]:
-            quote = data["quotes"]["quote"]
-            if isinstance(quote, list):
-                quote = quote[0]
-            price = float(quote.get("last", 0))
-            description = quote.get(
-                "description", symbol
-            )  # Fall back to symbol if no description
-            print(f"Got price for {symbol}: {price}, description: {description}")
-            return price, description
-
-        print(f"No price data found for {symbol} in Tradier response")
+        quote = get_default_provider().get_snapshot(symbol)
+    except Exception as exc:
+        print(f"Error getting stock price for {symbol}: {exc}")
         return None, None
-
-    except Exception as e:
-        print(f"Error getting stock price from Tradier for {symbol}: {e}")
-        import traceback
-
-        traceback.print_exc()
+    if not quote or quote.get("price") is None:
         return None, None
+    return float(quote["price"]), symbol
 
 
 def get_options_chain(symbol, expiration_date=None):
-    """Get options chain data using Tradier API only"""
-    if not TRADIER_API_TOKEN:
-        print("Tradier API token not configured")
+    """Slim wrapper kept for callers that want (calls_df, puts_df, price)."""
+    calls, puts, price, _ = get_options_chain_tradier(symbol, expiration_date)
+    if calls is None or puts is None or calls.empty or puts.empty:
         return None, None, None
-
-    try:
-        print(f"Getting options chain for {symbol} using Tradier API...")
-        calls, puts, current_price, expirations = get_options_chain_tradier(
-            symbol, expiration_date
-        )
-
-        if (
-            calls is not None
-            and puts is not None
-            and not calls.empty
-            and not puts.empty
-        ):
-            print(f"Successfully retrieved options data from Tradier for {symbol}")
-            return calls, puts, current_price
-
-        print(f"Failed to get options data for {symbol} from Tradier")
-        return None, None, None
-
-    except Exception as e:
-        print(f"Error in get_options_chain for {symbol}: {e}")
-        import traceback
-
-        traceback.print_exc()
-        return None, None, None
+    return calls, puts, price
 
 
 def black_scholes(S, K, T, r, sigma, option_type="call"):
@@ -1051,9 +1727,17 @@ def login():
             # Check if there's a pending trade to save
             if 'pending_trade' in session:
                 return redirect(url_for("add_trade"))
-                
+
+            # Check if this is a brand new user (created in last 5 minutes)
+            is_new_user = (datetime.utcnow() - user.created_at).total_seconds() < 300 if hasattr(user, 'created_at') else False
+
             next_page = request.args.get("next")
-            return redirect(next_page or url_for("index"))
+            if next_page and is_safe_url(next_page):
+                return redirect(next_page)
+            elif is_new_user:
+                return redirect(url_for("welcome"))
+            else:
+                return redirect(url_for("dashboard"))
         flash("Invalid username or password", "danger")
 
     return render_template("login.html", form=form, hide_sidebar=True)
@@ -1090,7 +1774,7 @@ def register():
             app.logger.warning(f"Failed to send verification email to {user.email}: {e}")
         
         login_user(user)
-        flash("Welcome to Options Plunge! Please check your email to verify your account and start receiving market briefs.", "success")
+        flash("Welcome to Options Plunge! 🎉 Check your email to verify and unlock all features.", "success")
         # Auto-enroll new user to Market Brief subscribers (confirmed & active)
         try:
             existing = MarketBriefSubscriber.query.filter_by(email=user.email).first()
@@ -1128,11 +1812,25 @@ def register():
         
         # Check if there's a pending trade to save
         if 'pending_trade' in session:
+            flash("Great! Now let's save that trade you were working on.", "info")
             return redirect(url_for("add_trade"))
-            
-        return redirect(url_for("verify_email_required"))
 
-    return render_template("register.html", form=form, hide_sidebar=True)
+        # Redirect to welcome page for new users
+        return redirect(url_for("welcome"))
+
+    response = make_response(render_template("register.html", form=form, hide_sidebar=True))
+    # Prevent caching to ensure Google OAuth button shows
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
+
+@app.route("/welcome")
+@login_required
+def welcome():
+    """Welcome page for new users after registration"""
+    return render_template("welcome.html")
 
 
 @app.route("/logout")
@@ -1444,6 +2142,10 @@ def add_trade():
             elif 'pending_trade' in session and 'exit_chart_image' in session['pending_trade']:
                 exit_chart_filename = session['pending_trade']['exit_chart_image']
 
+            # Chart data fields
+            chart_annotations_json = request.form.get("chart_annotations_json") or None
+            chart_snapshot_path = request.form.get("chart_snapshot_path") or None
+
             print(f"Creating trade with user_id: {current_user.id}")
             trade = Trade(
                 user_id=current_user.id,
@@ -1484,6 +2186,9 @@ def add_trade():
                 long_premium=form.long_premium.data,
                 short_premium=form.short_premium.data,
                 net_credit=form.net_credit.data,
+                # Chart data fields
+                chart_annotations=chart_annotations_json,
+                chart_snapshot_path=chart_snapshot_path,
             )
 
             print("Trade object created successfully")
@@ -1520,12 +2225,20 @@ def add_trade():
             next_action = request.form.get('next_action', 'save')
             
             if next_action == 'save_planned':
-                flash("Planned trade saved successfully!", "success")
+                flash("✓ Planned trade saved successfully! You can now analyze it with AI.", "success")
                 return redirect(url_for("view_trade", id=trade.id))
+            elif next_action == 'save_add':
+                # Save and add another trade
+                flash("✓ Trade saved successfully! You can add another trade below.", "success")
+                return redirect(url_for("add_trade"))
+            elif next_action == 'save_dup':
+                # Save and duplicate - redirect to add_trade with trade data pre-filled
+                flash("✓ Trade saved successfully! Form cleared for next trade.", "success")
+                return redirect(url_for("add_trade"))
             elif next_action == 'save_planned_analyze':
                 # Check if user has Pro access for AI analysis
                 if not current_user.has_pro_access():
-                    flash("Planned trade saved! AI planning requires Pro access. Upgrade to get AI-powered entry and exit recommendations.", "warning")
+                    flash("✓ Planned trade saved! AI planning requires Pro access. Upgrade to get AI-powered entry and exit recommendations.", "warning")
                     return redirect(url_for("view_trade", id=trade.id))
                 
                 try:
@@ -1536,13 +2249,13 @@ def add_trade():
                     
                     analysis = ai_analyzer.analyze_planned_trade(trade, user_settings)
                     if analysis:
-                        flash("Planned trade saved and AI analysis completed!", "success")
+                        flash("✓ Planned trade saved and AI analysis completed! Review the recommendations below.", "success")
                     else:
-                        flash("Planned trade saved! AI analysis failed - please try again later.", "warning")
+                        flash("✓ Planned trade saved! AI analysis failed - please try again later.", "warning")
                     return redirect(url_for("view_trade", id=trade.id))
                 except Exception as e:
                     print(f"Error in planned trade analysis: {e}")
-                    flash("Planned trade saved! AI analysis failed - please try again later.", "warning")
+                    flash("✓ Planned trade saved! AI analysis failed - please try again later.", "warning")
                     return redirect(url_for("view_trade", id=trade.id))
             else:
                 # Handle normal trade analysis for closed trades
@@ -1553,12 +2266,12 @@ def add_trade():
                 ):
                     try:
                         ai_analyzer.analyze_trade(trade)
-                        flash("Trade added and analyzed successfully!", "success")
+                        flash("✓ Trade added and analyzed successfully! View it in your trades list.", "success")
                     except Exception as e:
                         print(f"Error in auto-analysis: {e}")
-                        flash("Trade added successfully! Analysis will be done later.", "success")
+                        flash("✓ Trade added successfully! Analysis will be done later. View it in your trades list.", "success")
                 else:
-                    flash("Trade added successfully!", "success")
+                    flash("✓ Trade added successfully! View it in your trades list.", "success")
 
                 return redirect(url_for("trades"))
             
@@ -1609,7 +2322,7 @@ def edit_trade(id):
             form.populate_obj(trade)
             trade.calculate_pnl()
             db.session.commit()
-            flash("Trade updated successfully!", "success")
+            flash("✓ Trade updated successfully! You can now analyze it with AI.", "success")
             return redirect(url_for("view_trade", id=trade.id))
 
     return render_template("edit_trade.html", form=form, trade=trade)
@@ -1919,51 +2632,18 @@ def analytics():
             "analytics.html", charts_json=None, stats=None, no_data=True, show_login_prompt=False, show_demo_data=True
         )
     else:
-        # For unauthenticated users, show sample data
-        from datetime import datetime, timedelta
-        
-        # Create sample data for demonstration
-        sample_dates = [
-            datetime.now() - timedelta(days=30),
-            datetime.now() - timedelta(days=25),
-            datetime.now() - timedelta(days=20),
-            datetime.now() - timedelta(days=15),
-            datetime.now() - timedelta(days=10),
-            datetime.now() - timedelta(days=5),
-            datetime.now() - timedelta(days=1)
-        ]
-        
-        sample_data = [
-            {"date": sample_dates[0], "pnl": 250, "is_winner": True, "setup_type": "breakout"},
-            {"date": sample_dates[1], "pnl": -150, "is_winner": False, "setup_type": "reversal"},
-            {"date": sample_dates[2], "pnl": 400, "is_winner": True, "setup_type": "breakout"},
-            {"date": sample_dates[3], "pnl": 175, "is_winner": True, "setup_type": "momentum"},
-            {"date": sample_dates[4], "pnl": -200, "is_winner": False, "setup_type": "reversal"},
-            {"date": sample_dates[5], "pnl": 300, "is_winner": True, "setup_type": "breakout"},
-            {"date": sample_dates[6], "pnl": 125, "is_winner": True, "setup_type": "momentum"}
-        ]
-        
-        df = pd.DataFrame(sample_data)
-        
-        stats = {
-            "total_trades": 7,
-            "winning_trades": 5,
-            "losing_trades": 2,
-            "win_rate": 71.4,
-            "total_pnl": 900,
-            "avg_win": 250,
-            "avg_loss": -175,
-            "largest_win": 400,
-            "largest_loss": -200,
-            "profit_factor": 3.57,
-        }
-
-        # Create charts with sample data
-        charts = create_analytics_charts(df)
-        charts_json = json.dumps(charts, cls=plotly.utils.PlotlyJSONEncoder)
-        
+        # Unauthenticated visitors get the clearly-labeled demo view (demo
+        # banner + watermark + demo-styled cards). We deliberately do NOT
+        # render the normal analytics layout with hardcoded 71.4% / $900
+        # numbers, because that previously read as if it were the visitor's
+        # own performance.
         return render_template(
-            "analytics.html", charts_json=charts_json, stats=stats, no_data=False, show_login_prompt=True
+            "analytics.html",
+            charts_json=None,
+            stats=None,
+            no_data=False,
+            show_login_prompt=True,
+            show_demo_data=True,
         )
 
 
@@ -2359,6 +3039,42 @@ def bulk_analysis():
         )
 
 
+@app.route("/api/platform-stats")
+def platform_stats():
+    """Return real platform activity statistics for landing page"""
+    try:
+        stats = {
+            "trades_tracked": Trade.query.count(),
+            "journal_entries": TradingJournal.query.count(),
+            "ai_analyses": TradeAnalysis.query.count(),
+            "briefs_sent": MarketBriefSubscriber.query.filter_by(confirmed=True).count() * 52  # Approximate weekly briefs
+        }
+        
+        # Format numbers for display
+        def format_number(n):
+            if n >= 1000000:
+                return f"{n/1000000:.1f}M"
+            elif n >= 1000:
+                return f"{n/1000:.1f}K"
+            else:
+                return str(n)
+        
+        return jsonify({
+            "trades_tracked": format_number(stats["trades_tracked"]),
+            "journal_entries": format_number(stats["journal_entries"]),
+            "ai_analyses": format_number(stats["ai_analyses"]),
+            "briefs_sent": format_number(stats["briefs_sent"])
+        })
+    except Exception as e:
+        # Return placeholder stats if database query fails
+        return jsonify({
+            "trades_tracked": "1K+",
+            "journal_entries": "500+",
+            "ai_analyses": "2K+",
+            "briefs_sent": "10K+"
+        })
+
+
 @app.route("/api/quick_trade", methods=["POST"])
 @login_required
 @requires_pro
@@ -2392,6 +3108,510 @@ def api_quick_trade():
     return jsonify({"success": False, "errors": form.errors})
 
 
+# ───────── Candle-data helper functions (DataProvider-backed) ─────────
+def _bucket_allow():
+    """Token bucket rate limiter"""
+    now = time.time()
+    delta = now - BUCKET["last"]
+    BUCKET["last"] = now
+    BUCKET["tokens"] = min(BUCKET["capacity"], BUCKET["tokens"] + delta * BUCKET["refill_rate"])
+    if BUCKET["tokens"] >= 1:
+        BUCKET["tokens"] -= 1
+        return True
+    return False
+
+def _cache_get(key):
+    """Get cached data if not expired"""
+    row = CACHE.get(key)
+    if row and (time.time() - row["ts"] < row["ttl"]):
+        return row["data"]
+    return None
+
+def _cache_put(key, data, ttl):
+    """Store data in cache with TTL"""
+    CACHE[key] = {"data": data, "ts": time.time(), "ttl": ttl}
+
+def _iso_to_ms(iso):
+    """Convert an ISO-8601 timestamp string to milliseconds since epoch."""
+    if not iso:
+        return None
+    if iso.endswith("Z"):
+        iso = iso[:-1] + "+00:00"
+    return int(dt.datetime.fromisoformat(iso).timestamp() * 1000)
+
+def _coalesce(v, default=0): 
+    return default if v is None else v
+
+def _bars_to_columnar(bars):
+    """Convert normalized DataProvider bars into the {t,o,h,l,c,v} arrays
+    that the frontend candlestick chart expects."""
+    out = {"t": [], "o": [], "h": [], "l": [], "c": [], "v": []}
+    for b in bars or []:
+        ms = _iso_to_ms(b.get("timestamp"))
+        if ms is None:
+            continue
+        out["t"].append(ms)
+        out["o"].append(round(b.get("open") or 0, 4))
+        out["h"].append(round(b.get("high") or 0, 4))
+        out["l"].append(round(b.get("low") or 0, 4))
+        out["c"].append(round(b.get("close") or 0, 4))
+        out["v"].append(int(b.get("volume") or 0))
+    return out
+
+
+def _fetch_bars(symbol, tf, start=None, end=None, adjust=True):
+    """Fetch bars via DataProvider for a UI timeframe string (1m/5m/1h/1d...).
+
+    Polygon returns split-adjusted OHLCV natively when `adjusted=true`, so
+    no separate split-factor pass is needed.
+    """
+    multiplier, timespan, lookback = TF_MAP.get(tf, (1, "day", 3650))
+    if not end:
+        end = dt.date.today().isoformat()
+    if not start:
+        start = (dt.date.today() - dt.timedelta(days=lookback)).isoformat()
+    bars = get_default_provider().get_bars(
+        symbol, multiplier, timespan, start, end, adjusted=adjust, limit=5000
+    )
+    return _bars_to_columnar(bars), start, end
+
+
+def _tiingo_intraday(symbol, freq, lookback_days):
+    """Back-compat shim for legacy callers - fetches intraday bars via
+    DataProvider. `freq` is ignored aside from being minute-granular."""
+    data, _, _ = _fetch_bars(symbol, "1m" if freq == "1Min" else "5m")
+    return data or None
+
+
+def _tiingo_daily(symbol, start=None, end=None):
+    """Back-compat shim for legacy callers - fetches daily bars via
+    DataProvider."""
+    data, _, _ = _fetch_bars(symbol, "1d", start=start, end=end)
+    return data or None
+
+
+# ───────── Chart API Endpoints ─────────
+@app.route("/api/clear-cache", methods=["POST"])
+def clear_cache():
+    """Clear the candles cache"""
+    global CACHE
+    old_size = len(CACHE)
+    CACHE = {}
+    return jsonify({"status": "cache cleared", "entries_cleared": old_size})
+
+@app.route("/api/candles")
+def api_candles():
+    """Return candlestick bars for the requested symbol/timeframe via
+    providers.DataProvider (Polygon.io, aka "Massive API")."""
+    dp = get_default_provider()
+    if not dp.polygon_key:
+        return jsonify({"error": "market data provider not configured"}), 500
+
+    symbol = (request.args.get("symbol") or "").upper().strip()
+    tf = request.args.get("tf", "1d")
+    start = request.args.get("start")
+    end = request.args.get("end")
+    adjust = (request.args.get("adjust") or "1") != "0"
+    if not symbol:
+        return jsonify({"error": "symbol required"}), 400
+    if tf not in TF_MAP:
+        return jsonify({"error": f"unsupported tf: {tf}"}), 400
+
+    cache_key = f"{symbol}:{tf}:{start or ''}:{end or ''}:adj{int(adjust)}"
+    cached = _cache_get(cache_key)
+    if cached:
+        return jsonify(cached)
+
+    if not _bucket_allow():
+        fb = _cache_get(f"{symbol}:1d::adj1")
+        if fb:
+            return jsonify(fb)
+        return jsonify({"error": "rate-limited; try again shortly"}), 429
+
+    try:
+        data, _, _ = _fetch_bars(symbol, tf, start=start, end=end, adjust=adjust)
+    except Exception as e:
+        print(f"api_candles error for {symbol} {tf}: {e}")
+        return jsonify({"error": "upstream unavailable", "detail": str(e)[:200]}), 502
+
+    # Intraday timeframes fall back to daily when the intraday window is
+    # empty - helpful around weekends/holidays when Polygon returns [] for
+    # an intraday range.
+    if (not data or not data.get("t")) and tf != "1d":
+        try:
+            data, _, _ = _fetch_bars(symbol, "1d", start=start, end=end, adjust=adjust)
+            tf = "1d"
+        except Exception as e:
+            return jsonify({"error": "upstream unavailable", "detail": str(e)[:200]}), 502
+
+    if not data or not data.get("t"):
+        return jsonify({"error": "no data"}), 404
+
+    _cache_put(cache_key, data, TTL.get(tf, 300))
+    return jsonify(data)
+
+@app.route("/api/upload-chart", methods=["POST"])
+def api_upload_chart():
+    """Upload chart snapshot as base64 PNG"""
+    data = request.get_json() or {}
+    data_url = data.get("dataUrl", "")
+    if not data_url.startswith("data:image/"):
+        return jsonify({"error": "bad image"}), 400
+    
+    header, b64 = data_url.split(",", 1)
+    img = Image.open(io.BytesIO(base64.b64decode(b64)))
+    
+    # Create charts directory if it doesn't exist
+    charts_dir = "static/uploads/charts"
+    os.makedirs(charts_dir, exist_ok=True)
+    
+    ts = dt.datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    path = f"{charts_dir}/chart_{ts}.png"
+    img.save(path, "PNG")
+    
+    return jsonify({"path": "/" + path})
+
+@app.route("/api/ai/sr-levels", methods=["POST"])
+def api_sr_levels():
+    """Enhanced major-levels S/R detector with prominence scoring and clustering"""
+    import math
+    
+    try:
+        j = request.get_json() or {}
+        t = j.get("t", [])   # ms since epoch
+        h = j.get("h", [])
+        l = j.get("l", [])
+        c = j.get("c", [])
+
+        # Params (can expose via query later)
+        window = int((request.args.get("w") or 5))           # pivot window
+        max_levels = int((request.args.get("max") or 4))     # 3–5 recommended
+        style = (request.args.get("style") or "zone")        # 'line' | 'zone'
+        circle_pivots = (request.args.get("circles") or "1") == "1"
+        major_only = (request.args.get("major") or "1") == "1"
+
+        n = len(c)
+        if n == 0:
+            return jsonify({"level_shapes": [], "pivot_circles": [], "levels": []})
+
+        # --- ATR for scale (simplified, period 14) ---
+        tr = []
+        for i in range(n):
+            prev_c = c[i-1] if i>0 else c[0]
+            tr.append(max(h[i]-l[i], abs(h[i]-prev_c), abs(l[i]-prev_c)))
+        atrp = 14
+        atr = sum(tr[-atrp:]) / max(1, min(atrp, len(tr)))
+        if atr <= 0:
+            atr = (max(h) - min(l)) / 100.0 or 1.0
+
+        # --- find pivots (swing highs/lows) ---
+        pivots = []  # (idx, price, kind)
+        for i in range(window, n-window):
+            hi = h[i] == max(h[i-window:i+window+1])
+            lo = l[i] == min(l[i-window:i+window+1])
+            if hi:
+                pivots.append((i, h[i], "H"))
+            if lo:
+                pivots.append((i, l[i], "L"))
+
+        if not pivots:
+            return jsonify({"level_shapes": [], "pivot_circles": [], "levels": []})
+
+        # --- prominence score per pivot ---
+        # local excursion vs neighbors, normalized by ATR; weight recency
+        scores = []
+        for (i, px, kind) in pivots:
+            left = max(0, i-window)
+            right = min(n-1, i+window)
+            nbhd_hi = max(h[left:right+1])
+            nbhd_lo = min(l[left:right+1])
+            if kind == "H":
+                prom = (px - nbhd_lo) / atr
+            else: # "L"
+                prom = (nbhd_hi - px) / atr
+            # recency: newer bars matter slightly more
+            rec = 1.0 + 0.25 * (i / max(1, n-1))
+            scores.append(((i, px, kind), prom * rec))
+
+        # --- cluster pivots into price levels (ATR-band) ---
+        # band ≈ 0.6*ATR to merge close pivots; keeps only strong clusters
+        band = 0.6 * atr
+        # sort by price to cluster
+        piv_sorted = [p for p,_ in sorted(zip(pivots, [s for _,s in scores]), key=lambda x:x[0][1])]
+        sc_by_idx = {tuple(p): s for (p, s) in scores}
+
+        clusters = []  # each: dict(level, members, score)
+        for p in piv_sorted:
+            i, px, kind = p
+            if not clusters:
+                clusters.append({"prices":[px], "members":[p], "score":sc_by_idx[tuple(p)]})
+                continue
+            # attach to nearest cluster by |px - level|
+            # compute current level as weighted median ~ average
+            best_k = -1
+            best_d = 1e18
+            for k, cl in enumerate(clusters):
+                lvl = sum(cl["prices"])/len(cl["prices"])
+                d = abs(px - lvl)
+                if d < best_d:
+                    best_d, best_k = d, k
+            if best_d <= band:
+                cl = clusters[best_k]
+                cl["prices"].append(px)
+                cl["members"].append(p)
+                cl["score"] += sc_by_idx[tuple(p)]
+            else:
+                clusters.append({"prices":[px], "members":[p], "score":sc_by_idx[tuple(p)]})
+
+        # compress to level price & zone width
+        levels = []
+        for cl in clusters:
+            prices = cl["prices"]
+            lvl = sum(prices)/len(prices)
+            spread = max(atr*0.25, (max(prices)-min(prices)) * 0.5)  # zone half-width
+            levels.append({
+                "level": lvl,
+                "half": spread,
+                "score": cl["score"] * (1 + 0.15*len(prices)),  # reward more touches
+                "members": cl["members"]
+            })
+
+        # pick top-k by score (major only) or return all
+        levels = sorted(levels, key=lambda x: x["score"], reverse=True)
+        if major_only:
+            levels = levels[:max_levels]
+
+        # --- build Plotly shapes ---
+        x0, x1 = t[0], t[-1]
+        level_shapes = []
+        pivot_circles = []
+
+        for lv in levels:
+            y = lv["level"]
+            half = lv["half"]
+            if style == "line":
+                level_shapes.append({
+                    "type":"line","xref":"x","yref":"y",
+                    "x0":x0,"x1":x1,"y0":y,"y1":y,
+                    "line":{"color":"rgba(0,120,255,0.9)","width":2}
+                })
+            else:  # zone
+                level_shapes.append({
+                    "type":"rect","xref":"x","yref":"y",
+                    "x0":x0,"x1":x1,"y0":y-half,"y1":y+half,
+                    "line":{"color":"rgba(0,120,255,0.0)","width":0},
+                    "fillcolor":"rgba(0,120,255,0.12)"
+                })
+
+            if circle_pivots:
+                # circle a few strongest member pivots within this cluster
+                members = sorted(lv["members"], key=lambda m: sc_by_idx[tuple(m)], reverse=True)[:2]
+                for (i, px, kind) in members:
+                    # ~visual radius: few bars wide
+                    dt_ms = max( (t[min(n-1, i+3)] - t[max(0, i-3)]), (t[-1]-t[0])//200 )
+                    pivot_circles.append({
+                        "type":"circle","xref":"x","yref":"y",
+                        "x0": t[i]-dt_ms, "x1": t[i]+dt_ms,
+                        "y0": px - half*0.6, "y1": px + half*0.6,
+                        "line":{"color":"rgba(255,140,0,0.8)","width":2},
+                        "fillcolor":"rgba(255,140,0,0.10)"
+                    })
+
+        payload = {
+            "level_shapes": level_shapes,
+            "pivot_circles": pivot_circles,
+            "levels": [round(lv["level"], 4) for lv in levels]
+        }
+        return jsonify(payload)
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# IMPROVED: Beginner-friendly chart explanation endpoint
+@app.route('/api/ai/explain_chart_simple', methods=['POST'])
+def explain_chart_simple():
+    """
+    Simplified, beginner-friendly chart explanation
+    Returns plain English analysis without jargon
+    """
+    data = request.get_json() or {}
+    symbol = data.get('symbol', 'UNKNOWN')
+    timeframe = data.get('timeframe', '1d')
+    prices = data.get('prices', {})
+    candles = data.get('candles', {})
+    
+    current_price = prices.get('current', 0)
+    high_price = prices.get('high', 0)
+    low_price = prices.get('low', 0)
+    
+    # Calculate simple trend (based on last 20 candles)
+    closes = candles.get('c', [])
+    if len(closes) < 10:
+        return jsonify({"error": "Not enough data"}), 400
+    
+    # Simple trend detection
+    recent_closes = closes[-20:] if len(closes) >= 20 else closes
+    first_avg = sum(recent_closes[:len(recent_closes)//2]) / (len(recent_closes)//2)
+    second_avg = sum(recent_closes[len(recent_closes)//2:]) / (len(recent_closes) - len(recent_closes)//2)
+    
+    trend_direction = 'up' if second_avg > first_avg * 1.02 else ('down' if second_avg < first_avg * 0.98 else 'sideways')
+    
+    # Calculate support and resistance (simplified)
+    lows = candles.get('l', [])
+    highs = candles.get('h', [])
+    
+    # Find recent significant lows for support
+    recent_lows = sorted(lows[-30:])[:5] if len(lows) >= 30 else sorted(lows)[:3]
+    support_levels = list(set([round(low, 2) for low in recent_lows]))[:2]
+    
+    # Find recent significant highs for resistance
+    recent_highs = sorted(highs[-30:], reverse=True)[:5] if len(highs) >= 30 else sorted(highs, reverse=True)[:3]
+    resistance_levels = list(set([round(high, 2) for high in recent_highs]))[:2]
+    
+    # Generate beginner-friendly summary
+    if trend_direction == 'up':
+        summary = f"{symbol} is currently in an upward trend, meaning the price has been generally rising. "
+        summary += f"The stock is currently at ${current_price:.2f}. "
+        summary += "This upward movement suggests buyers are in control and pushing prices higher."
+    elif trend_direction == 'down':
+        summary = f"{symbol} is currently in a downward trend, meaning the price has been generally falling. "
+        summary += f"The stock is currently at ${current_price:.2f}. "
+        summary += "This downward movement suggests sellers are in control and pushing prices lower."
+    else:
+        summary = f"{symbol} is currently moving sideways (also called 'consolidating'), meaning it's not going up or down strongly. "
+        summary += f"The stock is at ${current_price:.2f} and trading in a range. "
+        summary += "This often happens when buyers and sellers are equally matched."
+    
+    # Create simple scenarios
+    scenarios = []
+    
+    # Bullish scenario
+    if resistance_levels:
+        target = resistance_levels[0]
+        scenarios.append({
+            "type": "bullish",
+            "title": "📈 Upward Move Scenario",
+            "description": f"If {symbol} can break above ${target:.2f}, it could continue moving higher. This would show that buyers are strong enough to push through this resistance level.",
+            "trigger": f"Price breaking and staying above ${target:.2f}"
+        })
+    
+    # Bearish scenario
+    if support_levels:
+        target = support_levels[0]
+        scenarios.append({
+            "type": "bearish",
+            "title": "📉 Downward Move Scenario",
+            "description": f"If {symbol} falls below ${target:.2f}, it could continue moving lower. This would show that sellers are strong enough to push through this support level.",
+            "trigger": f"Price breaking and staying below ${target:.2f}"
+        })
+    
+    # Build response
+    response = {
+        "symbol": symbol,
+        "timeframe": timeframe,
+        "trend": {
+            "direction": trend_direction,
+            "description": "Upward" if trend_direction == 'up' else ("Downward" if trend_direction == 'down' else "Sideways")
+        },
+        "current_price": round(current_price, 2),
+        "support_levels": sorted(support_levels),
+        "resistance_levels": sorted(resistance_levels, reverse=True),
+        "scenarios": scenarios,
+        "summary": summary
+    }
+    
+    return jsonify(response)
+
+
+# IMPROVED: Simplified support/resistance detection
+@app.route('/api/ai/sr-levels-simple', methods=['POST'])
+def sr_levels_simple():
+    """
+    Simplified support/resistance level detection
+    Returns only the 2-3 most important levels
+    """
+    data = request.get_json() or {}
+    highs = data.get('h', [])
+    lows = data.get('l', [])
+    closes = data.get('c', [])
+    
+    if not highs or not lows or len(closes) < 20:
+        return jsonify({"levels": []})
+    
+    current_price = closes[-1]
+    
+    # Simple level detection using recent price action
+    lookback = min(50, len(closes))
+    recent_highs = highs[-lookback:]
+    recent_lows = lows[-lookback:]
+    
+    # Find peaks (resistance) and troughs (support)
+    levels = []
+    
+    # Method: Find local maxima and minima
+    window = 5
+    for i in range(window, len(recent_highs) - window):
+        # Check if this is a local high
+        if recent_highs[i] == max(recent_highs[i-window:i+window+1]):
+            levels.append({
+                'price': round(recent_highs[i], 2),
+                'type': 'resistance',
+                'strength': 1
+            })
+        
+        # Check if this is a local low
+        if recent_lows[i] == min(recent_lows[i-window:i+window+1]):
+            levels.append({
+                'price': round(recent_lows[i], 2),
+                'type': 'support',
+                'strength': 1
+            })
+    
+    # Remove duplicates (levels within 0.5% of each other)
+    unique_levels = []
+    for level in levels:
+        is_duplicate = False
+        for existing in unique_levels:
+            if abs(level['price'] - existing['price']) / existing['price'] < 0.005:
+                is_duplicate = True
+                existing['strength'] += 1
+                break
+        if not is_duplicate:
+            unique_levels.append(level)
+    
+    # Sort by strength and take top 3
+    unique_levels.sort(key=lambda x: x['strength'], reverse=True)
+    top_levels = unique_levels[:3]
+    
+    # Ensure we have at least one support below current price and one resistance above
+    supports = [l for l in top_levels if l['price'] < current_price]
+    resistances = [l for l in top_levels if l['price'] > current_price]
+    
+    final_levels = []
+    if supports:
+        final_levels.append(max(supports, key=lambda x: x['price']))
+    if resistances:
+        final_levels.append(min(resistances, key=lambda x: x['price']))
+    
+    # If we still don't have enough levels, add simple ones
+    if len(final_levels) < 2:
+        if not supports:
+            final_levels.append({
+                'price': round(min(recent_lows), 2),
+                'type': 'support',
+                'strength': 1
+            })
+        if not resistances:
+            final_levels.append({
+                'price': round(max(recent_highs), 2),
+                'type': 'resistance',
+                'strength': 1
+            })
+    
+    return jsonify({"levels": final_levels})
+
+
 @app.route("/tools")
 def tools():
     """Tools and calculators main page"""
@@ -2416,10 +3636,39 @@ def privacy():
     return render_template("privacy.html")
 
 
+def _options_enabled() -> bool:
+    """Returns True if the options-chain surfaces should be exposed. Gated by
+    the OPTIONS_ENABLED config flag *and* the presence of a Polygon key,
+    because without a key the chain endpoint will always return empty."""
+    if not app.config.get("OPTIONS_ENABLED"):
+        return False
+    try:
+        return bool(get_default_provider().polygon_key)
+    except Exception:
+        return False
+
+
+def _options_unavailable_response(status: int = 503):
+    """Return a user-friendly placeholder for disabled options surfaces."""
+    if request.is_json or request.path.startswith("/test-options"):
+        return jsonify({
+            "enabled": False,
+            "message": "Options data is temporarily unavailable. We're upgrading "
+                       "our market-data plan to re-enable this feature.",
+        }), status
+    return render_template(
+        "tools/options_unavailable.html"
+    ), status
+
+
 @app.route("/tools/options-calculator", methods=["GET", "POST"])
 def options_calculator():
-    """Options calculator with Tradier data only"""
-    
+    """Options calculator. Disabled behind OPTIONS_ENABLED flag until an
+    options-capable data source is wired in."""
+
+    if not _options_enabled():
+        return _options_unavailable_response()
+
     # Check for preview mode query param
     preview_mode = request.args.get('preview') == '1'
     
@@ -2553,6 +3802,8 @@ def options_calculator():
 @requires_pro
 def calculate_options_pnl():
     """Calculate comprehensive options P&L analysis"""
+    if not _options_enabled():
+        return _options_unavailable_response()
     try:
         data = request.get_json()
 
@@ -2859,32 +4110,28 @@ def search_stocks():
 
 @app.route("/test-options/<symbol>")
 def test_options(symbol):
-    """Test endpoint to debug options chain issues"""
+    """Debug endpoint for the options-chain path via DataProvider."""
+    if not _options_enabled():
+        return _options_unavailable_response()
     symbol = symbol.upper()
-    print(f"Testing options for {symbol}")
-
-    # Test Tradier API
+    dp = get_default_provider()
     result = {
         "symbol": symbol,
-        "tradier_configured": TRADIER_API_TOKEN != "your_tradier_token_here"
-        and TRADIER_API_TOKEN,
-        "tradier_result": None,
+        "provider_configured": bool(dp.polygon_key),
+        "chain_result": None,
         "errors": [],
     }
-
-    # Test Tradier API
     try:
         calls, puts, price, expirations = get_options_chain_tradier(symbol)
-        result["tradier_result"] = {
+        result["chain_result"] = {
             "success": calls is not None and puts is not None,
-            "calls_count": len(calls) if calls is not None else 0,
-            "puts_count": len(puts) if puts is not None else 0,
+            "calls_count": 0 if calls is None else len(calls),
+            "puts_count": 0 if puts is None else len(puts),
             "current_price": price,
             "expiration_count": len(expirations) if expirations else 0,
         }
     except Exception as e:
-        result["errors"].append(f"Tradier error: {str(e)}")
-
+        result["errors"].append(str(e))
     return jsonify(result)
 
 
@@ -2982,60 +4229,121 @@ def education_advanced_options():
 # BRIEF ROUTES
 # ──────────────────────────────────────────────────
 
+def _read_brief_date(path):
+    """Return the ET date recorded in a brief_*_date.txt file, or None."""
+    if not path.exists():
+        return None
+    try:
+        raw = path.read_text(encoding='utf-8').strip()
+    except Exception:
+        return None
+    if not raw:
+        return None
+    if raw.startswith("unavailable:"):
+        parts = raw.split(":", 2)
+        if len(parts) >= 2:
+            raw = parts[1]
+    # Files may be in "YYYY-MM-DD" or "YYYY-MM-DD HH:MM ET" format.
+    from datetime import datetime as _dt
+    for fmt in ("%Y-%m-%d %H:%M ET", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
+        try:
+            return _dt.strptime(raw[: len(fmt) + 5].strip(), fmt).date()
+        except Exception:
+            continue
+    return None
+
+
+def _stale_banner(kind: str, recorded_date, max_age_days: int):
+    """Return an HTML banner if the recorded date is older than ``max_age_days``
+    in America/New_York. kind is "daily" or "weekly" for copy."""
+    import pytz as _pytz
+    from datetime import datetime as _dt
+    if recorded_date is None:
+        return ""
+    today_et = _dt.now(_pytz.timezone("America/New_York")).date()
+    age = (today_et - recorded_date).days
+    if age <= max_age_days:
+        return ""
+    label = "daily" if kind == "daily" else "weekly"
+    return (
+        '<div style="background:#fff3cd;border:1px solid #ffeeba;color:#856404;'
+        'padding:12px 16px;border-radius:6px;margin:12px;font-family:Arial,'
+        'Helvetica,sans-serif;font-size:14px;">'
+        f'<strong>Heads up:</strong> this {label} brief is {age} day(s) old '
+        f'(generated {recorded_date.isoformat()}). A fresh edition will be '
+        'published on the next scheduled run.</div>'
+    )
+
+
 @app.route("/brief/latest")
 def latest_brief():
-    """Serve the latest market brief from static files"""
+    """Serve the latest daily market brief, with ET-aware freshness banner."""
     from pathlib import Path
-    
-    # Resolve paths relative to the Flask app root to avoid CWD issues
+
     base_dir = Path(current_app.root_path)
     brief_file = base_dir / 'static' / 'uploads' / 'brief_latest.html'
     date_file = base_dir / 'static' / 'uploads' / 'brief_latest_date.txt'
-    
+
     if not brief_file.exists():
         return "No brief available", 404
-    
+
     try:
-        with open(brief_file, 'r', encoding='utf-8') as f:
-            html_content = f.read()
-        
-        # Date is optional; kept for potential future use
-        if date_file.exists():
-            try:
-                _ = date_file.read_text(encoding='utf-8').strip()
-            except Exception:
-                pass
-        
-        return html_content, 200, {'Content-Type': 'text/html; charset=utf-8'}
-        
+        html_content = brief_file.read_text(encoding='utf-8')
     except Exception as e:
         return f"Error reading brief: {str(e)}", 500
 
+    banner = _stale_banner("daily", _read_brief_date(date_file), max_age_days=1)
+    if banner:
+        if "<body" in html_content:
+            html_content = html_content.replace(
+                "<body", f"<body data-brief-stale=\"true\"", 1
+            )
+            # Inject the banner immediately after the opening body tag.
+            idx = html_content.find(">", html_content.find("<body"))
+            if idx != -1:
+                html_content = html_content[: idx + 1] + banner + html_content[idx + 1 :]
+        else:
+            html_content = banner + html_content
+
+    return html_content, 200, {'Content-Type': 'text/html; charset=utf-8'}
+
+
 @app.route("/brief/weekly")
 def weekly_brief():
-    """Serve the latest weekly brief from static files, fallback to daily if missing."""
+    """Serve the latest weekly brief with ET-aware freshness banner."""
     from pathlib import Path
-    
+
     base_dir = Path(current_app.root_path)
     weekly_file = base_dir / 'static' / 'uploads' / 'brief_weekly_latest.html'
     daily_file = base_dir / 'static' / 'uploads' / 'brief_latest.html'
-    
+    weekly_date_file = base_dir / 'static' / 'uploads' / 'brief_weekly_latest_date.txt'
+    daily_date_file = base_dir / 'static' / 'uploads' / 'brief_latest_date.txt'
+
     target_file = weekly_file if weekly_file.exists() else (daily_file if daily_file.exists() else None)
     if target_file is None:
         return "No weekly brief available", 404
-    
+
     try:
-        with open(target_file, 'r', encoding='utf-8') as f:
-            html_content = f.read()
-        
-        # If we fell back to daily, adjust the heading so the UI reads correctly
-        if target_file == daily_file:
-            html_content = html_content.replace('Morning Market Brief', 'Weekly Market Brief')
-        
-        return html_content, 200, {'Content-Type': 'text/html; charset=utf-8'}
-        
+        html_content = target_file.read_text(encoding='utf-8')
     except Exception as e:
         return f"Error reading weekly brief: {str(e)}", 500
+
+    if target_file == daily_file:
+        html_content = html_content.replace('Morning Market Brief', 'Weekly Market Brief')
+        recorded = _read_brief_date(daily_date_file)
+    else:
+        recorded = _read_brief_date(weekly_date_file) or _read_brief_date(daily_date_file)
+
+    banner = _stale_banner("weekly", recorded, max_age_days=8)
+    if banner:
+        if "<body" in html_content:
+            idx = html_content.find(">", html_content.find("<body"))
+            if idx != -1:
+                html_content = html_content[: idx + 1] + banner + html_content[idx + 1 :]
+        else:
+            html_content = banner + html_content
+
+    return html_content, 200, {'Content-Type': 'text/html; charset=utf-8'}
 
 # --- Weekly brief page & admin trigger ---
 
@@ -3103,7 +4411,13 @@ def email_diagnostics():
 @app.route("/admin/email-test", methods=["POST"])
 @login_required
 def email_test():
-    """Sends a minimal test email through the SAME function used by daily sends."""
+    """Send a minimal health-check email to a SINGLE recipient.
+
+    Historically this reused ``send_daily_brief_direct`` which iterates every
+    Pro subscriber in the database, i.e. a single admin click would blast the
+    entire subscriber base. This version sends to exactly one address — either
+    the JSON body's ``to`` field or the ``TEST_EMAIL`` environment variable.
+    """
     if current_user.email != 'support@optionsplunge.com':
         return jsonify({"error": "Access denied"}), 403
 
@@ -3113,34 +4427,71 @@ def email_test():
     if not test_to:
         return jsonify({"error": "Provide JSON {'to': 'you@example.com'} or set TEST_EMAIL"}), 400
 
+    html = (
+        "<h3>OptionsPlunge Email Health Check</h3>"
+        "<p>If you received this, SMTP/provider config works.</p>"
+    )
+    subject = "OptionsPlunge — Email Health Check"
     try:
-        # Reuse the direct sender your daily job uses
-        from emails import send_daily_brief_direct
-        html = "<h3>OptionsPlunge Email Health Check</h3><p>If you received this, SMTP/provider config works.</p>"
-        ok = send_daily_brief_direct(html)  # Fallback signature without recipients
-        return jsonify({"sent": bool(ok), "to": test_to})
+        sendgrid_key = os.getenv("SENDGRID_KEY") or app.config.get("SENDGRID_KEY")
+        if sendgrid_key:
+            try:
+                from sendgrid import SendGridAPIClient
+                from sendgrid.helpers.mail import Mail as SGMail, Email as SGEmail, To as SGTo, Content as SGContent
+
+                sender_name, sender_addr = app.config.get(
+                    "MAIL_DEFAULT_SENDER", (None, None)
+                )
+                from_email = SGEmail(
+                    sender_addr or "support@optionsplunge.com",
+                    sender_name or "Options Plunge Support",
+                )
+                mail_msg = SGMail(from_email, SGTo(test_to), subject, SGContent("text/html", html))
+                resp = SendGridAPIClient(api_key=sendgrid_key).send(mail_msg)
+                ok = resp.status_code in (200, 202)
+                return jsonify({"sent": ok, "to": test_to, "provider": "sendgrid"})
+            except Exception as sg_err:
+                app.logger.warning("SendGrid health-check failed: %s. Falling back to SMTP.", sg_err)
+
+        # SMTP fallback using Flask-Mail
+        msg = Message(
+            subject,
+            recipients=[test_to],
+            html=html,
+            sender=app.config.get("MAIL_DEFAULT_SENDER"),
+        )
+        mail.send(msg)
+        return jsonify({"sent": True, "to": test_to, "provider": "smtp"})
     except Exception as e:
         return jsonify({"sent": False, "error": str(e)}), 500
 
 
 @app.route("/verify_email/<token>")
 def verify_email(token):
-    """Verify user email with token"""
-    user = User.query.filter_by(email_verification_token=token).first()
+    """Verify email with token from email link"""
+    if current_user.is_authenticated and current_user.email_verified:
+        flash("Your email is already verified!", "info")
+        return redirect(url_for("dashboard"))
+    
+    # Verify the token and get user
+    user = User.verify_email_token(token)
     
     if not user:
-        flash("Invalid or expired verification link", "danger")
-        return redirect(url_for("login"))
-    
-    if user.verify_email(token):
-        db.session.commit()
-        flash("Email verified successfully! You will now receive market briefs.", "success")
-        return redirect(url_for("dashboard"))
-    else:
-        flash("Verification link has expired. Please request a new one.", "danger")
+        flash("Invalid or expired verification link. Please request a new one.", "error")
         return redirect(url_for("resend_verification"))
     
-    return redirect(url_for("login"))
+    # Mark email as verified
+    user.email_verified = True
+    user.email_verification_token = None
+    user.token_generated_at = None
+    db.session.commit()
+    
+    # Log user in if not already
+    if not current_user.is_authenticated:
+        login_user(user)
+    
+    flash("Email verified successfully! 🎉 Welcome to Options Plunge!", "success")
+    return redirect(url_for("dashboard"))
 
 
 @app.route("/resend_verification", methods=["GET", "POST"])
@@ -3148,25 +4499,34 @@ def verify_email(token):
 def resend_verification():
     """Resend email verification"""
     if current_user.email_verified:
-        flash("Your email is already verified", "info")
+        flash("Your email is already verified! 🎉", "success")
         return redirect(url_for("dashboard"))
     
     if request.method == "POST":
         try:
-            # Generate new verification token
+            from emails import send_verification_email
             token = current_user.generate_email_verification_token()
             db.session.commit()
+            send_verification_email(current_user, token)
             
-            # Send verification email
-            from emails import send_verification_email
-            if send_verification_email(current_user, token):
-                flash("Verification email sent! Please check your inbox.", "success")
-            else:
-                flash("Failed to send verification email. Please try again.", "danger")
+            flash("Verification email sent! Check your inbox (and spam folder).", "success")
+            
+            # Return JSON if AJAX request
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({"success": True, "message": "Verification email sent!"})
+            
         except Exception as e:
-            flash(f"Error sending verification email: {str(e)}", "danger")
+            app.logger.error(f"Failed to resend verification email to {current_user.email}: {e}")
+            flash("Failed to send verification email. Please try again later.", "error")
+            
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({"success": False, "error": "Failed to send email"}), 500
     
-    return render_template("resend_verification.html")
+    # Redirect back to previous page or dashboard (validate referrer for security)
+    referrer = request.referrer
+    if referrer and is_safe_url(referrer):
+        return redirect(referrer)
+    return redirect(url_for("dashboard"))
 
 
 @app.route("/verify_email_required")

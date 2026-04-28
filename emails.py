@@ -136,13 +136,15 @@ def send_confirmation_email_direct(subscriber):
         return False
 
 def send_daily_brief_to_subscribers(brief_html, date_str=None):
-    """Send daily brief only to Pro users (active or trialing) who opted into daily emails"""
+    """Send daily brief only to Pro users (active or trialing) who opted into
+    daily emails AND have verified their email address. Email verification is
+    required so we don't mail unconfirmed addresses (bounces, spam traps)."""
     if not date_str:
         date_str = datetime.now().strftime('%Y-%m-%d')
-    
-    # Select only Pro users who opted in to daily brief
+
     subscribers = User.query.filter(
         User.is_subscribed_daily == True,
+        User.email_verified == True,
         User.subscription_status.in_(['active', 'trialing'])
     ).all()
     
@@ -210,74 +212,85 @@ def send_daily_brief_direct(brief_html, date_str=None):
     if not date_str:
         date_str = datetime.now().strftime('%Y-%m-%d')
     
-    # Select only Pro users who opted in to daily brief
-    subscribers = User.query.filter(
-        User.is_subscribed_daily == True,
-        User.subscription_status.in_(['active', 'trialing'])
-    ).all()
+    # Import here to avoid circular imports
+    from app import app, db
+    from models import User
     
-    if not subscribers:
-        logger.info("No confirmed subscribers found")
-        return 0
-    
-    # Get SendGrid key
-    sendgrid_key = os.getenv('SENDGRID_KEY')
-    if not sendgrid_key:
-        logger.error("SENDGRID_KEY not configured")
-        return 0
-    
-    success_count = 0
-    
-    for subscriber in subscribers:
-        try:
-            # Create URLs directly (no Flask context)
-            server_name = os.getenv('SERVER_NAME', 'optionsplunge.com')
-            scheme = os.getenv('PREFERRED_URL_SCHEME', 'https')
-            unsubscribe_url = f"{scheme}://{server_name}/unsubscribe/{subscriber.email}"
-            preferences_url = f"{scheme}://{server_name}/market_brief"
-            
-            # Create email HTML directly
-            email_html = f"""
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="utf-8">
-                <title>Morning Market Brief</title>
-            </head>
-            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-                <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                    {brief_html}
-                    <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
-                    <p style="text-align: center; color: #666; font-size: 12px;">
-                        <a href="{unsubscribe_url}">Unsubscribe</a> | 
-                        <a href="{preferences_url}">Preferences</a>
-                    </p>
-                </div>
-            </body>
-            </html>
-            """
-            
-            # Send via SendGrid (direct approach)
-            sg = SendGridAPIClient(api_key=sendgrid_key)
-            from_email = SGEmail("support@optionsplunge.com", "Options Plunge Support")
-            to_email = SGTo(subscriber.email)
-            subject = f'Morning Market Brief - {date_str}'
-            content = SGContent("text/html", email_html)
-            sg_mail = SGMail(from_email, to_email, subject, content)
-            
-            response = sg.send(sg_mail)
-            if response.status_code in (200, 202):
-                success_count += 1
-                logger.info(f"Daily brief sent to {subscriber.email}")
-            else:
-                logger.error(f"SendGrid error for {subscriber.email}: {response.status_code}")
-                
-        except Exception as e:
-            logger.error(f"Error sending daily brief to {subscriber.email}: {str(e)}")
-            continue
-    
-    logger.info(f"Daily brief sent to {success_count}/{len(subscribers)} Pro users")
-    return success_count
+    # Use Flask app context for database queries
+    with app.app_context():
+        # Select only Pro users who opted in to daily brief and verified email
+        subscribers = User.query.filter(
+            User.is_subscribed_daily == True,
+            User.email_verified == True,
+            User.subscription_status.in_(['active', 'trialing'])
+        ).all()
+        
+        if not subscribers:
+            logger.info("No confirmed subscribers found")
+            return 0
+        
+        # Prefer SendGrid if configured; otherwise fall back to Flask-Mail SMTP
+        sendgrid_key = os.getenv('SENDGRID_KEY')
+        success_count = 0
+
+        for subscriber in subscribers:
+            try:
+                # `brief_html` is already a complete, well-styled HTML document
+                # rendered via `templates/email/morning_brief.html.jinja` (see
+                # market_brief_generator._build_morning_brief_context). We must
+                # NOT wrap it in a second <html>/<body> shell — Gmail/Outlook
+                # strip the inner <style> block when they see nested html tags,
+                # which was the root cause of the morning brief rendering
+                # unstyled. Instead, substitute the per-recipient unsubscribe
+                # token embedded by the context builder.
+                email_html = brief_html.replace("__RECIPIENT_EMAIL__", subscriber.email)
+
+                sent_via_sendgrid = False
+                if sendgrid_key:
+                    try:
+                        # Send via SendGrid (direct approach)
+                        sg = SendGridAPIClient(api_key=sendgrid_key)
+                        from_email = SGEmail("support@optionsplunge.com", "Options Plunge Support")
+                        to_email = SGTo(subscriber.email)
+                        subject = f'Morning Market Brief - {date_str}'
+                        content = SGContent("text/html", email_html)
+                        sg_mail = SGMail(from_email, to_email, subject, content)
+
+                        response = sg.send(sg_mail)
+                        if response.status_code in (200, 202):
+                            success_count += 1
+                            sent_via_sendgrid = True
+                            logger.info(f"Daily brief sent to {subscriber.email} via SendGrid")
+                        else:
+                            logger.warning(
+                                f"SendGrid non-success status {response.status_code} for {subscriber.email}; will fallback to SMTP"
+                            )
+                    except Exception as sg_err:
+                        logger.warning(f"SendGrid failed for {subscriber.email}: {sg_err}; will fallback to SMTP")
+
+                if not sent_via_sendgrid:
+                    # Fallback to SMTP using Flask-Mail
+                    try:
+                        from flask_mail import Message, Mail
+                        mail = Mail(app)
+                        msg = Message(
+                            subject=f'Morning Market Brief - {date_str}',
+                            recipients=[subscriber.email],
+                            html=email_html,
+                            sender=app.config.get('MAIL_DEFAULT_SENDER')
+                        )
+                        mail.send(msg)
+                        success_count += 1
+                        logger.info(f"Daily brief sent to {subscriber.email} via SMTP fallback")
+                    except Exception as smtp_err:
+                        logger.error(f"SMTP fallback failed for {subscriber.email}: {smtp_err}")
+                    
+            except Exception as e:
+                logger.error(f"Error sending daily brief to {subscriber.email}: {str(e)}")
+                continue
+        
+        logger.info(f"Daily brief sent to {success_count}/{len(subscribers)} Pro users")
+        return success_count
 
 def send_welcome_email(subscriber):
     """Send welcome email after confirmation"""
@@ -416,37 +429,83 @@ Date: {subscriber.subscribed_at.strftime('%Y-%m-%d %H:%M:%S')}
 
 
 def send_verification_email(user, token):
-    """Send email verification email to user"""
+    """Send email verification email with compelling subject"""
     try:
         # Create verification URL
-        domain = app.config.get('SERVER_NAME', 'optionsplunge.com')
-        scheme = app.config.get('PREFERRED_URL_SCHEME', 'https')
-        verify_url = f"{scheme}://{domain}/verify_email/{token}"
+        verify_url = url_for('verify_email', token=token, _external=True)
         
-        # Create verification email HTML
-        html_content = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="utf-8">
-            <title>Verify Your Account</title>
-        </head>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                <h1 style="color: #2c3e50;">Verify Your Options Plunge Account</h1>
-                <p>Hi {user.username},</p>
-                <p>Welcome to Options Plunge! To complete your registration and start receiving market briefs, please verify your email address.</p>
-                <div style="text-align: center; margin: 30px 0;">
-                    <a href="{verify_url}" style="background-color: #3498db; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">Verify Email Address</a>
-                </div>
-                <p>Or copy and paste this link into your browser:</p>
-                <p style="word-break: break-all; color: #666;">{verify_url}</p>
-                <p>This link will expire in 24 hours for security reasons.</p>
-                <p>If you didn't create an account with Options Plunge, you can safely ignore this email.</p>
-                <p>Best regards,<br>Options Plunge Team</p>
+        # Compelling subject line
+        subject = "🎯 Unlock Your Options Plunge Account - Verify Your Email"
+        
+        # HTML body
+        html_body = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; color: white;">
+                <h1 style="margin: 0;">Welcome to Options Plunge!</h1>
+                <p style="margin: 10px 0 0 0; opacity: 0.9;">You're one step away from better trading</p>
             </div>
-        </body>
-        </html>
+            
+            <div style="padding: 30px; background: #f8f9fa;">
+                <p>Hi {user.username},</p>
+                
+                <p>Thanks for signing up! Click the button below to verify your email address and unlock all features:</p>
+                
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="{verify_url}" style="background: linear-gradient(135deg, #27ae60, #2ecc71); color: white; padding: 15px 40px; text-decoration: none; border-radius: 25px; font-weight: bold; display: inline-block;">
+                        Verify My Email
+                    </a>
+                </div>
+                
+                <p><strong>What you'll unlock:</strong></p>
+                <ul style="line-height: 1.8;">
+                    <li>📊 Track unlimited trades</li>
+                    <li>📝 Maintain your trading journal</li>
+                    <li>📈 View performance analytics</li>
+                    <li>📧 Receive weekly market briefs</li>
+                    <li>⭐ Upgrade to Pro for AI-powered insights</li>
+                </ul>
+                
+                <p style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #dee2e6; color: #7f8c8d; font-size: 0.9rem;">
+                    <strong>Link not working?</strong> Copy and paste this URL into your browser:<br>
+                    <a href="{verify_url}" style="color: #3498db; word-break: break-all;">{verify_url}</a>
+                </p>
+                
+                <p style="color: #7f8c8d; font-size: 0.9rem;">
+                    This link expires in 24 hours for security. If you didn't create this account, you can safely ignore this email.
+                </p>
+            </div>
+            
+            <div style="padding: 20px; text-align: center; color: #95a5a6; font-size: 0.85rem;">
+                <p>Questions? Reply to this email or contact us at support@optionsplunge.com</p>
+                <p>&copy; 2025 Options Plunge. All rights reserved.</p>
+            </div>
+        </div>
+        """
+        
+        # Text body (fallback)
+        text_body = f"""
+        Welcome to Options Plunge!
+        
+        Hi {user.username},
+        
+        Thanks for signing up! Please verify your email address by clicking the link below:
+        
+        {verify_url}
+        
+        What you'll unlock:
+        - Track unlimited trades
+        - Maintain your trading journal
+        - View performance analytics
+        - Receive weekly market briefs
+        - Upgrade to Pro for AI-powered insights
+        
+        This link expires in 24 hours for security.
+        
+        If you didn't create this account, you can safely ignore this email.
+        
+        Questions? Contact us at support@optionsplunge.com
+        
+        - The Options Plunge Team
         """
         
         # Send via SendGrid
@@ -457,8 +516,7 @@ def send_verification_email(user, token):
                 from_email_name, from_email_addr = app.config.get('MAIL_DEFAULT_SENDER', (None, None))
                 from_email = SGEmail(from_email_addr or 'support@optionsplunge.com', from_email_name or 'Options Plunge Support')
                 to_email = SGTo(user.email)
-                subject = 'Verify your Options Plunge account'
-                content = SGContent("text/html", html_content)
+                content = SGContent("text/html", html_body)
                 sg_mail = SGMail(from_email, to_email, subject, content)
                 response = sg.send(sg_mail)
                 if response.status_code not in (200, 202):
@@ -467,15 +525,19 @@ def send_verification_email(user, token):
                 return True
             except Exception as sg_err:
                 logger.warning(f"SendGrid failed for {user.email}: {sg_err}. Falling back to SMTP.")
-                msg = Message('Verify your Options Plunge account',
-                              recipients=[user.email], html=html_content,
+                msg = Message(subject,
+                              recipients=[user.email], 
+                              html=html_body,
+                              body=text_body,
                               sender=app.config['MAIL_DEFAULT_SENDER'])
                 mail.send(msg)
                 logger.info(f"Verification email sent via SMTP to {user.email}")
                 return True
         else:
-            msg = Message('Verify your Options Plunge account',
-                          recipients=[user.email], html=html_content,
+            msg = Message(subject,
+                          recipients=[user.email], 
+                          html=html_body,
+                          body=text_body,
                           sender=app.config['MAIL_DEFAULT_SENDER'])
             mail.send(msg)
             logger.info(f"Verification email sent to {user.email}")

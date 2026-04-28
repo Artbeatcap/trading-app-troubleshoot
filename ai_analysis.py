@@ -221,7 +221,7 @@ class TradingAIAnalyzer:
                         {"role": "user", "content": content_parts},
                     ],
                     max_tokens=2000,
-                    temperature=0.7,
+                    temperature=0.2,
                 )
             else:
                 # Text-only analysis (existing behavior)
@@ -232,7 +232,7 @@ class TradingAIAnalyzer:
                         {"role": "user", "content": prompt},
                     ],
                     max_tokens=2000,
-                    temperature=0.7,
+                    temperature=0.2,
                 )
 
             analysis_text = response.choices[0].message.content
@@ -325,13 +325,23 @@ class TradingAIAnalyzer:
         try:
             if not self._ensure_api_key():
                 return {"error": "OPENAI_API_KEY environment variable not set. Please add your OpenAI API key to the .env file."}
-            # Prepare daily data
-            daily_data = self._prepare_daily_data(journal_entry, trades)
 
-            # Generate daily analysis prompt
+            if self._is_empty_journal(journal_entry, trades):
+                return {
+                    "feedback": (
+                        "Not enough journal context to run a meaningful daily "
+                        "review yet. Add notes on your setup, risk, emotions, "
+                        "or log at least one trade and re-run."
+                    ),
+                    "daily_score": None,
+                    "key_insights": [],
+                    "tomorrow_focus": [],
+                    "skipped": True,
+                }
+
+            daily_data = self._prepare_daily_data(journal_entry, trades)
             prompt = self._create_daily_analysis_prompt(daily_data)
 
-            # Get AI analysis
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
@@ -339,7 +349,7 @@ class TradingAIAnalyzer:
                     {"role": "user", "content": prompt},
                 ],
                 max_tokens=1500,
-                temperature=0.7,
+                temperature=0.2,
             )
 
             analysis_text = response.choices[0].message.content
@@ -393,7 +403,7 @@ class TradingAIAnalyzer:
                     {"role": "user", "content": prompt},
                 ],
                 max_tokens=2000,
-                temperature=0.7,
+                temperature=0.2,
             )
 
             analysis_text = response.choices[0].message.content
@@ -574,6 +584,32 @@ class TradingAIAnalyzer:
                 })
 
         return data
+
+    @staticmethod
+    def _is_empty_journal(journal_entry, trades) -> bool:
+        """Return True if the journal entry has no meaningful content.
+
+        We deliberately skip the daily GPT review on effectively-empty
+        journals to avoid hallucinated feedback being attributed to the
+        trader.
+        """
+        if trades:
+            return False
+        text_fields = [
+            getattr(journal_entry, "market_outlook", None),
+            getattr(journal_entry, "daily_goals", None),
+            getattr(journal_entry, "what_went_well", None),
+            getattr(journal_entry, "what_went_wrong", None),
+            getattr(journal_entry, "emotional_state", None),
+        ]
+        if any((field or "").strip() for field in text_fields):
+            return False
+        numeric_fields = [
+            getattr(journal_entry, "daily_pnl", None),
+            getattr(journal_entry, "stress_level", None),
+            getattr(journal_entry, "discipline_score", None),
+        ]
+        return not any(v is not None for v in numeric_fields)
 
     def _prepare_daily_data(self, journal_entry, trades):
         """Prepare daily data for AI analysis"""

@@ -7,7 +7,7 @@ import json
 import os
 import requests
 from decimal import Decimal, ROUND_HALF_UP
-from config import Config  # <‑‑ grabs TRADIER_API_TOKEN
+from config import Config
 
 db = SQLAlchemy()
 
@@ -100,6 +100,14 @@ class User(UserMixin, db.Model):
         self.token_generated_at = datetime.utcnow()
         return self.email_verification_token
 
+    @classmethod
+    def verify_email_token(cls, token):
+        """Verify email token and return user if valid"""
+        user = cls.query.filter_by(email_verification_token=token).first()
+        if user and not user.token_expired():
+            return user
+        return None
+    
     def verify_email(self, token):
         """Verify email with the provided token"""
         if self.email_verification_token == token and not self.token_expired():
@@ -167,7 +175,16 @@ class User(UserMixin, db.Model):
         return user
 
     def has_pro_access(self):
-        """Check if user has active Pro subscription or is in trial"""
+        """Check if user has Pro access"""
+        # Require email verification for Pro features
+        if not self.email_verified:
+            return False
+        
+        # Check if user is in trial period
+        if self.trial_end and datetime.utcnow() < self.trial_end:
+            return True
+        
+        # Check if user has active subscription
         return self.subscription_status in ['active', 'trialing']
     
     def __repr__(self):
@@ -190,37 +207,24 @@ class Trade(db.Model):
     is_planned = db.Column(db.Boolean, default=False, nullable=False)
 
     # ────────────────────────────────────────────────────────────
-    # NEW: live quote via Tradier REST
+    # Live quote via providers.DataProvider (Polygon.io / "Massive API")
     # ────────────────────────────────────────────────────────────
     def get_current_market_price(self):
-        """
-        Return the latest trade price (or bid/ask mid) from Tradier.
-        Works for stocks/ETFs and OCC‑formatted option symbols.
-        Falls back to entry_price on API failure.
-        """
-        token = Config.TRADIER_API_TOKEN or os.getenv("TRADIER_API_TOKEN")
-        if not token:
-            return self.entry_price  # graceful fallback
+        """Return the latest trade price for this trade's symbol.
 
-        url = "https://api.tradier.com/v1/markets/quotes"
-        headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+        Returns None when no provider returns a price. Callers that
+        previously relied on an implicit `entry_price` fallback should
+        handle None explicitly and display the quote as unavailable rather
+        than silently invent a P&L of 0.
+        """
+        from providers import get_default_provider
         try:
-            resp = requests.get(url, headers=headers, params={"symbols": self.symbol})
-            resp.raise_for_status()
-            data = resp.json()["quotes"]["quote"]
-            if isinstance(data, list):
-                data = data[0]
-
-            last = data.get("last") or 0
-            if last == 0:  # illiquid option
-                bid, ask = data.get("bid"), data.get("ask")
-                if bid and ask:
-                    last = (bid + ask) / 2
-
-            return float(last) if last else self.entry_price
-
+            quote = get_default_provider().get_snapshot(self.symbol)
         except Exception:
-            return self.entry_price  # network / JSON error fallback
+            return None
+        if not quote or quote.get("price") is None:
+            return None
+        return float(quote["price"])
 
     # Basic trade information
     symbol = db.Column(db.String(10), nullable=False)
@@ -297,6 +301,10 @@ class Trade(db.Model):
     # Additional notes
     notes = db.Column(db.Text)
     tags = db.Column(db.String(200))  # Comma-separated tags
+    
+    # Chart data fields
+    chart_annotations = db.Column(db.Text, nullable=True)  # Plotly shapes JSON
+    chart_snapshot_path = db.Column(db.Text, nullable=True)  # Relative path to saved PNG
 
     # Chart screenshots
     entry_chart_image = db.Column(db.String(200))  # Path to entry chart screenshot
@@ -837,10 +845,26 @@ class TradingJournal(db.Model):
     user = db.relationship("User", backref=db.backref("journal_entries", lazy=True))
 
     def get_day_trades(self):
-        """Get all trades for this journal date"""
+        """Get all trades relevant to this journal date.
+
+        A trade is "for" a journal date if it was either entered OR exited on
+        that date. The previous implementation only matched on ``entry_date``,
+        which meant a multi-day swing that was CLOSED on ``journal_date`` (the
+        most interesting day for the trader to journal about) would not show
+        up in the review.
+        """
+        journal_day = self.journal_date
         return (
             Trade.query.filter_by(user_id=self.user_id)
-            .filter(db.func.date(Trade.entry_date) == self.journal_date)
+            .filter(
+                db.or_(
+                    db.func.date(Trade.entry_date) == journal_day,
+                    db.and_(
+                        Trade.exit_date.isnot(None),
+                        db.func.date(Trade.exit_date) == journal_day,
+                    ),
+                )
+            )
             .all()
         )
 
@@ -949,3 +973,62 @@ class MarketBrief(db.Model):
     
     def __repr__(self):
         return f'<MarketBrief {self.brief_type} {self.date}>'
+
+
+# === New Models: Plans, PlanAlerts, Execution, UsageCounter ===
+
+class Plan(db.Model):
+    __tablename__ = 'plans'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    symbol = db.Column(db.String(32), nullable=False, index=True)
+    scenario_direction = db.Column(db.String(8))  # bull|bear
+    invalidation = db.Column(db.Float)
+    targets = db.Column(db.JSON)  # jsonb in Postgres
+    playbook_tags = db.Column(db.JSON)
+    rr_expected = db.Column(db.Float)
+    sizing = db.Column(db.JSON)
+    draft_payload = db.Column(db.JSON)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class PlanAlert(db.Model):
+    __tablename__ = 'plan_alerts'
+    id = db.Column(db.Integer, primary_key=True)
+    plan_id = db.Column(db.Integer, db.ForeignKey('plans.id'), nullable=False, index=True)
+    type = db.Column(db.String(32))  # on_trigger|on_invalidation|on_target
+    channel = db.Column(db.String(16))  # email|sms|inapp
+    status = db.Column(db.String(16), default='active')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class Execution(db.Model):
+    __tablename__ = 'executions'
+    execution_id = db.Column(db.String(64), primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    broker = db.Column(db.String(16), nullable=False)
+    broker_trade_id = db.Column(db.String(64))
+    account_id = db.Column(db.String(64))
+    timestamp_utc = db.Column(db.DateTime, index=True, nullable=False)
+    symbol = db.Column(db.String(32), index=True, nullable=False)
+    asset_type = db.Column(db.String(16), nullable=False)  # equity|option
+    side = db.Column(db.String(8), nullable=False)
+    quantity = db.Column(db.Float, nullable=False)
+    price = db.Column(db.Float, nullable=False)
+    commission = db.Column(db.Float, default=0)
+    fees = db.Column(db.Float, default=0)
+    currency = db.Column(db.String(8), default='USD')
+    # Options
+    right = db.Column(db.String(1))
+    strike = db.Column(db.Float)
+    expiration = db.Column(db.Date)
+    multiplier = db.Column(db.Integer)
+    occ = db.Column(db.String(64))
+
+class UsageCounter(db.Model):
+    __tablename__ = 'usage_counters'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    key = db.Column(db.String(64), nullable=False)
+    week_start = db.Column(db.Date, nullable=False)
+    count = db.Column(db.Integer, default=0)
+    __table_args__ = (db.UniqueConstraint('user_id','key','week_start', name='uix_usage_user_key_week'),)

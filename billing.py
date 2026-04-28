@@ -11,13 +11,62 @@ except ImportError:
 
 bp = Blueprint("billing", __name__, url_prefix="/api/billing")
 
-# Initialize Stripe
+# Initialize Stripe. Pinning api_version keeps our webhook payload shape
+# stable even if Stripe rolls a new default API version on the account.
+STRIPE_API_VERSION = os.getenv("STRIPE_API_VERSION", "2024-06-20")
 if stripe:
     stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+    stripe.api_version = STRIPE_API_VERSION
 
 # Price IDs from environment variables
 PRICE_MONTHLY = os.getenv("STRIPE_PRICE_MONTHLY")   # e.g., price_123
 PRICE_ANNUAL = os.getenv("STRIPE_PRICE_ANNUAL")    # e.g., price_456
+
+
+def _sync_user_from_subscription(user, subscription, *, plan_type=None, customer_id=None,
+                                 subscription_id=None):
+    """Apply a Stripe ``Subscription`` object's state to a local ``User``.
+
+    Centralised so ``checkout.session.completed``, ``customer.subscription.updated``
+    and the post-checkout ``/success`` page all agree on how to map Stripe
+    state -> DB columns. Returns ``user`` for convenience.
+    """
+    if user is None or subscription is None:
+        return user
+
+    status = subscription.get("status") if isinstance(subscription, dict) else getattr(subscription, "status", None)
+    if status:
+        user.subscription_status = status
+
+    if plan_type:
+        user.plan_type = plan_type
+    if customer_id:
+        user.stripe_customer_id = customer_id
+    if subscription_id:
+        user.stripe_subscription_id = subscription_id
+
+    try:
+        if status in ("active", "trialing"):
+            user.is_subscribed_daily = True
+            user.is_subscribed_weekly = True
+        elif status in ("canceled", "past_due", "unpaid", "incomplete_expired"):
+            user.is_subscribed_daily = False
+            user.is_subscribed_weekly = True
+    except Exception:
+        pass
+
+    trial_end = (
+        subscription.get("trial_end") if isinstance(subscription, dict)
+        else getattr(subscription, "trial_end", None)
+    )
+    if trial_end:
+        from datetime import datetime
+        user.trial_end = datetime.utcfromtimestamp(trial_end)
+        user.had_trial = True
+    elif status == "active":
+        user.trial_end = None
+
+    return user
 
 def requires_pro(f):
     """Decorator to require Pro subscription"""
@@ -101,6 +150,15 @@ def webhook_received():
     sig_header = request.headers.get("Stripe-Signature")
     webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
 
+    if not webhook_secret:
+        # Refuse to process unsigned webhooks. Accepting them in production
+        # would let any attacker forge subscription-activation events and flip
+        # a user to Pro for free.
+        current_app.logger.error(
+            "Refusing Stripe webhook — STRIPE_WEBHOOK_SECRET is not configured."
+        )
+        return jsonify({"error": "Webhook secret not configured"}), 500
+
     try:
         event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
     except Exception as e:
@@ -130,38 +188,28 @@ def handle_checkout_completed(session):
     try:
         user_id = int(session.metadata.get("user_id"))
         plan_type = session.metadata.get("plan_type", "monthly")
-        
+
         user = User.query.get(user_id)
         if not user:
             current_app.logger.error(f"User not found for checkout: {user_id}")
             return
-        
-        # Get subscription details to check for trial
+
         subscription = stripe.Subscription.retrieve(session.subscription)
-        
-        # Update user subscription status
-        user.subscription_status = subscription.status  # 'trialing' or 'active'
-        user.plan_type = plan_type
-        user.stripe_customer_id = session.customer
-        user.stripe_subscription_id = session.subscription
-        # Enable daily + weekly brief for Pro
-        try:
-            user.is_subscribed_daily = True
-            user.is_subscribed_weekly = True
-        except Exception:
-            pass
-        
-        # Set trial end date if trial exists
-        if subscription.get("trial_end"):
-            from datetime import datetime
-            user.trial_end = datetime.utcfromtimestamp(subscription["trial_end"])
-            user.had_trial = True
-        
+        _sync_user_from_subscription(
+            user,
+            subscription,
+            plan_type=plan_type,
+            customer_id=session.customer,
+            subscription_id=session.subscription,
+        )
         db.session.commit()
-        current_app.logger.info(f"User {user_id} subscription activated: {plan_type}, status: {subscription.status}")
-        
-    except Exception as e:
+        current_app.logger.info(
+            f"User {user_id} subscription activated: {plan_type}, status: {subscription.status}"
+        )
+
+    except Exception:
         current_app.logger.exception("Error handling checkout completion")
+
 
 def handle_subscription_updated(subscription):
     """Handle subscription updates"""
@@ -170,33 +218,14 @@ def handle_subscription_updated(subscription):
         if not user:
             current_app.logger.error(f"User not found for subscription: {subscription.id}")
             return
-        
-        # Update subscription status
-        user.subscription_status = subscription.status
-        # Keep brief subscriptions aligned with Pro status
-        try:
-            if subscription.status in ("active", "trialing"):
-                user.is_subscribed_daily = True
-                user.is_subscribed_weekly = True
-            elif subscription.status in ("canceled", "past_due", "unpaid", "incomplete_expired"):
-                # Keep weekly for free users, disable daily
-                user.is_subscribed_daily = False
-                user.is_subscribed_weekly = True
-        except Exception:
-            pass
-        
-        # Update trial end date if present
-        if subscription.get("trial_end"):
-            from datetime import datetime
-            user.trial_end = datetime.utcfromtimestamp(subscription["trial_end"])
-        elif subscription.status == "active" and user.trial_end:
-            # Trial ended, clear trial_end
-            user.trial_end = None
-        
+
+        _sync_user_from_subscription(user, subscription)
         db.session.commit()
-        current_app.logger.info(f"User {user.id} subscription updated: {subscription.status}")
-        
-    except Exception as e:
+        current_app.logger.info(
+            f"User {user.id} subscription updated: {subscription.status}"
+        )
+
+    except Exception:
         current_app.logger.exception("Error handling subscription update")
 
 def handle_subscription_canceled(subscription):
@@ -264,19 +293,16 @@ def success():
                         target_user = User.query.get(meta_user_id)
 
                 if target_user:
-                    target_user.subscription_status = subscription.status
-                    # Store plan type from metadata if available
+                    plan_type = None
                     if session.metadata and session.metadata.get("plan_type"):
-                        target_user.plan_type = session.metadata.get("plan_type")
-                    target_user.stripe_customer_id = session.customer
-                    target_user.stripe_subscription_id = session.subscription
-                    # Handle trial information
-                    if subscription.get("trial_end"):
-                        from datetime import datetime
-                        target_user.trial_end = datetime.utcfromtimestamp(subscription["trial_end"])
-                        target_user.had_trial = True
-                    elif subscription.status == "active":
-                        target_user.trial_end = None
+                        plan_type = session.metadata.get("plan_type")
+                    _sync_user_from_subscription(
+                        target_user,
+                        subscription,
+                        plan_type=plan_type,
+                        customer_id=session.customer,
+                        subscription_id=session.subscription,
+                    )
                     db.session.commit()
                 else:
                     current_app.logger.error("Could not resolve target user for checkout success update")

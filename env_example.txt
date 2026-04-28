@@ -10,8 +10,18 @@ DATABASE_URL=postgresql://localhost/tradingapp
 # OpenAI API (for AI analysis)
 OPENAI_API_KEY=your-openai-api-key
 
-# Tradier Configuration
-TRADIER_API_TOKEN=your-tradier-token
+# Market data provider (required)
+# Polygon.io ("Massive API"). Accepts MASSIVE_API_KEY or POLYGON_API_KEY.
+# Earnings calendar, earnings surprises, and economic calendar are NOT
+# available on the Stocks Starter tier and return empty results.
+MASSIVE_API_KEY=your-polygon-api-key
+# Optional base-URL override (mainly for testing)
+POLYGON_BASE_URL=https://api.polygon.io
+# Seconds between outbound API calls (Polygon Stocks Starter = 0.05 is safe, free tier = 12)
+RATE_LIMIT_DELAY=0.05
+
+# Anthropic Claude (for AI catalyst summaries on movers/alerts)
+ANTHROPIC_API_KEY=your-anthropic-api-key
 
 # Google OAuth Configuration
 GOOGLE_OAUTH_CLIENT_ID=your-google-client-id

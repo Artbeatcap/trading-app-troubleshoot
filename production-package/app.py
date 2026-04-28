@@ -109,17 +109,17 @@ if GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET:
         redirect_to="google_login"  # Redirect to our custom login handler after OAuth
     )
     app.register_blueprint(google_bp, url_prefix="/login")
-    print("✅ Google OAuth blueprint registered successfully")
+    print("Google OAuth blueprint registered successfully")
 else:
-    print("⚠️  Google OAuth not configured. Set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET env vars.")
+    print("WARNING: Google OAuth not configured. Set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET env vars.")
 
 # Register billing blueprint
 try:
     from billing import bp as billing_bp, requires_pro
     app.register_blueprint(billing_bp)
-    print("✅ Billing blueprint registered successfully")
+    print("Billing blueprint registered successfully")
 except ImportError as e:
-    print(f"⚠️  Billing blueprint not available: {e}")
+    print(f"WARNING: Billing blueprint not available: {e}")
     # Fallback requires_pro decorator
     def requires_pro(f):
         from functools import wraps

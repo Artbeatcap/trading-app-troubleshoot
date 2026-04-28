@@ -21,11 +21,27 @@ class Config:
     # OpenAI Configuration
     OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
 
-    # Finnhub Configuration (for market news/quotes)
-    FINNHUB_TOKEN = os.environ.get('FINNHUB_TOKEN')
+    # Polygon.io (internally "Massive API") is the sole market-data provider.
+    # Finnhub, Tradier, Tiingo, Alpha Vantage, and FMP have all been fully
+    # removed; every market data call flows through providers.DataProvider.
+    # Endpoints not covered by the current Polygon tier (earnings calendar,
+    # earnings surprises, economic calendar) degrade gracefully to [].
+    MASSIVE_API_KEY = os.environ.get('MASSIVE_API_KEY') or os.environ.get('POLYGON_API_KEY')
+    POLYGON_BASE_URL = os.environ.get('POLYGON_BASE_URL', 'https://api.polygon.io')
+    try:
+        RATE_LIMIT_DELAY = float(os.environ.get('RATE_LIMIT_DELAY', '0.05'))
+    except ValueError:
+        RATE_LIMIT_DELAY = 0.05
 
-    # Tradier Configuration
-    TRADIER_API_TOKEN = os.environ.get('TRADIER_API_TOKEN')
+    # Anthropic (Claude Haiku) for catalyst summarization
+    ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY')
+
+    # Options data feature flag. Our current Polygon Stocks Starter plan does
+    # not include the options endpoint, so the Options Calculator / chain
+    # surfaces would render empty states. Flip OPTIONS_ENABLED=1 once you
+    # upgrade to an options-capable provider tier (or wire in a second
+    # options provider inside providers.DataProvider.get_option_chain).
+    OPTIONS_ENABLED = os.environ.get('OPTIONS_ENABLED', 'false').lower() in ('true', 'on', '1', 'yes')
 
     # Mail Configuration (for user registration/password reset and newsletter)
     MAIL_SERVER = os.environ.get('MAIL_SERVER') or 'smtp.gmail.com'
@@ -33,6 +49,8 @@ class Config:
     MAIL_USE_TLS = os.environ.get('MAIL_USE_TLS', 'true').lower() in ['true', 'on', '1']
     MAIL_USERNAME = os.environ.get('MAIL_USERNAME')
     MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
+    # Ensure emails are sent in production unless explicitly disabled
+    MAIL_SUPPRESS_SEND = os.environ.get('MAIL_SUPPRESS_SEND', 'false').lower() in ['true', 'on', '1']
     # Optional SendGrid API key for email sending; if present, will be preferred
     SENDGRID_KEY = os.environ.get('SENDGRID_KEY')
     # Mail sender configuration with name and email
@@ -43,7 +61,14 @@ class Config:
 
     # App Configuration
     TRADES_PER_PAGE = 20
-    ANALYSIS_MODEL = 'gpt-4o-mini'  # Default AI model for analysis
+    ANALYSIS_MODEL = 'gpt-5-nano'  # Default AI model for analysis
+
+    # Market Brief Pipeline Configuration
+    MODEL_BRIEF_STAGE_A = os.environ.get('MODEL_BRIEF_STAGE_A', 'gpt-4o-mini')
+    MODEL_BRIEF_STAGE_B = os.environ.get('MODEL_BRIEF_STAGE_B', 'gpt-4o-mini')
+    MAX_INPUT_TOKENS_SOFT = int(os.environ.get('MAX_INPUT_TOKENS_SOFT', '80000'))
+    MAX_OUTPUT_TOKENS = int(os.environ.get('MAX_OUTPUT_TOKENS', '1200'))
+    BRIEF_POLISH = os.environ.get('BRIEF_POLISH', 'true').lower() in ['true', 'on', '1']
 
     # URL Configuration for email links
     # For local development, don't set SERVER_NAME to allow all hosts

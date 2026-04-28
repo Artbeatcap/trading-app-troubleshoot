@@ -167,8 +167,15 @@ class TradeForm(FlaskForm):
             raise ValidationError('Expiration date is required for options trades.')
         if self.trade_type.data in ['credit_put_spread', 'credit_call_spread'] and not expiration_date.data:
             raise ValidationError('Expiration date is required for spread trades.')
-        if expiration_date.data and expiration_date.data < date.today():
-            raise ValidationError('Expiration date cannot be in the past.')
+        # Only reject past expirations when the user is creating a *planned*
+        # trade. Existing/closed trades routinely have expirations in the past
+        # (you can't log a call you opened last month if the form rejects it).
+        if (
+            self.is_planned.data
+            and expiration_date.data
+            and expiration_date.data < date.today()
+        ):
+            raise ValidationError('Expiration date cannot be in the past for a planned trade.')
     
     def validate_long_strike(self, long_strike):
         """Validate long strike for spread trades"""
