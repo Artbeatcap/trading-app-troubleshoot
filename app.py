@@ -58,6 +58,146 @@ import datetime as dt
 from PIL import Image
 import csv
 
+
+class DemoPagination:
+    """Minimal pagination shape for sample lists rendered by templates."""
+
+    def __init__(self, items, page=1, per_page=20):
+        self.items = items
+        self.page = page
+        self.per_page = per_page
+        self.total = len(items)
+        self.pages = 1
+        self.has_prev = False
+        self.has_next = False
+        self.prev_num = None
+        self.next_num = None
+
+    def iter_pages(self):
+        return [1]
+
+
+def get_sample_trades():
+    """Return hard-coded demo trades that are safe for unauthenticated views."""
+    now = datetime.now()
+    return [
+        {
+            'id': 1,
+            'symbol': 'AAPL',
+            'trade_type': 'stock',
+            'entry_date': now - timedelta(days=5),
+            'entry_price': 150.25,
+            'quantity': 100,
+            'exit_date': now - timedelta(days=2),
+            'exit_price': 155.75,
+            'profit_loss': 550.00,
+            'setup_type': 'breakout',
+            'market_condition': 'bullish',
+            'timeframe': 'daily',
+            'entry_reason': 'Breakout above resistance with high volume',
+            'exit_reason': 'Target reached',
+            'notes': 'Strong earnings catalyst',
+            'tags': 'earnings, breakout, tech',
+            'is_analyzed': True,
+            'is_planned': False,
+        },
+        {
+            'id': 2,
+            'symbol': 'TSLA',
+            'trade_type': 'option_call',
+            'entry_date': now - timedelta(days=10),
+            'entry_price': 2.50,
+            'quantity': 10,
+            'exit_date': now - timedelta(days=7),
+            'exit_price': 4.25,
+            'profit_loss': 1750.00,
+            'setup_type': 'momentum',
+            'market_condition': 'bullish',
+            'timeframe': '4h',
+            'entry_reason': 'Strong momentum with high IV',
+            'exit_reason': 'IV crush after earnings',
+            'notes': 'Earnings play - sold before announcement',
+            'tags': 'earnings, options, momentum',
+            'is_analyzed': False,
+            'is_planned': False,
+        },
+        {
+            'id': 3,
+            'symbol': 'SPY',
+            'trade_type': 'credit_put_spread',
+            'entry_date': now - timedelta(days=15),
+            'entry_price': 1.25,
+            'quantity': 5,
+            'exit_date': now - timedelta(days=12),
+            'exit_price': 0.50,
+            'profit_loss': 375.00,
+            'setup_type': 'income',
+            'market_condition': 'sideways',
+            'timeframe': 'daily',
+            'entry_reason': 'High probability setup in sideways market',
+            'exit_reason': 'Early profit taking',
+            'notes': 'Theta decay working in our favor',
+            'tags': 'income, spreads, theta',
+            'is_analyzed': True,
+            'is_planned': False,
+        },
+    ]
+
+
+def get_sample_journals():
+    """Return hard-coded demo journal entries for unauthenticated views."""
+    now = datetime.now()
+    return [
+        {
+            'journal_date': now - timedelta(days=1),
+            'market_notes': 'Market showing strong momentum in tech sector. AAPL and TSLA leading the charge with earnings catalysts. VIX remains low indicating complacency.',
+            'trading_notes': 'Executed 3 trades today: AAPL breakout (winner), TSLA momentum (winner), SPY reversal (loser). Overall P&L: +$450. Stuck to my plan and managed risk well.',
+            'emotions': 'Felt confident and focused. No FOMO or revenge trading urges. Stayed disciplined with position sizing.',
+            'lessons_learned': 'Breakout trades work best with volume confirmation. Need to be more patient with reversal setups.',
+            'tomorrow_plan': 'Focus on high-probability setups only. Watch for continuation patterns in tech. Keep position sizes consistent.',
+            'daily_pnl': 450.00,
+            'daily_score': 8.5,
+            'ai_daily_feedback': 'Excellent discipline today! Your risk management was spot-on and you stuck to your trading plan. Consider adding volume analysis to your reversal setups.'
+        },
+        {
+            'journal_date': now - timedelta(days=2),
+            'market_notes': 'Market choppy with mixed signals. Fed minutes caused some volatility. Sector rotation into defensive names.',
+            'trading_notes': 'Only 1 trade: QQQ put spread (small loss). Market conditions weren\'t ideal for my setups. Better to sit out than force trades.',
+            'emotions': 'Frustrated with the choppy market but stayed patient. Proud that I didn\'t chase bad setups.',
+            'lessons_learned': 'Sometimes the best trade is no trade. Market conditions matter more than individual setups.',
+            'tomorrow_plan': 'Wait for clearer market direction. Focus on quality over quantity.',
+            'daily_pnl': -75.00,
+            'daily_score': 7.0,
+            'ai_daily_feedback': 'Great job staying patient in difficult market conditions. Your discipline to avoid forcing trades shows maturity. Consider adding market condition filters to your strategy.'
+        },
+        {
+            'journal_date': now - timedelta(days=3),
+            'market_notes': 'Strong bullish day with clear trend. All major indices up 1%+. Volume confirming the move.',
+            'trading_notes': '2 trades: SPY call (winner), IWM breakout (winner). Both trades followed the trend and had clear setups.',
+            'emotions': 'Excited about the clear market direction. Felt in sync with the market rhythm.',
+            'lessons_learned': 'Trend following works best in strong trending markets. Don\'t fight the trend.',
+            'tomorrow_plan': 'Look for continuation patterns. Consider adding to winning positions if trend continues.',
+            'daily_pnl': 325.00,
+            'daily_score': 9.0,
+            'ai_daily_feedback': 'Outstanding performance! You perfectly aligned with market conditions and executed flawlessly. Your trend-following approach was textbook.'
+        }
+    ]
+
+
+def get_demo_dashboard_stats(sample_trades):
+    closed_trades = [trade for trade in sample_trades if trade.get('exit_price') is not None]
+    winning_trades = [
+        trade for trade in closed_trades
+        if trade.get('profit_loss') is not None and trade['profit_loss'] > 0
+    ]
+    total_pnl = sum(trade['profit_loss'] for trade in closed_trades if trade.get('profit_loss'))
+    return {
+        "total_trades": len(sample_trades),
+        "win_rate": len(winning_trades) / len(closed_trades) * 100 if closed_trades else 0,
+        "total_pnl": total_pnl,
+        "trades_analyzed": len([trade for trade in sample_trades if trade.get('is_analyzed')]),
+    }
+
 # === API Blueprints: AI Explain, Options, Usage, Imports ===
 from flask import Blueprint
 from datetime import timezone
@@ -1916,32 +2056,10 @@ def dashboard():
                 onboarding_dismissed=onboarding_dismissed,
             )
         else:
-            # Show aggregate stats for guests using all available trades
-            recent_trades = (
-                Trade.query.order_by(Trade.entry_date.desc()).limit(10).all()
-            )
-
-            closed_trades = Trade.query.filter(Trade.exit_price.isnot(None)).all()
-            win_rate = (
-                len([t for t in closed_trades if t.profit_loss and t.profit_loss > 0])
-                / len(closed_trades) * 100
-                if closed_trades
-                else 0
-            )
-            total_pnl = sum(t.profit_loss for t in closed_trades if t.profit_loss)
-
-            stats = {
-                "total_trades": Trade.query.count(),
-                "win_rate": win_rate,
-                "total_pnl": total_pnl,
-                "trades_analyzed": Trade.query.filter_by(is_analyzed=True).count(),
-            }
-
-            recent_journals = (
-                TradingJournal.query.order_by(TradingJournal.journal_date.desc())
-                .limit(5)
-                .all()
-            )
+            # Guests must only see explicit demo data, never user-owned rows.
+            recent_trades = get_sample_trades()
+            stats = get_demo_dashboard_stats(recent_trades)
+            recent_journals = get_sample_journals()
 
             onboarding = {
                 "has_trade": False,
@@ -1961,6 +2079,8 @@ def dashboard():
                 mobile_preference=mobile_preference,
                 onboarding=onboarding,
                 onboarding_dismissed=onboarding_dismissed,
+                show_login_prompt=True,
+                show_demo_data=True,
             )
     except Exception as e:
         # Log the error for debugging
@@ -1996,64 +2116,7 @@ def dismiss_onboarding():
 @app.route("/trades")
 def trades():
     """Display trades. Show real data for authenticated users, sample data for others."""
-    
-    # Show sample trades for unauthenticated users
-    sample_trades = [
-        {
-            'id': 1,
-            'symbol': 'AAPL',
-            'trade_type': 'stock',
-            'entry_date': datetime.now() - timedelta(days=5),
-            'entry_price': 150.25,
-            'quantity': 100,
-            'exit_date': datetime.now() - timedelta(days=2),
-            'exit_price': 155.75,
-            'profit_loss': 550.00,
-            'setup_type': 'breakout',
-            'market_condition': 'bullish',
-            'timeframe': 'daily',
-            'entry_reason': 'Breakout above resistance with high volume',
-            'exit_reason': 'Target reached',
-            'notes': 'Strong earnings catalyst',
-            'tags': 'earnings, breakout, tech'
-        },
-        {
-            'id': 2,
-            'symbol': 'TSLA',
-            'trade_type': 'option_call',
-            'entry_date': datetime.now() - timedelta(days=10),
-            'entry_price': 2.50,
-            'quantity': 10,
-            'exit_date': datetime.now() - timedelta(days=7),
-            'exit_price': 4.25,
-            'profit_loss': 1750.00,
-            'setup_type': 'momentum',
-            'market_condition': 'bullish',
-            'timeframe': '4h',
-            'entry_reason': 'Strong momentum with high IV',
-            'exit_reason': 'IV crush after earnings',
-            'notes': 'Earnings play - sold before announcement',
-            'tags': 'earnings, options, momentum'
-        },
-        {
-            'id': 3,
-            'symbol': 'SPY',
-            'trade_type': 'credit_put_spread',
-            'entry_date': datetime.now() - timedelta(days=15),
-            'entry_price': 1.25,
-            'quantity': 5,
-            'exit_date': datetime.now() - timedelta(days=12),
-            'exit_price': 0.50,
-            'profit_loss': 375.00,
-            'setup_type': 'income',
-            'market_condition': 'sideways',
-            'timeframe': 'daily',
-            'entry_reason': 'High probability setup in sideways market',
-            'exit_reason': 'Early profit taking',
-            'notes': 'Theta decay working in our favor',
-            'tags': 'income, spreads, theta'
-        }
-    ]
+    sample_trades = get_sample_trades()
     
     if current_user.is_authenticated:
         # Check if user has real trades
@@ -2068,7 +2131,7 @@ def trades():
             return render_template("trades.html", trades=sample_trades, show_login_prompt=False, is_authenticated=True, show_demo_data=True)
     else:
         # For unauthenticated users, show sample data with login prompt
-        return render_template("trades.html", trades=sample_trades, show_login_prompt=True, is_authenticated=False)
+        return render_template("trades.html", trades=sample_trades, show_login_prompt=True, is_authenticated=False, show_demo_data=True)
 
 
 @app.route("/add_trade", methods=["GET", "POST"])
@@ -2395,59 +2458,7 @@ def analyze_planned_trade(id):
 def journal():
     """Display journal entries. Show real data for authenticated users, sample data for others."""
     page = request.args.get("page", 1, type=int)
-    
-    # Show sample journal entries for unauthenticated users
-    from datetime import datetime, timedelta
-    
-    sample_journals = [
-        {
-            'journal_date': datetime.now() - timedelta(days=1),
-            'market_notes': 'Market showing strong momentum in tech sector. AAPL and TSLA leading the charge with earnings catalysts. VIX remains low indicating complacency.',
-            'trading_notes': 'Executed 3 trades today: AAPL breakout (winner), TSLA momentum (winner), SPY reversal (loser). Overall P&L: +$450. Stuck to my plan and managed risk well.',
-            'emotions': 'Felt confident and focused. No FOMO or revenge trading urges. Stayed disciplined with position sizing.',
-            'lessons_learned': 'Breakout trades work best with volume confirmation. Need to be more patient with reversal setups.',
-            'tomorrow_plan': 'Focus on high-probability setups only. Watch for continuation patterns in tech. Keep position sizes consistent.',
-            'daily_pnl': 450.00,
-            'daily_score': 8.5,
-            'ai_daily_feedback': 'Excellent discipline today! Your risk management was spot-on and you stuck to your trading plan. Consider adding volume analysis to your reversal setups.'
-        },
-        {
-            'journal_date': datetime.now() - timedelta(days=2),
-            'market_notes': 'Market choppy with mixed signals. Fed minutes caused some volatility. Sector rotation into defensive names.',
-            'trading_notes': 'Only 1 trade: QQQ put spread (small loss). Market conditions weren\'t ideal for my setups. Better to sit out than force trades.',
-            'emotions': 'Frustrated with the choppy market but stayed patient. Proud that I didn\'t chase bad setups.',
-            'lessons_learned': 'Sometimes the best trade is no trade. Market conditions matter more than individual setups.',
-            'tomorrow_plan': 'Wait for clearer market direction. Focus on quality over quantity.',
-            'daily_pnl': -75.00,
-            'daily_score': 7.0,
-            'ai_daily_feedback': 'Great job staying patient in difficult market conditions. Your discipline to avoid forcing trades shows maturity. Consider adding market condition filters to your strategy.'
-        },
-        {
-            'journal_date': datetime.now() - timedelta(days=3),
-            'market_notes': 'Strong bullish day with clear trend. All major indices up 1%+. Volume confirming the move.',
-            'trading_notes': '2 trades: SPY call (winner), IWM breakout (winner). Both trades followed the trend and had clear setups.',
-            'emotions': 'Excited about the clear market direction. Felt in sync with the market rhythm.',
-            'lessons_learned': 'Trend following works best in strong trending markets. Don\'t fight the trend.',
-            'tomorrow_plan': 'Look for continuation patterns. Consider adding to winning positions if trend continues.',
-            'daily_pnl': 325.00,
-            'daily_score': 9.0,
-            'ai_daily_feedback': 'Outstanding performance! You perfectly aligned with market conditions and executed flawlessly. Your trend-following approach was textbook.'
-        }
-    ]
-    
-    # Create a mock pagination object for the sample data
-    class MockPagination:
-        def __init__(self, items, page, per_page):
-            self.items = items
-            self.page = page
-            self.per_page = per_page
-            self.total = len(items)
-            self.pages = 1
-            self.has_prev = False
-            self.has_next = False
-            self.prev_num = None
-            self.next_num = None
-            self.iter_pages = lambda: [1]
+    sample_journals = get_sample_journals()
     
     if current_user.is_authenticated:
         # Check if user has real journal entries
@@ -2459,12 +2470,12 @@ def journal():
             return render_template("journal.html", journals=user_journals, show_login_prompt=False, show_demo_data=False)
         else:
             # User has no journal entries - show demo data
-            journals = MockPagination(sample_journals, page, 20)
+            journals = DemoPagination(sample_journals, page, 20)
             return render_template("journal.html", journals=journals, show_login_prompt=False, show_demo_data=True)
     else:
         # For unauthenticated users, show sample data with login prompt
-        journals = MockPagination(sample_journals, page, 20)
-        return render_template("journal.html", journals=journals, show_login_prompt=True)
+        journals = DemoPagination(sample_journals, page, 20)
+        return render_template("journal.html", journals=journals, show_login_prompt=True, show_demo_data=True)
 
 
 @app.route("/journal/add", methods=["GET", "POST"])
