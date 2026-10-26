@@ -1523,10 +1523,8 @@ def add_edit_journal(journal_date=None):
             # Update existing
             form.populate_obj(journal)
         else:
-            # Create new journal entry. Guests have no user_id
-            journal = TradingJournal(
-                user_id=current_user.id if current_user.is_authenticated else None
-            )
+            # Guest drafts are kept in session; persistent journals always have an owner.
+            journal = TradingJournal(user_id=current_user.id)
             form.populate_obj(journal)
 
         # Get trades for this day and analyze daily performance

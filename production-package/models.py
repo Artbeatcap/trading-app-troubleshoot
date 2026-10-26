@@ -778,8 +778,7 @@ class TradingJournal(db.Model):
     """Daily trading journal entries"""
 
     id = db.Column(db.Integer, primary_key=True)
-    # user_id is optional so guests can post journals
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
 
     journal_date = db.Column(db.Date, nullable=False)
 

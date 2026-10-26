@@ -3,6 +3,7 @@
 from datetime import date, datetime
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 from app import app
 from app import db
@@ -104,3 +105,44 @@ def test_guest_pages_render_demo_content(client_with_private_data, path, sample_
 
     assert response.status_code == 200
     assert sample_marker in response.get_data(as_text=True)
+
+
+def test_guest_journal_post_stores_session_draft_without_creating_row():
+    client = app.test_client()
+
+    response = client.post(
+        "/journal/add",
+        data={
+            "journal_date": "2026-01-12",
+            "market_notes": "Guest market draft",
+            "trading_notes": "Guest trading draft",
+            "emotions": "calm",
+            "lessons_learned": "wait for confirmation",
+            "tomorrow_plan": "review watchlist",
+            "daily_pnl": "12.34",
+            "daily_score": "6",
+        },
+    )
+
+    assert response.status_code == 302
+    assert "/login" in response.headers["Location"]
+    with client.session_transaction() as sess:
+        assert sess["pending_journal"]["trading_notes"] == "Guest trading draft"
+
+    with app.app_context():
+        assert TradingJournal.query.count() == 0
+
+
+def test_trading_journal_requires_user_id():
+    with app.app_context():
+        db.session.add(
+            TradingJournal(
+                journal_date=date(2026, 1, 12),
+                trading_notes="Ownerless persistent journal",
+            )
+        )
+
+        with pytest.raises(IntegrityError):
+            db.session.commit()
+
+        db.session.rollback()
