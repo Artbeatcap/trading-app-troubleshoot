@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, flash, redirect, url_for, jsonify, session, current_app, make_response, abort
+from flask import Flask, render_template, request, flash, redirect, url_for, jsonify, session, current_app, make_response, abort, g, send_from_directory
 from flask_login import (
     LoginManager,
     login_user,
@@ -935,6 +935,227 @@ except Exception as e:
 app = Flask(__name__)
 app.config.from_object(Config)
 
+# One public URL. www, the bare IP, and trailing slashes all fold into this.
+CANONICAL_ORIGIN = "https://optionsplunge.com"
+CANONICAL_HOSTS = {"optionsplunge.com", "www.optionsplunge.com", "167.88.43.61"}
+NON_CANONICAL_HOSTS = {"www.optionsplunge.com", "167.88.43.61"}
+DEFAULT_DESCRIPTION = (
+    "Options Plunge is an AI-powered options trading analysis platform "
+    "with market briefs, trade tools, and options education."
+)
+PAGE_DESCRIPTIONS = {
+    "index": (
+        "Options Plunge helps options traders review setups with AI analysis, "
+        "daily market briefs, calculators, and a trading journal."
+    ),
+    "pricing": (
+        "Compare Options Plunge Free and Pro. Start a 14-day trial for AI "
+        "trade analysis, market briefs, and the full options toolkit."
+    ),
+    "privacy": (
+        "How Options Plunge collects, uses, and protects account data, "
+        "market-brief emails, and payment information."
+    ),
+    "education": (
+        "Options education from Options Plunge: the Greeks, strategies, "
+        "implied volatility, risk management, and position sizing."
+    ),
+    "education_greeks": (
+        "What delta, gamma, theta, vega, and rho mean for an options trade, "
+        "with practical examples."
+    ),
+    "education_strategies": (
+        "A practical guide to common options strategies, when each one fits, "
+        "and the risks to watch."
+    ),
+    "education_risk_management": (
+        "How to size risk, set exits, and keep one options trade from "
+        "damaging the account."
+    ),
+    "education_position_sizing": (
+        "Position sizing for options: how many contracts to trade from "
+        "account size and defined risk."
+    ),
+    "education_implied_volatility": (
+        "How implied volatility changes option prices, and how to read it "
+        "before entering a trade."
+    ),
+    "education_advanced_options": (
+        "Advanced options topics for traders who already know the Greeks, "
+        "strategies, and basic risk rules."
+    ),
+    "tools": (
+        "Options calculators, a Black-Scholes pricer, and stock lookup "
+        "from Options Plunge."
+    ),
+    "options_calculator": (
+        "Estimate an option's value, breakeven, and profit and loss before "
+        "placing the trade."
+    ),
+    "black_scholes_calculator": (
+        "Black-Scholes calculator for a theoretical option price and the "
+        "main Greeks."
+    ),
+    "stock_lookup": (
+        "Look up a stock's price and context before building an options trade."
+    ),
+    "market_brief": (
+        "Daily and weekly market briefs for options traders, covering the "
+        "session setup and what changed."
+    ),
+}
+SITEMAP_PATHS = (
+    "/",
+    "/pricing",
+    "/privacy",
+    "/education",
+    "/education/greeks",
+    "/education/strategies",
+    "/education/risk-management",
+    "/education/position-sizing",
+    "/education/implied-volatility",
+    "/education/advanced-options",
+    "/tools",
+    "/tools/options-calculator",
+    "/tools/black-scholes",
+    "/tools/stock-lookup",
+    "/market_brief",
+    "/brief/latest",
+    "/brief/weekly",
+)
+_NOINDEX_EXACT = {
+    "/login",
+    "/register",
+    "/logout",
+    "/dashboard",
+    "/settings",
+    "/trades",
+    "/add_trade",
+    "/journal",
+    "/analytics",
+    "/bulk_analysis",
+    "/welcome",
+    "/resend_verification",
+    "/verify_email_required",
+    "/search_stocks",
+    "/google_login",
+}
+_NOINDEX_PREFIXES = (
+    "/admin",
+    "/api/",
+    "/trade/",
+    "/debug/",
+    "/confirm/",
+    "/unsubscribe/",
+    "/reset_password",
+    "/verify_email/",
+    "/journal/",
+    "/onboarding/",
+    "/login/",
+    "/test-options",
+    "/tools/calculate-bs",
+    "/tools/options-pnl",
+)
+
+
+def _request_host():
+    return (request.host or "").split(":")[0].lower()
+
+
+def _clean_path(path):
+    path = path or "/"
+    if len(path) > 1 and path.endswith("/"):
+        path = path.rstrip("/") or "/"
+    return path
+
+
+def _is_noindex_path(path):
+    path = _clean_path(path)
+    if path in _NOINDEX_EXACT:
+        return True
+    return any(path.startswith(prefix) for prefix in _NOINDEX_PREFIXES)
+
+
+def _canonical_redirect_target():
+    """Fold www, the server IP, and trailing slashes into one HTTPS URL.
+
+    On the public hosts the target is always https://optionsplunge.com, even
+    when Flask sees plain HTTP behind nginx. Local hosts only lose the slash.
+    """
+    if request.method not in ("GET", "HEAD"):
+        return None
+    host = _request_host()
+    path = request.path or "/"
+    host_bad = host in NON_CANONICAL_HOSTS
+    slash_bad = path != "/" and path.endswith("/")
+    path = _clean_path(path)
+    if host in CANONICAL_HOSTS:
+        if not host_bad and not slash_bad:
+            return None
+        # Public hosts always land on HTTPS apex, including when nginx
+        # forwards the request to Flask as plain HTTP.
+        target = CANONICAL_ORIGIN + path
+    else:
+        if not slash_bad:
+            return None
+        # Local dev: relative redirect so the current scheme and port stay.
+        target = path
+    if request.query_string:
+        target += "?" + request.query_string.decode("utf-8", "ignore")
+    return target
+
+
+def _inject_canonical(html, path):
+    if not isinstance(html, str) or 'rel="canonical"' in html:
+        return html
+    tag = f'<link rel="canonical" href="{CANONICAL_ORIGIN}{path}">'
+    if "</head>" in html:
+        return html.replace("</head>", tag + "</head>", 1)
+    return tag + html
+
+
+@app.before_request
+def canonicalize_request():
+    target = _canonical_redirect_target()
+    if target:
+        return redirect(target, 301)
+
+
+@app.after_request
+def add_seo_headers(response):
+    path = request.path or "/"
+    if response.status_code == 404 or (
+        response.status_code == 200 and _is_noindex_path(path)
+    ):
+        response.headers["X-Robots-Tag"] = "noindex, follow"
+    return response
+
+
+@app.context_processor
+def inject_seo():
+    try:
+        path = _clean_path(request.path)
+        endpoint = request.endpoint
+        missing = endpoint is None or bool(getattr(g, "seo_noindex", False))
+    except RuntimeError:
+        return dict(
+            canonical_url=CANONICAL_ORIGIN + "/",
+            robots_directive="index, follow",
+            page_description=DEFAULT_DESCRIPTION,
+        )
+    noindex = missing or _is_noindex_path(path)
+    if missing and endpoint is None:
+        canonical = CANONICAL_ORIGIN + "/"
+    elif path == "/":
+        canonical = CANONICAL_ORIGIN + "/"
+    else:
+        canonical = CANONICAL_ORIGIN + path
+    return dict(
+        canonical_url=canonical,
+        robots_directive="noindex, follow" if noindex else "index, follow",
+        page_description=PAGE_DESCRIPTIONS.get(endpoint, DEFAULT_DESCRIPTION),
+    )
+
 # Override SERVER_NAME for local development
 if os.environ.get('FLASK_ENV') != 'production':
     app.config['SERVER_NAME'] = None
@@ -1849,8 +2070,69 @@ def index():
 
 @app.route("/home")
 def home():
-    """Public landing page with logged-in layout"""
-    return render_template("index.html", show_logged_in=True)
+    """Old duplicate of the landing page."""
+    return redirect(url_for("index"), code=301)
+
+
+@app.route("/robots.txt")
+def robots_txt():
+    body = "\n".join([
+        "User-agent: *",
+        "Allow: /",
+        "Disallow: /login",
+        "Disallow: /register",
+        "Disallow: /logout",
+        "Disallow: /dashboard",
+        "Disallow: /settings",
+        "Disallow: /trades",
+        "Disallow: /trade/",
+        "Disallow: /add_trade",
+        "Disallow: /journal",
+        "Disallow: /analytics",
+        "Disallow: /bulk_analysis",
+        "Disallow: /welcome",
+        "Disallow: /admin",
+        "Disallow: /api/",
+        "Disallow: /reset_password",
+        "Disallow: /verify_email",
+        "Disallow: /resend_verification",
+        "Disallow: /debug/",
+        "Disallow: /search_stocks",
+        "Disallow: /onboarding/",
+        "Disallow: /google_login",
+        "Disallow: /prefect/",
+        "",
+        f"Sitemap: {CANONICAL_ORIGIN}/sitemap.xml",
+        "",
+    ])
+    response = make_response(body)
+    response.mimetype = "text/plain"
+    return response
+
+
+@app.route("/sitemap.xml")
+def sitemap_xml():
+    lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ]
+    for path in SITEMAP_PATHS:
+        lines.append("  <url>")
+        lines.append(f"    <loc>{CANONICAL_ORIGIN}{path}</loc>")
+        lines.append("  </url>")
+    lines.append("</urlset>")
+    response = make_response("\n".join(lines) + "\n")
+    response.mimetype = "application/xml"
+    return response
+
+
+@app.route("/favicon.ico")
+def favicon():
+    return send_from_directory(
+        os.path.join(app.root_path, "static"),
+        "favicon.ico",
+        mimetype="image/vnd.microsoft.icon",
+    )
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -4194,6 +4476,7 @@ def reset_password(token):
 # Error handlers
 @app.errorhandler(404)
 def not_found_error(error):
+    g.seo_noindex = True
     return render_template("404.html"), 404
 
 
@@ -4314,6 +4597,7 @@ def latest_brief():
         else:
             html_content = banner + html_content
 
+    html_content = _inject_canonical(html_content, "/brief/latest")
     return html_content, 200, {'Content-Type': 'text/html; charset=utf-8'}
 
 
@@ -4352,21 +4636,15 @@ def weekly_brief():
         else:
             html_content = banner + html_content
 
+    html_content = _inject_canonical(html_content, "/brief/weekly")
     return html_content, 200, {'Content-Type': 'text/html; charset=utf-8'}
 
 # --- Weekly brief page & admin trigger ---
 
 @app.route("/weekly-brief")
 def weekly_brief_public():
-    """
-    Serves the last generated weekly brief HTML.
-    """
-    try:
-        with open("static/uploads/brief_weekly_latest.html", "r", encoding="utf-8") as f:
-            html = f.read()
-    except Exception:
-        html = "<p>No weekly brief has been generated yet.</p>"
-    return html
+    """Duplicate of /brief/weekly. Keep the old URL, send it to the canonical one."""
+    return redirect(url_for("weekly_brief"), code=301)
 
 @app.route("/admin/send_weekly_brief")
 def admin_send_weekly_brief():

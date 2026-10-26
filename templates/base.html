@@ -18,6 +18,9 @@
         })();
     </script>
     <title>{% block title %}Options Plunge - AI Trading Analysis{% endblock %}</title>
+    <link rel="canonical" href="{{ canonical_url }}">
+    <meta name="description" content="{% block meta_description %}{{ page_description }}{% endblock %}">
+    <meta name="robots" content="{{ robots_directive }}">
     
     <!-- Favicon -->
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
